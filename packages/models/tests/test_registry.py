@@ -386,6 +386,40 @@ def test_registration_requires_imported_lifecycle(tmp_path: Path) -> None:
     )
 
 
+def test_production_transition_requires_qualification_identifiers(tmp_path: Path) -> None:
+    path = _write_model(tmp_path / "unqualified.gguf")
+    artifact = _artifact(path).model_copy(
+        update={"capability_results": frozenset(), "approved_tasks": frozenset()}
+    )
+    registry = ModelRegistry()
+    registry.register(artifact)
+    registry.transition(artifact.artifact_id, ModelLifecycle.QUARANTINED)
+    registry.transition(artifact.artifact_id, ModelLifecycle.BENCHMARKING)
+    registry.transition(artifact.artifact_id, ModelLifecycle.CANDIDATE)
+
+    _assert_error(
+        ModelRegistryErrorCode.PROMOTION_EVIDENCE_MISSING,
+        lambda: registry.transition(artifact.artifact_id, ModelLifecycle.PRODUCTION),
+    )
+    assert registry.get(artifact.artifact_id).lifecycle is ModelLifecycle.CANDIDATE
+
+
+def test_production_transition_revalidates_model_artifact(tmp_path: Path) -> None:
+    registry, artifact_id = _registry_at_state(tmp_path, ModelLifecycle.CANDIDATE)
+    registered_path = registry.get(artifact_id).local_path
+    registered_path.write_bytes(b"changed after candidate qualification")
+    registered_path.chmod(0o600)
+
+    _assert_error(
+        ModelRegistryErrorCode.ARTIFACT_HASH_MISMATCH,
+        lambda: registry.transition(artifact_id, ModelLifecycle.PRODUCTION),
+    )
+    assert registry.get(artifact_id).lifecycle is ModelLifecycle.CANDIDATE
+    assert [record.lifecycle for record in registry.history(artifact_id)][
+        -1
+    ] is ModelLifecycle.CANDIDATE
+
+
 def test_registration_requires_exact_model_artifact_type(tmp_path: Path) -> None:
     class ExtendedModelArtifact(ModelArtifact):
         reviewer_note: str

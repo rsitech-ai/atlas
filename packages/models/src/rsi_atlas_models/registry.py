@@ -24,6 +24,7 @@ class ModelRegistryErrorCode(StrEnum):
     INVALID_INITIAL_LIFECYCLE = "invalid_initial_lifecycle"
     INVALID_LIFECYCLE = "invalid_lifecycle"
     INVALID_LIFECYCLE_TRANSITION = "invalid_lifecycle_transition"
+    PROMOTION_EVIDENCE_MISSING = "promotion_evidence_missing"
     DUPLICATE_ARTIFACT_ID = "duplicate_artifact_id"
     DUPLICATE_ARTIFACT_HASH = "duplicate_artifact_hash"
     ARTIFACT_NOT_FOUND = "artifact_not_found"
@@ -115,6 +116,14 @@ class ModelRegistry:
                 raise ModelRegistryError(ModelRegistryErrorCode.ARTIFACT_NOT_FOUND) from error
             if lifecycle not in _TRANSITIONS[prior.lifecycle]:
                 raise ModelRegistryError(ModelRegistryErrorCode.INVALID_LIFECYCLE_TRANSITION)
+            if lifecycle is ModelLifecycle.PRODUCTION:
+                if (
+                    not prior.capabilities
+                    or not prior.capability_results
+                    or not prior.approved_tasks
+                ):
+                    raise ModelRegistryError(ModelRegistryErrorCode.PROMOTION_EVIDENCE_MISSING)
+                self._validate_file(prior)
             current = prior.model_copy(update={"lifecycle": lifecycle})
             self._by_id[identifier] = current
             self._history[identifier] = (*self._history[identifier], current)
