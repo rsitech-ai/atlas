@@ -1,0 +1,10 @@
+[build-system]
+requires = ["hatchling==1.31.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rsi-atlas-security"
+version = "0.1.0"
+description = "Deterministic runtime policy and process capabilities for RSI Atlas"
+requires-python = ">=3.11,<3.15"
+dependencies = []

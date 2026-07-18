@@ -1,0 +1,257 @@
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from enum import StrEnum
+from pathlib import Path
+from typing import Any
+
+from rsi_atlas_security.network_policy import ProcessRole, canonical_remote_origin
+
+
+class ManifestValidationError(ValueError):
+    pass
+
+
+class DataClass(StrEnum):
+    PUBLIC_SOURCES = "public_sources"
+    CHAIN_DATA = "chain_data"
+    QUARANTINE = "quarantine"
+    INDEXES = "indexes"
+    FEATURES = "features"
+    EVALUATIONS = "evaluations"
+    PRIVATE_PDFS = "private_pdfs"
+    ANALYST_NOTES = "analyst_notes"
+    REPORTS = "reports"
+    PROMPTS = "prompts"
+    TRACES = "traces"
+    CODEX_WORKTREES = "codex_worktrees"
+    PRIVATE_ARTIFACT_ROOT = "private_artifact_root"
+    PRIVATE_DATABASE_ROOT = "private_database_root"
+
+
+ROLE_CAPABILITY = {
+    ProcessRole.API: "api_control",
+    ProcessRole.ENGINE: "engine_control",
+    ProcessRole.DOCUMENT_WORKER: "document_parse",
+    ProcessRole.MODEL_WORKER: "model_inference",
+    ProcessRole.DATA_WORKER: "data_transform",
+    ProcessRole.EVALUATION_WORKER: "evaluation_run",
+    ProcessRole.COLLECTOR: "remote_collection",
+    ProcessRole.EXPORTER: "candidate_export",
+    ProcessRole.CODEX_CONTROLLER: "codex_patch",
+}
+PROHIBITED_CAPABILITIES = frozenset(
+    {
+        "trading",
+        "exchange_account",
+        "wallet",
+        "custody",
+        "blockchain_signing",
+        "signing",
+        "private_key",
+        "unrestricted_shell",
+        "policy_mutation",
+        "model_promotion",
+        "evaluation_promotion",
+        "publication",
+        "merge",
+        "push",
+    }
+)
+KNOWN_CAPABILITIES = frozenset(ROLE_CAPABILITY.values()) | PROHIBITED_CAPABILITIES
+COLLECTOR_PRIVATE_DATA = frozenset(
+    {
+        DataClass.PRIVATE_PDFS,
+        DataClass.ANALYST_NOTES,
+        DataClass.REPORTS,
+        DataClass.PROMPTS,
+        DataClass.TRACES,
+        DataClass.CODEX_WORKTREES,
+        DataClass.PRIVATE_ARTIFACT_ROOT,
+        DataClass.PRIVATE_DATABASE_ROOT,
+    }
+)
+NO_KEYCHAIN_ROLES = frozenset(
+    {
+        ProcessRole.DOCUMENT_WORKER,
+        ProcessRole.MODEL_WORKER,
+        ProcessRole.EVALUATION_WORKER,
+        ProcessRole.CODEX_CONTROLLER,
+    }
+)
+ROOT_KEYS = frozenset({"schema_version", "processes"})
+PROCESS_KEYS = frozenset(
+    {
+        "role",
+        "read_data_classes",
+        "write_data_classes",
+        "keychain_access",
+        "network_destinations",
+        "subprocess_authority",
+        "shell_authority",
+        "capabilities",
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ProcessCapability:
+    role: ProcessRole
+    read_data_classes: frozenset[DataClass]
+    write_data_classes: frozenset[DataClass]
+    keychain_access: bool
+    network_destinations: tuple[str, ...]
+    subprocess_authority: bool
+    shell_authority: bool
+    capabilities: frozenset[str]
+    prohibited_capabilities: frozenset[str]
+
+
+def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ManifestValidationError("duplicate JSON key in capability manifest")
+        result[key] = value
+    return result
+
+
+def _strict_string_list(value: object, *, field: str) -> list[str]:
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise ManifestValidationError("process manifest field types are invalid")
+    if len(value) != len(set(value)):
+        raise ManifestValidationError(f"duplicate {field} entry")
+    return value
+
+
+def _parse_data_classes(value: object) -> frozenset[DataClass]:
+    values = _strict_string_list(value, field="data class")
+    try:
+        return frozenset(DataClass(item) for item in values)
+    except ValueError as error:
+        raise ManifestValidationError("unknown data class in process manifest") from error
+
+
+def _parse_capabilities(value: object) -> frozenset[str]:
+    capabilities = frozenset(_strict_string_list(value, field="capability"))
+    unknown = capabilities - KNOWN_CAPABILITIES
+    if unknown:
+        raise ManifestValidationError("unknown capability in process manifest")
+    prohibited = capabilities & PROHIBITED_CAPABILITIES
+    if prohibited:
+        raise ManifestValidationError("prohibited capability in process manifest")
+    return capabilities
+
+
+def _parse_remote_destinations(value: object, *, role: ProcessRole) -> tuple[str, ...]:
+    values = _strict_string_list(value, field="network destination")
+    destinations: list[str] = []
+    for item in values:
+        try:
+            destination = canonical_remote_origin(item)
+        except ValueError as error:
+            raise ManifestValidationError(
+                "invalid network destination in process manifest"
+            ) from error
+        if destination in destinations:
+            raise ManifestValidationError("duplicate canonical network destination")
+        destinations.append(destination)
+    if destinations and role is not ProcessRole.COLLECTOR:
+        raise ManifestValidationError("process role has prohibited remote network destination")
+    return tuple(destinations)
+
+
+def _parse_process(raw: object) -> ProcessCapability:
+    if not isinstance(raw, dict):
+        raise ManifestValidationError("process manifest entry must be an object")
+    keys = frozenset(raw)
+    unknown = keys - PROCESS_KEYS
+    if unknown:
+        raise ManifestValidationError("unknown process key in capability manifest")
+    if keys != PROCESS_KEYS:
+        raise ManifestValidationError("process manifest is missing required fields")
+    try:
+        raw_role = raw["role"]
+        if not isinstance(raw_role, str):
+            raise TypeError
+        role = ProcessRole(raw_role)
+    except (TypeError, ValueError) as error:
+        raise ManifestValidationError("unknown process role in capability manifest") from error
+    keychain_access = raw["keychain_access"]
+    subprocess_authority = raw["subprocess_authority"]
+    shell_authority = raw["shell_authority"]
+    if not all(
+        isinstance(value, bool)
+        for value in (keychain_access, subprocess_authority, shell_authority)
+    ):
+        raise ManifestValidationError("process manifest field types are invalid")
+    reads = _parse_data_classes(raw["read_data_classes"])
+    writes = _parse_data_classes(raw["write_data_classes"])
+    if reads & writes:
+        raise ManifestValidationError("process manifest contains contradictory data grants")
+    capabilities = _parse_capabilities(raw["capabilities"])
+    if capabilities != frozenset({ROLE_CAPABILITY[role]}):
+        raise ManifestValidationError("process manifest contains contradictory capability grants")
+    if role is ProcessRole.COLLECTOR and reads & COLLECTOR_PRIVATE_DATA:
+        raise ManifestValidationError("collector private data grant is prohibited")
+    if keychain_access and role in NO_KEYCHAIN_ROLES:
+        raise ManifestValidationError("process role has prohibited Keychain access")
+    if shell_authority:
+        raise ManifestValidationError("shell authority is prohibited")
+    if subprocess_authority and role is not ProcessRole.CODEX_CONTROLLER:
+        raise ManifestValidationError("subprocess authority is prohibited for process role")
+    destinations = _parse_remote_destinations(raw["network_destinations"], role=role)
+    return ProcessCapability(
+        role=role,
+        read_data_classes=reads,
+        write_data_classes=writes,
+        keychain_access=keychain_access,
+        network_destinations=destinations,
+        subprocess_authority=subprocess_authority,
+        shell_authority=shell_authority,
+        capabilities=capabilities,
+        prohibited_capabilities=frozenset(),
+    )
+
+
+def parse_process_capability_manifest(payload: str) -> tuple[ProcessCapability, ...]:
+    try:
+        raw = json.loads(payload, object_pairs_hook=_strict_object)
+    except ManifestValidationError:
+        raise
+    except (json.JSONDecodeError, RecursionError) as error:
+        raise ManifestValidationError("capability manifest JSON is invalid") from error
+    if not isinstance(raw, dict):
+        raise ManifestValidationError("capability manifest root must be an object")
+    keys = frozenset(raw)
+    unknown = keys - ROOT_KEYS
+    if unknown:
+        raise ManifestValidationError("unknown manifest key in capability manifest")
+    if keys != ROOT_KEYS or raw.get("schema_version") != "1.0.0":
+        raise ManifestValidationError("capability manifest schema is invalid")
+    processes = raw.get("processes")
+    if not isinstance(processes, list):
+        raise ManifestValidationError("capability manifest processes must be a list")
+    parsed: list[ProcessCapability] = []
+    seen_roles: set[ProcessRole] = set()
+    for raw_process in processes:
+        process = _parse_process(raw_process)
+        if process.role in seen_roles:
+            raise ManifestValidationError("duplicate process role in capability manifest")
+        seen_roles.add(process.role)
+        parsed.append(process)
+    return tuple(parsed)
+
+
+def load_process_capability_manifest(path: Path) -> tuple[ProcessCapability, ...]:
+    try:
+        payload = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        raise ManifestValidationError("capability manifest could not be read") from error
+    capabilities = parse_process_capability_manifest(payload)
+    if tuple(capability.role for capability in capabilities) != tuple(ProcessRole):
+        raise ManifestValidationError(
+            "shipped capability manifest roles are incomplete or unordered"
+        )
+    return capabilities

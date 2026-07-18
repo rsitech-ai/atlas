@@ -5,6 +5,7 @@ requires-python = ">=3.11,<3.15"
 dependencies = [
   "rsi-atlas-contracts",
   "rsi-atlas-engine",
+  "rsi-atlas-security",
   "rsi-atlas-storage",
 ]
 
@@ -19,11 +20,13 @@ dev = [
 [tool.uv.sources]
 rsi-atlas-contracts = { workspace = true }
 rsi-atlas-engine = { workspace = true }
+rsi-atlas-security = { workspace = true }
 rsi-atlas-storage = { workspace = true }
 
 [tool.uv.workspace]
 members = [
   "packages/contracts",
+  "packages/security",
   "packages/storage",
   "services/engine",
 ]
@@ -31,6 +34,7 @@ members = [
 [tool.pytest.ini_options]
 testpaths = [
   "packages/contracts/tests",
+  "packages/security/tests",
   "packages/storage/tests",
   "services/engine/tests",
 ]
@@ -48,6 +52,7 @@ strict = true
 warn_unreachable = true
 mypy_path = [
   "packages/contracts/src",
+  "packages/security/src",
   "packages/storage/src",
   "services/engine/src",
 ]

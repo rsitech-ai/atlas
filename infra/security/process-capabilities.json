@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0.0",
+  "processes": [
+    {
+      "role": "atlas-api",
+      "read_data_classes": ["reports", "traces"],
+      "write_data_classes": [],
+      "keychain_access": false,
+      "network_destinations": [],
+      "subprocess_authority": false,
+      "shell_authority": false,
+      "capabilities": ["api_control"]
+    },
+    {
+      "role": "atlas-engine",
+      "read_data_classes": ["indexes", "features", "evaluations"],
+      "write_data_classes": ["traces"],
+      "keychain_access": false,
+      "network_destinations": [],
+      "subprocess_authority": false,
+      "shell_authority": false,
+      "capabilities": ["engine_control"]
+    },
+    {
+      "role": "atlas-worker-document",
+      "read_data_classes": ["private_pdfs"],
+      "write_data_classes": ["indexes"],
+      "keychain_access": false,
+      "network_destinations": [],
+      "subprocess_authority": false,
+      "shell_authority": false,
+      "capabilities": ["document_parse"]
+    },
+    {
+      "role": "atlas-worker-model",
+      "read_data_classes": ["indexes", "prompts"],
+      "write_data_classes": ["features"],
+      "keychain_access": false,
+      "network_destinations": [],
+      "subprocess_authority": false,
+      "shell_authority": false,
+      "capabilities": ["model_inference"]
+    },
+    {
+      "role": "atlas-worker-data",
+      "read_data_classes": ["public_sources", "chain_data", "quarantine"],
+      "write_data_classes": ["indexes"],
+      "keychain_access": false,
+      "network_destinations": [],
+      "subprocess_authority": false,
+      "shell_authority": false,
+      "capabilities": ["data_transform"]
+    },
+    {
+      "role": "atlas-worker-evaluation",
+      "read_data_classes": ["features", "reports"],
+      "write_data_classes": ["evaluations"],
+      "keychain_access": false,
+      "network_destinations": [],
+      "subprocess_authority": false,
+      "shell_authority": false,
+      "capabilities": ["evaluation_run"]
+    },
+    {
+      "role": "atlas-collector",
+      "read_data_classes": ["public_sources", "chain_data"],
+      "write_data_classes": ["quarantine"],
+      "keychain_access": true,
+      "network_destinations": [],
+      "subprocess_authority": false,
+      "shell_authority": false,
+      "capabilities": ["remote_collection"]
+    },
+    {
+      "role": "atlas-exporter",
+      "read_data_classes": ["reports"],
+      "write_data_classes": [],
+      "keychain_access": false,
+      "network_destinations": [],
+      "subprocess_authority": false,
+      "shell_authority": false,
+      "capabilities": ["candidate_export"]
+    },
+    {
+      "role": "atlas-codex-controller",
+      "read_data_classes": ["codex_worktrees"],
+      "write_data_classes": [],
+      "keychain_access": false,
+      "network_destinations": [],
+      "subprocess_authority": true,
+      "shell_authority": false,
+      "capabilities": ["codex_patch"]
+    }
+  ]
+}
