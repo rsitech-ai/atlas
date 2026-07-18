@@ -46,3 +46,8 @@ select = ["B", "E", "F", "I", "RUF", "SIM", "UP"]
 python_version = "3.11"
 strict = true
 warn_unreachable = true
+mypy_path = [
+  "packages/contracts/src",
+  "packages/storage/src",
+  "services/engine/src",
+]

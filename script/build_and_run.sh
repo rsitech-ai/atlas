@@ -29,6 +29,7 @@ APP_BINARY="$APP_MACOS/$APP_PROCESS"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 ENGINE_LOG="$DIST_DIR/engine.log"
 ENGINE_STATUS_URL="http://$ENGINE_HOST:$ENGINE_PORT/v1/system/status"
+POSTGRES_SCRIPT="$ROOT_DIR/infra/local/postgres.sh"
 
 owned_app_pids() {
   local app_pid
@@ -153,6 +154,7 @@ fi
 
 cd "$ROOT_DIR"
 uv sync --all-packages
+"$POSTGRES_SCRIPT" start
 launchctl submit \
   -l "$ENGINE_SERVICE_LABEL" \
   -o "$ENGINE_LOG" \
