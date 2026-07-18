@@ -119,6 +119,19 @@ class RuntimePaths:
     migration_root: Path
 
     @classmethod
+    def from_environment(
+        cls,
+        *,
+        environ: Mapping[str, str] | None = None,
+        repository_root: Path | None = None,
+    ) -> RuntimePaths:
+        values = os.environ if environ is None else environ
+        root = repository_root or Path(__file__).resolve().parents[4]
+        raw_data_root = values.get("RSI_ATLAS_DATA_ROOT")
+        data_root = Path(raw_data_root) if raw_data_root is not None else root / ".local"
+        return cls.from_data_root(data_root, repository_root=root)
+
+    @classmethod
     def from_data_root(
         cls,
         data_root: Path,
@@ -328,11 +341,8 @@ class RuntimeServices:
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> RuntimeServices:
         values = os.environ if environ is None else environ
-        repository_root = Path(__file__).resolve().parents[4]
-        raw_data_root = values.get("RSI_ATLAS_DATA_ROOT")
-        data_root = Path(raw_data_root) if raw_data_root is not None else repository_root / ".local"
         try:
-            paths = RuntimePaths.from_data_root(data_root, repository_root=repository_root)
+            paths = RuntimePaths.from_environment(environ=values)
         except (OSError, ValueError):
             return cls(probes=_configuration_failure_probes(), clock=clock)
         socket_directory = paths.data_root / "postgres" / "socket"

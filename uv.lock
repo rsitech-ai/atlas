@@ -605,6 +605,7 @@ source = { editable = "services/engine" }
 dependencies = [
     { name = "fastapi" },
     { name = "rsi-atlas-contracts" },
+    { name = "rsi-atlas-ingestion" },
     { name = "rsi-atlas-models" },
     { name = "rsi-atlas-observability" },
     { name = "rsi-atlas-security" },
@@ -616,6 +617,7 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = "==0.139.2" },
     { name = "rsi-atlas-contracts", editable = "packages/contracts" },
+    { name = "rsi-atlas-ingestion", editable = "packages/ingestion" },
     { name = "rsi-atlas-models", editable = "packages/models" },
     { name = "rsi-atlas-observability", editable = "packages/observability" },
     { name = "rsi-atlas-security", editable = "packages/security" },
