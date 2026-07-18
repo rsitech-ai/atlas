@@ -66,7 +66,6 @@ class W3CTraceContext:
 
 
 _TRACEPARENT = re.compile(r"^00-([0-9a-f]{32})-([0-9a-f]{16})-([01]{2})$")
-_MAX_TRACESTATE = 512
 
 
 def _validate_traceparent(value: object) -> str:
@@ -75,14 +74,6 @@ def _validate_traceparent(value: object) -> str:
     match = _TRACEPARENT.fullmatch(value)
     if match is None or match.group(1) == "0" * 32 or match.group(2) == "0" * 16:
         raise TracePolicyError("traceparent is invalid")
-    return value
-
-
-def _validate_tracestate(value: object) -> str:
-    if type(value) is not str or not value or len(value) > _MAX_TRACESTATE:
-        raise TracePolicyError("tracestate is invalid")
-    if any(ord(character) < 0x21 or ord(character) > 0x7E for character in value):
-        raise TracePolicyError("tracestate is invalid")
     return value
 
 
@@ -222,7 +213,7 @@ class TraceRuntime:
     def force_flush(self) -> bool:
         if self._shutdown:
             return False
-        return self._provider.force_flush()
+        return self._exporter.force_flush()
 
     def shutdown(self) -> None:
         if self._shutdown:

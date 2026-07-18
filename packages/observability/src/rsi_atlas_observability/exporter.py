@@ -103,20 +103,24 @@ class LocalJSONLSpanExporter(SpanExporter):
         with _INITIALIZATION_LOCK:
             try:
                 self._parent_fd, self._parent_identity = self._open_parent()
-                self._file_fd = os.open(
-                    destination.name,
-                    _OPEN_FILE_FLAGS,
-                    _FILE_MODE,
-                    dir_fd=self._parent_fd,
-                )
-                file_stat = os.fstat(self._file_fd)
-                _require_safe_file(file_stat)
-                self._file_identity = _identity(file_stat)
-                fcntl.flock(self._file_fd, fcntl.LOCK_EX)
+                fcntl.flock(self._parent_fd, fcntl.LOCK_EX)
                 try:
-                    self._validate_existing_file()
+                    self._file_fd = os.open(
+                        destination.name,
+                        _OPEN_FILE_FLAGS,
+                        _FILE_MODE,
+                        dir_fd=self._parent_fd,
+                    )
+                    file_stat = os.fstat(self._file_fd)
+                    _require_safe_file(file_stat)
+                    self._file_identity = _identity(file_stat)
+                    fcntl.flock(self._file_fd, fcntl.LOCK_EX)
+                    try:
+                        self._validate_existing_file()
+                    finally:
+                        fcntl.flock(self._file_fd, fcntl.LOCK_UN)
                 finally:
-                    fcntl.flock(self._file_fd, fcntl.LOCK_UN)
+                    fcntl.flock(self._parent_fd, fcntl.LOCK_UN)
             except Exception as error:
                 self._close_descriptors()
                 if isinstance(error, TraceStorageError):
