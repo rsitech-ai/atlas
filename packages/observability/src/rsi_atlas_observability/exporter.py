@@ -7,6 +7,7 @@ import json
 import os
 import stat
 import threading
+import time
 from collections.abc import Sequence
 from contextlib import suppress
 from pathlib import Path
@@ -93,6 +94,7 @@ class LocalJSONLSpanExporter(SpanExporter):
         self._parent_path = destination.parent
         self._lock = threading.RLock()
         self._shutdown = False
+        self._poisoned = False
         self._last_error: str | None = None
         self._parent_fd = -1
         self._file_fd = -1
@@ -110,7 +112,11 @@ class LocalJSONLSpanExporter(SpanExporter):
                 file_stat = os.fstat(self._file_fd)
                 _require_safe_file(file_stat)
                 self._file_identity = _identity(file_stat)
-                self._validate_existing_file()
+                fcntl.flock(self._file_fd, fcntl.LOCK_EX)
+                try:
+                    self._validate_existing_file()
+                finally:
+                    fcntl.flock(self._file_fd, fcntl.LOCK_UN)
             except Exception as error:
                 self._close_descriptors()
                 if isinstance(error, TraceStorageError):
@@ -230,12 +236,16 @@ class LocalJSONLSpanExporter(SpanExporter):
                 or any(character not in "0123456789abcdef" for character in value)
             ):
                 raise TraceStorageError("existing trace storage is invalid")
+            if int(value, 16) == 0:
+                raise TraceStorageError("existing trace storage is invalid")
         parent = typed["parent_span_id"]
         if parent is not None and (
             type(parent) is not str
             or len(parent) != 16
             or any(character not in "0123456789abcdef" for character in parent)
         ):
+            raise TraceStorageError("existing trace storage is invalid")
+        if parent is not None and int(parent, 16) == 0:
             raise TraceStorageError("existing trace storage is invalid")
         for key in ("start_time_unix_nano", "end_time_unix_nano", "duration_ns"):
             if type(typed[key]) is not int or cast(int, typed[key]) < 0:
@@ -273,6 +283,12 @@ class LocalJSONLSpanExporter(SpanExporter):
         if span_context is None:
             raise TraceStorageError("span context is invalid")
         parent_context = span.parent
+        if not self._valid_identifier(span_context.trace_id, 32) or not self._valid_identifier(
+            span_context.span_id, 16
+        ):
+            raise TraceStorageError("span context is invalid")
+        if parent_context is not None and not self._valid_identifier(parent_context.span_id, 16):
+            raise TraceStorageError("span parent context is invalid")
         start = span.start_time
         end = span.end_time
         if start is None or end is None or start < 0 or end < start:
@@ -292,6 +308,10 @@ class LocalJSONLSpanExporter(SpanExporter):
             "duration_ns": end - start,
             "status_code": span.status.status_code.name,
         }
+
+    @staticmethod
+    def _valid_identifier(value: object, width: int) -> bool:
+        return type(value) is int and 0 < value < 1 << (width * 4)
 
     def _encode_record(self, record: dict[str, object]) -> bytes:
         canonical = json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
@@ -313,15 +333,18 @@ class LocalJSONLSpanExporter(SpanExporter):
             if self._shutdown:
                 self._last_error = "trace exporter is shut down"
                 return SpanExportResult.FAILURE
+            if self._poisoned:
+                self._last_error = "trace exporter is poisoned"
+                return SpanExportResult.FAILURE
             try:
                 payloads = [self._encode_record(self._span_record(span)) for span in spans]
                 self._revalidate_bound_descriptors()
                 for payload in payloads:
-                    if os.fstat(self._file_fd).st_size + len(payload) > _MAX_FILE_BYTES:
-                        raise TraceStorageError("trace storage exceeds maximum size")
                     fcntl.flock(self._file_fd, fcntl.LOCK_EX)
                     try:
                         self._revalidate_bound_descriptors()
+                        if os.fstat(self._file_fd).st_size + len(payload) > _MAX_FILE_BYTES:
+                            raise TraceStorageError("trace storage exceeds maximum size")
                         self._write_all(payload)
                         os.fsync(self._file_fd)
                     finally:
@@ -329,17 +352,27 @@ class LocalJSONLSpanExporter(SpanExporter):
                 self._last_error = None
                 return SpanExportResult.SUCCESS
             except (OSError, TracePolicyError, TraceStorageError):
-                self._last_error = "trace storage export failed"
+                self._poisoned = True
+                self._last_error = "trace exporter is poisoned"
+                self._close_descriptors()
                 return SpanExportResult.FAILURE
 
     def force_flush(self, timeout_millis: int = 30_000) -> bool:
-        del timeout_millis
         with self._lock:
-            if self._shutdown:
+            if self._shutdown or self._poisoned or timeout_millis < 0:
                 return False
             try:
                 self._revalidate_bound_descriptors()
-                fcntl.flock(self._file_fd, fcntl.LOCK_EX)
+                deadline = time.monotonic() + timeout_millis / 1000
+                while True:
+                    try:
+                        fcntl.flock(self._file_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        break
+                    except BlockingIOError:
+                        if time.monotonic() >= deadline:
+                            self._last_error = "trace storage flush lock timed out"
+                            return False
+                        time.sleep(0.001)
                 try:
                     self._revalidate_bound_descriptors()
                     os.fsync(self._file_fd)
@@ -354,6 +387,8 @@ class LocalJSONLSpanExporter(SpanExporter):
         with self._lock:
             if self._shutdown:
                 return
+            if not self._poisoned:
+                self.force_flush()
             self._shutdown = True
             self._close_descriptors()
 

@@ -1,3 +1,4 @@
+import json
 import os
 import stat
 from pathlib import Path
@@ -86,5 +87,34 @@ def test_force_flush_uses_the_cross_process_file_lock(
     monkeypatch.setattr(exporter_module.fcntl, "flock", record_flock)
 
     assert exporter.force_flush() is True
-    assert calls == [exporter_module.fcntl.LOCK_EX, exporter_module.fcntl.LOCK_UN]
+    assert calls == [
+        exporter_module.fcntl.LOCK_EX | exporter_module.fcntl.LOCK_NB,
+        exporter_module.fcntl.LOCK_UN,
+    ]
     exporter.shutdown()
+
+
+def test_existing_zero_identifier_record_fails_closed(tmp_path: Path) -> None:
+    destination = tmp_path / "traces.jsonl"
+    record = {
+        "schema_version": "1.0.0",
+        "name": "atlas.command",
+        "context": {
+            "tenant_id": "11111111-1111-4111-8111-111111111111",
+            "workspace_id": "22222222-2222-4222-8222-222222222222",
+            "actor_id": "33333333-3333-4333-8333-333333333333",
+            "trace_id": "44444444-4444-4444-8444-444444444444",
+        },
+        "attributes": {},
+        "trace_id": "0" * 32,
+        "span_id": "1" * 16,
+        "parent_span_id": None,
+        "start_time_unix_nano": 1,
+        "end_time_unix_nano": 2,
+        "duration_ns": 1,
+        "status_code": "UNSET",
+    }
+    destination.write_text(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
+    destination.chmod(0o600)
+    with pytest.raises(TraceStorageError):
+        LocalJSONLSpanExporter(destination)

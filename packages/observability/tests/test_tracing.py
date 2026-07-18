@@ -117,6 +117,10 @@ def test_w3c_helpers_allow_only_trace_headers(tmp_path: Path) -> None:
     with pytest.raises(TracePolicyError):
         extract_w3c_context({"traceparent": carrier["traceparent"], "payload": "private"})
     with pytest.raises(TracePolicyError):
+        inject_w3c_context(span, tracestate="tenant=private")
+    with pytest.raises(TracePolicyError):
+        extract_w3c_context({"traceparent": carrier["traceparent"], "tracestate": "tenant=private"})
+    with pytest.raises(TracePolicyError):
         extract_w3c_context({"traceparent": "00-" + "0" * 32 + "-" + "1" * 16 + "-01"})
     runtime.shutdown()
 

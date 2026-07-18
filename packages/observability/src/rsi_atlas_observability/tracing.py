@@ -94,7 +94,7 @@ def inject_w3c_context(span: SafeSpan, *, tracestate: str | None = None) -> dict
     traceparent = f"00-{span_context.trace_id:032x}-{span_context.span_id:016x}-{sampled_flag}"
     result = {"traceparent": _validate_traceparent(traceparent)}
     if tracestate is not None:
-        result["tracestate"] = _validate_tracestate(tracestate)
+        raise TracePolicyError("tracestate is unavailable in metadata-only mode")
     return result
 
 
@@ -104,7 +104,9 @@ def extract_w3c_context(carrier: Mapping[str, str]) -> W3CTraceContext:
     if set(carrier) - {"traceparent", "tracestate"} or "traceparent" not in carrier:
         raise TracePolicyError("trace carrier contains unsupported headers")
     traceparent = _validate_traceparent(carrier["traceparent"])
-    tracestate = _validate_tracestate(carrier["tracestate"]) if "tracestate" in carrier else None
+    if "tracestate" in carrier:
+        raise TracePolicyError("tracestate is unavailable in metadata-only mode")
+    tracestate = None
     return W3CTraceContext(traceparent=traceparent, tracestate=tracestate)
 
 
