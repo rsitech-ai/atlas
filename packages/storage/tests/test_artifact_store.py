@@ -1,3 +1,4 @@
+import errno
 import hashlib
 import json
 import os
@@ -8,6 +9,7 @@ from typing import cast
 from uuid import UUID
 
 import pytest
+import rsi_atlas_storage.artifact_store as artifact_store_module
 from pydantic import ValidationError
 from rsi_atlas_contracts import (
     ArtifactCommandContext,
@@ -204,6 +206,38 @@ def test_put_never_publishes_through_an_ancestor_swapped_after_prepare(
 
     assert swapped
     assert tuple(outside.rglob("*")) == outside_entries_before
+
+
+def test_staging_setup_failure_closes_fd_and_removes_staging_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = ContentAddressedArtifactStore(tmp_path)
+    directory_fd = os.open(tmp_path, os.O_RDONLY | os.O_DIRECTORY)
+    original_open = artifact_store_module.os.open
+    opened_file_descriptors: list[int] = []
+
+    def record_open(*args: object, **kwargs: object) -> int:
+        file_descriptor = original_open(*args, **kwargs)
+        opened_file_descriptors.append(file_descriptor)
+        return file_descriptor
+
+    def fail_fchmod(file_descriptor: int, mode: int) -> None:
+        raise OSError("injected fchmod failure")
+
+    monkeypatch.setattr(artifact_store_module.os, "open", record_open)
+    monkeypatch.setattr(artifact_store_module.os, "fchmod", fail_fchmod)
+
+    try:
+        with pytest.raises(ArtifactIntegrityError, match="staging file cannot be secured"):
+            store._create_staging_file(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+    assert len(opened_file_descriptors) == 1
+    with pytest.raises(OSError) as error:
+        os.fstat(opened_file_descriptors[0])
+    assert error.value.errno == errno.EBADF
+    assert tuple(tmp_path.glob(".artifact-*")) == ()
 
 
 def _assert_private_store_modes(root: Path, artifact_directory: Path) -> None:

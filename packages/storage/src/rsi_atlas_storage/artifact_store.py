@@ -4,6 +4,7 @@ import json
 import os
 import secrets
 import stat
+from contextlib import suppress
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -238,8 +239,19 @@ class ContentAddressedArtifactStore:
                 continue
             except OSError as error:
                 raise ArtifactIntegrityError("artifact staging file cannot be created") from error
-            os.fchmod(file_fd, 0o600)
-            return name, file_fd
+            cleanup_required = True
+            try:
+                os.fchmod(file_fd, 0o600)
+                cleanup_required = False
+                return name, file_fd
+            except OSError as error:
+                raise ArtifactIntegrityError("artifact staging file cannot be secured") from error
+            finally:
+                if cleanup_required:
+                    with suppress(OSError):
+                        os.close(file_fd)
+                    with suppress(OSError):
+                        os.unlink(name, dir_fd=directory_fd)
         raise ArtifactIntegrityError("artifact staging file name collision")
 
     @staticmethod
