@@ -5,6 +5,7 @@ struct QAPresentationOptions: Equatable {
     let increaseContrast: Bool
     let useLargeText: Bool
     let reduceMotion: Bool
+    let compactWindow: Bool
 
     static func parse(arguments: [String]) -> Self {
         let values = Set(arguments)
@@ -12,7 +13,8 @@ struct QAPresentationOptions: Equatable {
             forceLight: values.contains("--qa-light"),
             increaseContrast: values.contains("--qa-increase-contrast"),
             useLargeText: values.contains("--qa-large-text"),
-            reduceMotion: values.contains("--qa-reduce-motion")
+            reduceMotion: values.contains("--qa-reduce-motion"),
+            compactWindow: values.contains("--qa-compact-window")
         )
     }
 
@@ -24,7 +26,8 @@ struct QAPresentationOptions: Equatable {
             forceLight: false,
             increaseContrast: false,
             useLargeText: false,
-            reduceMotion: false
+            reduceMotion: false,
+            compactWindow: false
         )
         #endif
     }

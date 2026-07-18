@@ -419,7 +419,7 @@ not signed release-artifact proof.
 - Consumes: one security-scoped local PDF and the Task 4 endpoint.
 - Produces: an Evidence workspace that visibly distinguishes awaiting-review, password, rejected, and exact-duplicate evidence without claiming admission, parsing, indexing, or publication.
 
-- [ ] **Step 1: Write cross-language decoding and store RED tests**
+- [x] **Step 1: Write cross-language decoding and store RED tests**
 
 ```swift
 @Test func admissionFixtureDecodesStrictly() throws {
@@ -441,21 +441,21 @@ not signed release-artifact proof.
 }
 ```
 
-- [ ] **Step 2: Run Swift tests and verify RED**
+- [x] **Step 2: Run Swift tests and verify RED**
 
 Run: `swift test --package-path apps/macos`
 
 Expected: compilation fails because the admission models/client/store do not exist.
 
-- [ ] **Step 3: Implement strict models, local identity, and transport**
+- [x] **Step 3: Implement strict models, local identity, and transport**
 
 Mirror every enum and field from the Python `DocumentAdmissionRecord`; decode with the existing recursively strict JSON boundary. `LocalWorkspaceIdentity` is explicitly development-scoped, generates tenant/workspace/actor UUIDs once in standard app preferences, and creates new trace/acquisition UUIDs per import. `DocumentImportClient` coordinates security-scoped access, rejects symlinks/non-PDF/zero/over-limit/change-during-read, uploads from the file URL with URLSession's file-backed upload API, caps response bytes, and maps HTTP/contract/transport/cancellation errors without exposing private full paths.
 
-- [ ] **Step 4: Implement the truthful Evidence surface**
+- [x] **Step 4: Implement the truthful Evidence surface**
 
 Add an `Evidence` sidebar destination and a native `fileImporter` restricted to `.pdf`. Present empty, uploading, awaiting-review, password, rejected, duplicate, and failed states. The result includes filename, lifecycle, outcome, raw artifact hash, duplicate target when present, safety check rows, reason rows, and exact copy that says `Quarantined — not admitted, parsed, or searchable`. Use text plus symbol plus semantic color; expose stable accessibility IDs for import button, progress, outcome, raw artifact, safety checks, reasons, and error/retry. Do not add drag-and-drop or watched folders in this slice.
 
-- [ ] **Step 5: Verify native behavior and release cfg boundary**
+- [x] **Step 5: Verify native behavior and release cfg boundary**
 
 Run:
 
@@ -467,7 +467,7 @@ swift build -c release --package-path apps/macos --product RSIAtlas
 
 In the foreground development app, import clean-looking, suspicious, encrypted, rejected-signature, and exact-duplicate fixtures; verify the clean-looking file remains awaiting review, plus same-window failure/retry, keyboard navigation, VoiceOver order, 860x600 content size, typical size, Light/Dark, large text, increased contrast, Reduce Motion, and a second window. Confirm no debug QA override changes release behavior.
 
-- [ ] **Step 6: Commit Task 5**
+- [x] **Step 6: Commit Task 5**
 
 ```bash
 git add apps/macos

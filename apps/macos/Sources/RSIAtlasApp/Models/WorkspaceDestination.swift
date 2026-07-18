@@ -2,6 +2,7 @@ import Foundation
 
 enum WorkspaceDestination: String, CaseIterable, Identifiable {
     case commandCenter
+    case evidence
 
     var id: Self { self }
 
@@ -9,6 +10,8 @@ enum WorkspaceDestination: String, CaseIterable, Identifiable {
         switch self {
         case .commandCenter:
             "Command Center"
+        case .evidence:
+            "Evidence"
         }
     }
 
@@ -16,6 +19,8 @@ enum WorkspaceDestination: String, CaseIterable, Identifiable {
         switch self {
         case .commandCenter:
             "gauge.with.dots.needle.67percent"
+        case .evidence:
+            "doc.badge.plus"
         }
     }
 }

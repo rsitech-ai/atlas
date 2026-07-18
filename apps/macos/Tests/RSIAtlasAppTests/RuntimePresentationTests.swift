@@ -10,7 +10,8 @@ struct RuntimePresentationTests {
             forceLight: false,
             increaseContrast: false,
             useLargeText: false,
-            reduceMotion: false
+            reduceMotion: false,
+            compactWindow: false
         ))
         #expect(QAPresentationOptions.parse(arguments: [
             "RSIAtlas",
@@ -18,11 +19,13 @@ struct RuntimePresentationTests {
             "--qa-increase-contrast",
             "--qa-large-text",
             "--qa-reduce-motion",
+            "--qa-compact-window",
         ]) == QAPresentationOptions(
             forceLight: true,
             increaseContrast: true,
             useLargeText: true,
-            reduceMotion: true
+            reduceMotion: true,
+            compactWindow: true
         ))
     }
 

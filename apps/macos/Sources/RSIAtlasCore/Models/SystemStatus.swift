@@ -272,7 +272,7 @@ private extension HealthState {
     }
 }
 
-private struct AnyCodingKey: CodingKey {
+struct AnyCodingKey: CodingKey {
     let stringValue: String
     let intValue: Int?
 
@@ -287,7 +287,7 @@ private struct AnyCodingKey: CodingKey {
     }
 }
 
-private extension Decoder {
+extension Decoder {
     func rejectUnknownKeys<Keys>(allowed: Keys.Type) throws
     where Keys: CodingKey & CaseIterable, Keys.AllCases: Collection {
         let container = try container(keyedBy: AnyCodingKey.self)

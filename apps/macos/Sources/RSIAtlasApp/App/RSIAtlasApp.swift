@@ -11,7 +11,10 @@ struct RSIAtlasApp: App {
                 .frame(minWidth: 860, minHeight: 600)
                 .modifier(QAPresentationModifier(options: .current))
         }
-        .defaultSize(width: 1120, height: 760)
+        .defaultSize(
+            width: QAPresentationOptions.current.compactWindow ? 860 : 1120,
+            height: QAPresentationOptions.current.compactWindow ? 600 : 760
+        )
         .windowResizability(.contentMinSize)
     }
 }
@@ -26,6 +29,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         } else if qaOptions.forceLight {
             NSApp.appearance = NSAppearance(named: .aqua)
+        }
+        if qaOptions.compactWindow {
+            DispatchQueue.main.async {
+                NSApp.keyWindow?.setContentSize(NSSize(width: 860, height: 600))
+            }
         }
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
