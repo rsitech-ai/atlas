@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from time import monotonic
 
 import pytest
 from rsi_atlas_contracts import ComponentGroup, HealthState, ThermalState
@@ -18,7 +19,11 @@ from rsi_atlas_engine.runtime import (
     RuntimeServices,
 )
 from rsi_atlas_models import ResourceSnapshot
-from rsi_atlas_storage import ContentAddressedArtifactStore
+from rsi_atlas_storage import (
+    ContentAddressedArtifactStore,
+    DatabaseSettings,
+    PostgresDatabase,
+)
 
 CHECKED_AT = datetime(2026, 7, 18, 12, 0, tzinfo=UTC)
 
@@ -30,6 +35,19 @@ class SafeResourceSampler:
             swap_bytes=0,
             thermal=ThermalState.NOMINAL,
             captured_at=CHECKED_AT,
+        )
+
+
+class FixedResourceSampler:
+    def __init__(self, captured_at: datetime) -> None:
+        self._captured_at = captured_at
+
+    def sample(self) -> ResourceSnapshot:
+        return ResourceSnapshot(
+            free_bytes=8 * 1024**3,
+            swap_bytes=0,
+            thermal=ThermalState.NOMINAL,
+            captured_at=self._captured_at,
         )
 
 
@@ -104,6 +122,29 @@ def test_probe_failure_is_sanitized_and_cannot_escape_status_contract() -> None:
     assert "/private" not in status.model_dump_json()
 
 
+def test_malformed_probe_observation_is_contained_and_sanitized() -> None:
+    malformed = _probe(
+        "database",
+        group=ComponentGroup.STORAGE,
+        observation=ProbeObservation(
+            state=HealthState.HEALTHY,
+            summary="secret=/private/research\nraw-payload",
+        ),
+    )
+
+    status = RuntimeServices(
+        probes=_eight_probes(replacement=malformed),
+        clock=lambda: CHECKED_AT,
+    ).status()
+
+    database = next(item for item in status.components if item.component_id == "database")
+    assert database.state is HealthState.BLOCKED
+    assert database.summary == "database check failed."
+    assert database.remediation == "Repair database."
+    assert "secret" not in status.model_dump_json()
+    assert "/private" not in status.model_dump_json()
+
+
 def test_mac_resource_sampler_returns_a_current_bounded_snapshot() -> None:
     before = datetime.now(UTC)
     snapshot = MacResourceSampler().sample()
@@ -132,6 +173,80 @@ def test_invalid_data_root_returns_diagnostic_contract_instead_of_crashing(
     offline = next(item for item in status.components if item.component_id == "offline_policy")
     assert offline.state is HealthState.UNSAFE
     assert str(unsafe) not in status.model_dump_json()
+
+
+def test_missing_data_root_is_bootstrapped_owner_private(tmp_path: Path) -> None:
+    data_root = tmp_path / "runtime"
+
+    paths = RuntimePaths.from_data_root(data_root)
+
+    assert paths.data_root == data_root
+    assert data_root.is_dir()
+    assert data_root.stat().st_mode & 0o777 == 0o700
+
+
+def test_missing_data_root_rejects_symlinked_parent(tmp_path: Path) -> None:
+    real_parent = tmp_path / "real"
+    real_parent.mkdir(mode=0o700)
+    linked_parent = tmp_path / "linked"
+    linked_parent.symlink_to(real_parent, target_is_directory=True)
+    data_root = linked_parent / "runtime"
+
+    with pytest.raises((OSError, ValueError)):
+        RuntimePaths.from_data_root(data_root)
+
+    assert not (real_parent / "runtime").exists()
+
+
+def test_offline_policy_is_unsafe_when_exact_postgres_socket_is_absent(
+    tmp_path: Path,
+) -> None:
+    data_root = tmp_path / "runtime"
+    data_root.mkdir(mode=0o700)
+    missing_socket_directory = data_root / "postgres" / "socket"
+    services = RuntimeServices.from_environment(
+        environ={"RSI_ATLAS_DATA_ROOT": str(data_root)},
+        database_conninfo=(f"host='{missing_socket_directory}' user='atlas' dbname='atlas'"),
+        resource_sampler=SafeResourceSampler(),
+        clock=lambda: CHECKED_AT,
+    )
+
+    status = services.status()
+
+    offline = next(item for item in status.components if item.component_id == "offline_policy")
+    assert offline.state is HealthState.UNSAFE
+    assert offline.summary == "The strict offline boundary could not be verified."
+    assert offline.remediation == (
+        "Restore the exact local socket and loopback policy, then refresh."
+    )
+    assert str(missing_socket_directory) not in status.model_dump_json()
+
+
+@pytest.mark.parametrize(
+    "captured_at",
+    [CHECKED_AT - timedelta(seconds=6), CHECKED_AT + timedelta(microseconds=1)],
+    ids=["stale", "future"],
+)
+def test_resource_policy_blocks_stale_and_future_samples(
+    tmp_path: Path,
+    captured_at: datetime,
+) -> None:
+    data_root = tmp_path / "runtime"
+    data_root.mkdir(mode=0o700)
+    services = RuntimeServices.from_environment(
+        environ={"RSI_ATLAS_DATA_ROOT": str(data_root)},
+        resource_sampler=FixedResourceSampler(captured_at),
+        clock=lambda: CHECKED_AT,
+    )
+
+    status = services.status()
+
+    resource = next(item for item in status.components if item.component_id == "resource_policy")
+    assert resource.state is HealthState.BLOCKED
+    assert resource.summary == "Current memory, swap, or thermal state blocks local work."
+    assert resource.remediation == (
+        "Reduce system pressure and refresh before starting bounded work."
+    )
 
 
 def test_real_runtime_probes_and_disposable_integrity_recovery(tmp_path: Path) -> None:
@@ -199,3 +314,29 @@ def test_real_runtime_probes_and_disposable_integrity_recovery(tmp_path: Path) -
         )
         is HealthState.HEALTHY
     )
+
+
+def test_database_probe_bounds_migration_lock_contention(tmp_path: Path) -> None:
+    conninfo = os.environ.get("RSI_ATLAS_TEST_DATABASE_URL")
+    if conninfo is None:
+        pytest.skip("real PostgreSQL integration URL is required")
+    data_root = tmp_path / "runtime"
+    data_root.mkdir(mode=0o700)
+    services = RuntimeServices.from_environment(
+        environ={"RSI_ATLAS_DATA_ROOT": str(data_root)},
+        database_conninfo=conninfo,
+        resource_sampler=SafeResourceSampler(),
+        clock=lambda: CHECKED_AT,
+    )
+    blocker = PostgresDatabase(DatabaseSettings.from_conninfo(conninfo))
+
+    with blocker.connect() as connection:
+        connection.execute("SELECT pg_advisory_xact_lock(%s)", (0x52534941544C4153,))
+        started_at = monotonic()
+        status = services.status()
+        elapsed = monotonic() - started_at
+
+    database = next(item for item in status.components if item.component_id == "database")
+    assert elapsed < 5
+    assert database.state is HealthState.BLOCKED
+    assert database.remediation == ("Start the project-owned PostgreSQL runtime, then refresh.")

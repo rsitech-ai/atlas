@@ -7,6 +7,7 @@ import os
 import stat
 import sys
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -64,6 +65,7 @@ _RUNTIME_CONTEXT = ArtifactCommandContext(
 _EXPECTED_MIGRATIONS = ["0001", "0002"]
 _EXPECTED_VECTOR_VERSION = "0.8.5"
 _LOOPBACK_ORIGIN = "http://127.0.0.1:8765"
+_DIRECTORY_OPEN_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,20 +90,23 @@ class RuntimeProbe:
             observation = self.check()
             if type(observation) is not ProbeObservation:
                 raise TypeError("runtime probe returned an invalid observation")
+            return ComponentStatus(
+                component_id=self.component_id,
+                title=self.title,
+                group=self.group,
+                state=observation.state,
+                summary=observation.summary,
+                remediation=observation.remediation,
+            )
         except Exception:
-            observation = ProbeObservation(
+            return ComponentStatus(
+                component_id=self.component_id,
+                title=self.title,
+                group=self.group,
                 state=self.failure_state,
                 summary=self.failure_summary,
                 remediation=self.failure_remediation,
             )
-        return ComponentStatus(
-            component_id=self.component_id,
-            title=self.title,
-            group=self.group,
-            state=observation.state,
-            summary=observation.summary,
-            remediation=observation.remediation,
-        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,7 +131,7 @@ class RuntimePaths:
         rendered = str(data_root)
         if "'" in rendered or any(ord(character) < 32 for character in rendered):
             raise ValueError("runtime data root contains unsupported characters")
-        cls._require_owner_private_directory(data_root)
+        cls._ensure_owner_private_directory(data_root)
         root = repository_root or Path(__file__).resolve().parents[4]
         if not root.is_absolute() or not (root / "migrations").is_dir():
             raise ValueError("runtime repository root is invalid")
@@ -139,20 +144,52 @@ class RuntimePaths:
         )
 
     @staticmethod
-    def _require_owner_private_directory(path: Path) -> None:
-        current = Path(path.anchor)
-        for component in path.parts[1:]:
-            current /= component
-            metadata = current.lstat()
-            if stat.S_ISLNK(metadata.st_mode):
-                raise ValueError("runtime data root must not contain symlinks")
-        metadata = path.stat(follow_symlinks=False)
-        if (
-            not stat.S_ISDIR(metadata.st_mode)
-            or metadata.st_uid != os.getuid()
-            or stat.S_IMODE(metadata.st_mode) != 0o700
-        ):
-            raise ValueError("runtime data root must be owner-private")
+    def _ensure_owner_private_directory(path: Path) -> None:
+        descriptor = -1
+        parent_descriptor = -1
+        try:
+            try:
+                descriptor = RuntimePaths._open_absolute_directory(path)
+            except FileNotFoundError:
+                parent_descriptor = RuntimePaths._open_absolute_directory(path.parent)
+                with suppress(FileExistsError):
+                    os.mkdir(path.name, mode=0o700, dir_fd=parent_descriptor)
+                descriptor = os.open(
+                    path.name,
+                    _DIRECTORY_OPEN_FLAGS,
+                    dir_fd=parent_descriptor,
+                )
+            metadata = os.fstat(descriptor)
+            if (
+                not stat.S_ISDIR(metadata.st_mode)
+                or metadata.st_uid != os.getuid()
+                or stat.S_IMODE(metadata.st_mode) != 0o700
+            ):
+                raise ValueError("runtime data root must be owner-private")
+        except OSError as error:
+            raise ValueError("runtime data root must not contain symlinks") from error
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+            if parent_descriptor >= 0:
+                os.close(parent_descriptor)
+
+    @staticmethod
+    def _open_absolute_directory(path: Path) -> int:
+        descriptor = os.open(os.sep, _DIRECTORY_OPEN_FLAGS)
+        try:
+            for component in path.parts[1:]:
+                next_descriptor = os.open(
+                    component,
+                    _DIRECTORY_OPEN_FLAGS,
+                    dir_fd=descriptor,
+                )
+                os.close(descriptor)
+                descriptor = next_descriptor
+            return descriptor
+        except BaseException:
+            os.close(descriptor)
+            raise
 
 
 class _SwapUsage(ctypes.Structure):
@@ -304,6 +341,7 @@ class RuntimeServices:
                 paths=paths,
                 conninfo=conninfo,
                 sampler=resource_sampler,
+                clock=clock,
             ),
             clock=clock,
         )
@@ -347,6 +385,7 @@ def _default_probes(
     paths: RuntimePaths,
     conninfo: str,
     sampler: ResourceSampling | None,
+    clock: Callable[[], datetime],
 ) -> tuple[RuntimeProbe, ...]:
     return (
         _static_probe(
@@ -398,7 +437,7 @@ def _default_probes(
             component_id="resource_policy",
             title="Resource Policy",
             group=ComponentGroup.RESOURCES,
-            check=lambda: _check_resource_policy(sampler or MacResourceSampler()),
+            check=lambda: _check_resource_policy(sampler or MacResourceSampler(), clock),
             failure_state=HealthState.BLOCKED,
             failure_summary="Current memory, swap, or thermal state blocks local work.",
             failure_remediation="Reduce system pressure and refresh before starting bounded work.",
@@ -494,7 +533,14 @@ def _configuration_failure_probes() -> tuple[RuntimeProbe, ...]:
 
 
 def _check_database(paths: RuntimePaths, conninfo: str) -> ProbeObservation:
-    database = PostgresDatabase(DatabaseSettings.from_conninfo(conninfo))
+    database = PostgresDatabase(
+        DatabaseSettings.from_conninfo(
+            conninfo,
+            connect_timeout_seconds=2,
+            statement_timeout_ms=4_000,
+            lock_timeout_ms=2_000,
+        )
+    )
     MigrationRunner(database, paths.migration_root).apply_all()
     row = database.fetch_one(
         """
@@ -531,10 +577,11 @@ def _check_artifact_store(paths: RuntimePaths) -> ProbeObservation:
 def _check_offline_policy(conninfo: str) -> ProbeObservation:
     settings = DatabaseSettings.from_conninfo(conninfo)
     socket_path = settings.socket_directory / ".s.PGSQL.5432"
-    socket_paths = [socket_path] if socket_path.exists() else []
+    if not socket_path.exists():
+        raise RuntimeError("project PostgreSQL socket is unavailable")
     policy = NetworkPolicy.offline(
         loopback_origins=[_LOOPBACK_ORIGIN],
-        unix_socket_paths=socket_paths,
+        unix_socket_paths=[socket_path],
     )
     remote = policy.authorize(
         role=ProcessRole.ENGINE,
@@ -550,13 +597,12 @@ def _check_offline_policy(conninfo: str) -> ProbeObservation:
     )
     if remote.allowed or not loopback.allowed:
         raise RuntimeError("offline network decision is invalid")
-    if socket_paths:
-        local_socket = policy.authorize(
-            role=ProcessRole.ENGINE,
-            unix_socket_path=socket_path,
-        )
-        if not local_socket.allowed:
-            raise RuntimeError("offline local socket decision is invalid")
+    local_socket = policy.authorize(
+        role=ProcessRole.ENGINE,
+        unix_socket_path=socket_path,
+    )
+    if not local_socket.allowed:
+        raise RuntimeError("offline local socket decision is invalid")
     return _observation(
         HealthState.HEALTHY,
         "Remote network access is denied and local boundaries are exact.",
@@ -577,7 +623,10 @@ def _check_trace_store(paths: RuntimePaths) -> ProbeObservation:
     )
 
 
-def _check_resource_policy(sampler: ResourceSampling) -> ProbeObservation:
+def _check_resource_policy(
+    sampler: ResourceSampling,
+    clock: Callable[[], datetime],
+) -> ProbeObservation:
     snapshot = sampler.sample()
     policy = ResourcePolicy(
         min_free_bytes=4 * 1024**3,
@@ -586,7 +635,7 @@ def _check_resource_policy(sampler: ResourceSampling) -> ProbeObservation:
         max_snapshot_age=timedelta(seconds=5),
         max_light_leases=1,
     )
-    arbiter = ResourceArbiter(policy, clock=lambda: snapshot.captured_at)
+    arbiter = ResourceArbiter(policy, clock=clock)
     with arbiter.acquire(
         UUID("55555555-5555-4555-8555-555555555555"),
         ResourceClass.LIGHT,

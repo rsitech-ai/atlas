@@ -88,6 +88,30 @@ struct CommandCenterStoreTests {
     }
 
     @Test @MainActor
+    func refreshCancellationPreservesTheLastSuccessfulStatus() async throws {
+        let expected = try fixtureStatus()
+        let loader = ControlledStatusLoader()
+        let store = CommandCenterStore(loader: loader)
+        let initial = Task { await store.reload() }
+        await loader.waitUntilRequestCount(1)
+        await loader.completeRequest(at: 0, with: .success(expected))
+        await initial.value
+
+        let refresh = Task { await store.reload() }
+        await loader.waitUntilRequestCount(2)
+        await loader.completeRequest(at: 1, with: .failure(CancellationError()))
+        await refresh.value
+
+        #expect(
+            store.state == .loaded(
+                status: expected,
+                isRefreshing: false,
+                refreshFailure: nil
+            )
+        )
+    }
+
+    @Test @MainActor
     func olderReloadCannotOverwriteANewerResult() async throws {
         let expected = try fixtureStatus()
         let loader = ControlledStatusLoader()
@@ -110,6 +134,25 @@ struct CommandCenterStoreTests {
                 refreshFailure: nil
             )
         )
+    }
+
+    @Test @MainActor
+    func olderSuccessCannotOverwriteANewerFailure() async throws {
+        let expected = try fixtureStatus()
+        let loader = ControlledStatusLoader()
+        let store = CommandCenterStore(loader: loader)
+
+        let olderReload = Task { await store.reload() }
+        await loader.waitUntilRequestCount(1)
+        let newerReload = Task { await store.reload() }
+        await loader.waitUntilRequestCount(2)
+
+        await loader.completeRequest(at: 1, with: .failure(EngineClientError.invalidResponse))
+        await newerReload.value
+        await loader.completeRequest(at: 0, with: .success(expected))
+        await olderReload.value
+
+        #expect(store.state == .failed(.invalidResponse))
     }
 }
 

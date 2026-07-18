@@ -45,7 +45,15 @@ public struct EngineClient: EngineStatusLoading {
             cachePolicy: .reloadIgnoringLocalAndRemoteCacheData,
             timeoutInterval: 5
         )
-        let (data, response) = try await dataLoader(request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await dataLoader(request)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
+        }
         guard let response = response as? HTTPURLResponse else {
             throw EngineClientError.invalidResponse
         }

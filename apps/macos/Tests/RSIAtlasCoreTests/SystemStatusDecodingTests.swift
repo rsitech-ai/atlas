@@ -90,6 +90,40 @@ struct SystemStatusDecodingTests {
     }
 
     @Test
+    func rejectsMissingExtraReorderedAndMisgroupedComponents() throws {
+        let payload = try fixturePayload()
+        let original = try #require(payload["components"] as? [[String: Any]])
+
+        var missing = try fixturePayload()
+        missing["components"] = Array(original.dropLast())
+        #expect(throws: DecodingError.self) {
+            try decode(missing)
+        }
+
+        var extra = try fixturePayload()
+        extra["components"] = original + [original[0]]
+        #expect(throws: DecodingError.self) {
+            try decode(extra)
+        }
+
+        var reordered = try fixturePayload()
+        var reorderedComponents = original
+        reorderedComponents.swapAt(0, 1)
+        reordered["components"] = reorderedComponents
+        #expect(throws: DecodingError.self) {
+            try decode(reordered)
+        }
+
+        var misgrouped = try fixturePayload()
+        var misgroupedComponents = original
+        misgroupedComponents[0]["group"] = "storage"
+        misgrouped["components"] = misgroupedComponents
+        #expect(throws: DecodingError.self) {
+            try decode(misgrouped)
+        }
+    }
+
+    @Test
     func rejectsInvalidDisplayTextAndAllowsOmittedRemediation() throws {
         var invalid = try fixturePayload()
         var components = try #require(invalid["components"] as? [[String: Any]])

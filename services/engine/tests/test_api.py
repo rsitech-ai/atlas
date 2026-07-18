@@ -48,3 +48,22 @@ def test_system_status_endpoint_keeps_diagnostic_contract_reachable_when_blocked
     assert response.status_code == 200
     assert response.json()["state"] == "blocked"
     assert response.json()["components"][1]["remediation"].startswith("Start")
+
+
+def test_startup_attempts_readiness_nonfatally_before_refresh_retry() -> None:
+    expected = _fixture_status()
+    attempts = 0
+
+    def status_factory() -> SystemStatus:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise RuntimeError("injected startup migration failure")
+        return expected
+
+    with TestClient(create_app(status_factory=status_factory)) as client:
+        response = client.get("/v1/system/status")
+
+    assert attempts == 2
+    assert response.status_code == 200
+    assert response.json() == expected.model_dump(mode="json")

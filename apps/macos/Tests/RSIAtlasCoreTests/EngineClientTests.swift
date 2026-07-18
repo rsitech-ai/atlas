@@ -54,6 +54,17 @@ struct EngineClientTests {
             try await invalidJSON.loadStatus()
         }
     }
+
+    @Test
+    func preservesURLSessionCancellationAsTaskCancellation() async {
+        let client = EngineClient { _ in
+            throw URLError(.cancelled)
+        }
+
+        await #expect(throws: CancellationError.self) {
+            try await client.loadStatus()
+        }
+    }
 }
 
 private func response(for request: URLRequest, statusCode: Int = 200) throws -> HTTPURLResponse {

@@ -25,7 +25,14 @@ class DatabaseSettings:
     database: str
 
     @classmethod
-    def from_conninfo(cls, conninfo: str) -> "DatabaseSettings":
+    def from_conninfo(
+        cls,
+        conninfo: str,
+        *,
+        connect_timeout_seconds: int | None = None,
+        statement_timeout_ms: int | None = None,
+        lock_timeout_ms: int | None = None,
+    ) -> "DatabaseSettings":
         if _SERVICE_PARAMETER.search(conninfo):
             raise ValueError("libpq service and servicefile configuration is forbidden")
         parsed = conninfo_to_dict(conninfo)
@@ -46,6 +53,12 @@ class DatabaseSettings:
         raw_database = parsed.get("dbname")
         if not isinstance(raw_database, str) or not raw_database:
             raise ValueError("RSI Atlas PostgreSQL requires an explicit database")
+        cls._apply_runtime_deadlines(
+            parsed,
+            connect_timeout_seconds=connect_timeout_seconds,
+            statement_timeout_ms=statement_timeout_ms,
+            lock_timeout_ms=lock_timeout_ms,
+        )
         socket_directory = Path(raw_host)
         cls._validate_socket_directory(socket_directory)
         return cls(
@@ -53,6 +66,35 @@ class DatabaseSettings:
             socket_directory=socket_directory,
             user=raw_user,
             database=raw_database,
+        )
+
+    @staticmethod
+    def _apply_runtime_deadlines(
+        parsed: dict[str, str | int | None],
+        *,
+        connect_timeout_seconds: int | None,
+        statement_timeout_ms: int | None,
+        lock_timeout_ms: int | None,
+    ) -> None:
+        configured = (
+            connect_timeout_seconds,
+            statement_timeout_ms,
+            lock_timeout_ms,
+        )
+        if all(value is None for value in configured):
+            return
+        if (
+            type(connect_timeout_seconds) is not int
+            or not 1 <= connect_timeout_seconds <= 30
+            or type(statement_timeout_ms) is not int
+            or not 1 <= statement_timeout_ms <= 60_000
+            or type(lock_timeout_ms) is not int
+            or not 1 <= lock_timeout_ms <= 60_000
+        ):
+            raise ValueError("runtime database deadlines are invalid")
+        parsed["connect_timeout"] = str(connect_timeout_seconds)
+        parsed["options"] = (
+            f"-c statement_timeout={statement_timeout_ms} -c lock_timeout={lock_timeout_ms}"
         )
 
     def assert_safe_environment(self) -> None:

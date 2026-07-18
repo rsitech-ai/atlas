@@ -29,6 +29,18 @@ class ComponentGroup(StrEnum):
     ENGINE = "engine"
 
 
+SYSTEM_COMPONENT_LAYOUT = (
+    ("engine_runtime", ComponentGroup.ENGINE),
+    ("database", ComponentGroup.STORAGE),
+    ("artifact_store", ComponentGroup.STORAGE),
+    ("offline_policy", ComponentGroup.PRIVACY),
+    ("trace_store", ComponentGroup.OBSERVABILITY),
+    ("resource_policy", ComponentGroup.RESOURCES),
+    ("model_registry", ComponentGroup.RESOURCES),
+    ("contract_api", ComponentGroup.ENGINE),
+)
+
+
 class ComponentStatus(StrictModel):
     component_id: str = Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")
     title: str = Field(min_length=1, max_length=80)
@@ -59,6 +71,9 @@ class SystemStatus(StrictModel):
 
     @model_validator(mode="after")
     def consistent_components(self) -> Self:
+        layout = tuple((component.component_id, component.group) for component in self.components)
+        if layout != SYSTEM_COMPONENT_LAYOUT:
+            raise ValueError("system status requires the exact ordered component layout")
         identifiers = tuple(component.component_id for component in self.components)
         if len(set(identifiers)) != len(identifiers):
             raise ValueError("system status contains a duplicate component identifier")

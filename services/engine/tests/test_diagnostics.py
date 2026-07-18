@@ -32,31 +32,77 @@ BLOCKED = ComponentStatus(
     summary="PostgreSQL is unavailable.",
     remediation="Start the project-owned PostgreSQL runtime.",
 )
+HEALTHY_DATABASE = ComponentStatus(
+    component_id="database",
+    title="Database",
+    group=ComponentGroup.STORAGE,
+    state=HealthState.HEALTHY,
+    summary="Database is healthy.",
+)
+ARTIFACT = ComponentStatus(
+    component_id="artifact_store",
+    title="Artifact Store",
+    group=ComponentGroup.STORAGE,
+    state=HealthState.HEALTHY,
+    summary="Artifact store is healthy.",
+)
+OFFLINE = ComponentStatus(
+    component_id="offline_policy",
+    title="Offline Policy",
+    group=ComponentGroup.PRIVACY,
+    state=HealthState.HEALTHY,
+    summary="Offline policy is healthy.",
+)
+TRACE = ComponentStatus(
+    component_id="trace_store",
+    title="Trace Store",
+    group=ComponentGroup.OBSERVABILITY,
+    state=HealthState.HEALTHY,
+    summary="Trace store is healthy.",
+)
+RESOURCE = ComponentStatus(
+    component_id="resource_policy",
+    title="Resource Policy",
+    group=ComponentGroup.RESOURCES,
+    state=HealthState.HEALTHY,
+    summary="Resource policy is healthy.",
+)
+CONTRACT = ComponentStatus(
+    component_id="contract_api",
+    title="Contract API",
+    group=ComponentGroup.ENGINE,
+    state=HealthState.HEALTHY,
+    summary="Contract API is healthy.",
+)
+
+
+def _components(*, database: ComponentStatus = HEALTHY_DATABASE) -> tuple[ComponentStatus, ...]:
+    return (HEALTHY, database, ARTIFACT, OFFLINE, TRACE, RESOURCE, DEGRADED, CONTRACT)
 
 
 def test_build_system_status_uses_exact_profile_components_and_severity() -> None:
     status = build_system_status(
         clock=lambda: CHECKED_AT,
         profile=RuntimeProfile.OFFLINE,
-        components=(HEALTHY, DEGRADED),
+        components=_components(),
     )
 
     assert status.schema_version == "1.1.0"
     assert status.checked_at == CHECKED_AT
     assert status.profile is RuntimeProfile.OFFLINE
     assert status.state is HealthState.DEGRADED
-    assert status.components == (HEALTHY, DEGRADED)
+    assert status.components == _components()
 
 
 def test_build_system_status_uses_most_severe_component_state() -> None:
     status = build_system_status(
         clock=lambda: CHECKED_AT,
         profile=RuntimeProfile.OFFLINE,
-        components=(DEGRADED, BLOCKED),
+        components=_components(database=BLOCKED),
     )
 
     assert status.state is HealthState.BLOCKED
-    assert status.components == (DEGRADED, BLOCKED)
+    assert status.components == _components(database=BLOCKED)
 
 
 def test_build_system_status_rejects_an_empty_component_set() -> None:

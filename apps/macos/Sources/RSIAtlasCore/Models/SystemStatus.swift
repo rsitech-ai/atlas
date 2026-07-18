@@ -120,6 +120,17 @@ public struct ComponentStatus: Codable, Identifiable, Sendable, Equatable {
 }
 
 public struct SystemStatus: Codable, Sendable, Equatable {
+    private static let componentLayout: [(String, ComponentGroup)] = [
+        ("engine_runtime", .engine),
+        ("database", .storage),
+        ("artifact_store", .storage),
+        ("offline_policy", .privacy),
+        ("trace_store", .observability),
+        ("resource_policy", .resources),
+        ("model_registry", .resources),
+        ("contract_api", .engine),
+    ]
+
     public let schemaVersion: String
     public let product: String
     public let profile: RuntimeProfile
@@ -148,11 +159,13 @@ public struct SystemStatus: Codable, Sendable, Equatable {
         guard product == "RSI Atlas Engine" else {
             throw StatusContractError.unexpectedProduct
         }
-        guard !components.isEmpty else {
-            throw StatusContractError.emptyComponents
-        }
-        guard Set(components.map(\.componentID)).count == components.count else {
-            throw StatusContractError.duplicateComponent
+        guard
+            components.count == Self.componentLayout.count,
+            zip(components, Self.componentLayout).allSatisfy({ component, expected in
+                component.componentID == expected.0 && component.group == expected.1
+            })
+        else {
+            throw StatusContractError.invalidComponentLayout
         }
         let expectedState = components.max {
             $0.state.severity < $1.state.severity
@@ -236,8 +249,7 @@ private enum StatusContractError: Error {
     case invalidDisplayText
     case unsupportedSchema
     case unexpectedProduct
-    case emptyComponents
-    case duplicateComponent
+    case invalidComponentLayout
     case inconsistentState
 }
 

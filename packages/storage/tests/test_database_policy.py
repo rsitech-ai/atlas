@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import pytest
+from psycopg.conninfo import conninfo_to_dict
 from rsi_atlas_storage.database import DatabaseSettings
 
 
@@ -14,6 +15,22 @@ def test_database_settings_accept_owner_only_absolute_socket(tmp_path: Path) -> 
     assert settings.socket_directory == socket_directory
     assert settings.user == "atlas"
     assert settings.database == "atlas"
+
+
+def test_database_settings_apply_bounded_runtime_deadlines(tmp_path: Path) -> None:
+    socket_directory = tmp_path / "socket"
+    socket_directory.mkdir(mode=0o700)
+
+    settings = DatabaseSettings.from_conninfo(
+        f"host={socket_directory} user=atlas dbname=atlas options='-c statement_timeout=0'",
+        connect_timeout_seconds=2,
+        statement_timeout_ms=4_000,
+        lock_timeout_ms=2_000,
+    )
+
+    parsed = conninfo_to_dict(settings.conninfo)
+    assert parsed["connect_timeout"] == "2"
+    assert parsed["options"] == "-c statement_timeout=4000 -c lock_timeout=2000"
 
 
 @pytest.mark.parametrize(

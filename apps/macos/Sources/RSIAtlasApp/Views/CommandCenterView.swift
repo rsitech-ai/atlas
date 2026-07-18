@@ -136,6 +136,7 @@ struct CommandCenterView: View {
                 .keyboardShortcut(.defaultAction)
                 .accessibilityIdentifier("runtime.retry")
             }
+            .accessibilityIdentifier("runtime.error_state")
         }
     }
 
