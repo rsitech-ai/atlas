@@ -579,7 +579,10 @@ VoiceOver accessibility order, keyboard refresh, and a second window. Developmen
 denied external TCP and mDNS while allowing only the exact PostgreSQL socket. Independent source
 review approved `7864630` and the debug-only presentation-QA delta through `647c25b` with no
 Critical or Important findings. The current physical thermal state may honestly block runtime work;
-the degraded-only-model launcher gate is rerun only when the machine returns to nominal/fair.
+the degraded-only-model launcher gate is rerun only when the machine returns to nominal/fair. After
+the sampler returned `ThermalState.FAIR`, the standard no-QA launcher passed at `91d9481`: schema
+`1.1.0`, overall `degraded`, seven healthy components, and only `model_registry` degraded, with the
+launchd engine process carrying the exact disposable `RSI_ATLAS_DATA_ROOT`.
 
 ## Verification
 
