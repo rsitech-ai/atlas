@@ -22,5 +22,9 @@ let package = Package(
             dependencies: ["RSIAtlasCore"],
             resources: [.process("Fixtures")]
         ),
+        .testTarget(
+            name: "RSIAtlasAppTests",
+            dependencies: ["RSIAtlasApp", "RSIAtlasCore"]
+        ),
     ]
 )

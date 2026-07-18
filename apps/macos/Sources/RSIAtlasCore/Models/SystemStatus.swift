@@ -112,7 +112,14 @@ public struct ComponentStatus: Codable, Identifiable, Sendable, Equatable {
             !value.isEmpty,
             value == value.trimmingCharacters(in: .whitespacesAndNewlines),
             value.count <= maximumLength,
-            !value.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 })
+            !value.unicodeScalars.contains(where: { scalar in
+                switch scalar.properties.generalCategory {
+                case .control, .format, .surrogate, .privateUse, .unassigned:
+                    true
+                default:
+                    false
+                }
+            })
         else {
             throw StatusContractError.invalidDisplayText
         }

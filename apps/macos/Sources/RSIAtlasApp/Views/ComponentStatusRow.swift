@@ -29,11 +29,15 @@ struct ComponentStatusRow: View {
         }
         .padding(.vertical, 6)
         .accessibilityElement(children: .ignore)
-        .accessibilityIdentifier("runtime.component.\(component.componentID)")
+        .accessibilityIdentifier(accessibilityIdentifier)
         .accessibilityLabel(accessibilityLabel)
     }
 
-    private var accessibilityLabel: String {
+    var accessibilityIdentifier: String {
+        RuntimeAccessibility.component(component.componentID)
+    }
+
+    var accessibilityLabel: String {
         [
             component.title,
             component.state.rawValue,
@@ -56,6 +60,10 @@ struct ComponentRemediationRow: View {
             .fixedSize(horizontal: false, vertical: true)
             .padding(.leading, 30)
             .accessibilityLabel("Remediation, \(remediation)")
-            .accessibilityIdentifier("runtime.remediation.\(componentID)")
+            .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    var accessibilityIdentifier: String {
+        RuntimeAccessibility.remediation(componentID)
     }
 }

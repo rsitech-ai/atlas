@@ -66,6 +66,8 @@ _EXPECTED_MIGRATIONS = ["0001", "0002"]
 _EXPECTED_VECTOR_VERSION = "0.8.5"
 _LOOPBACK_ORIGIN = "http://127.0.0.1:8765"
 _DIRECTORY_OPEN_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+_DATABASE_CONNECT_TIMEOUT_SECONDS = 1
+_DATABASE_TRANSACTION_TIMEOUT_MS = 3_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -335,7 +337,9 @@ class RuntimeServices:
         except (OSError, ValueError):
             return cls(probes=_configuration_failure_probes(), clock=clock)
         socket_directory = paths.data_root / "postgres" / "socket"
-        conninfo = database_conninfo or (f"host='{socket_directory}' user='atlas' dbname='atlas'")
+        conninfo = database_conninfo or (
+            f"host='{socket_directory}' port=5432 user='atlas' dbname='atlas'"
+        )
         return cls(
             probes=_default_probes(
                 paths=paths,
@@ -536,20 +540,24 @@ def _check_database(paths: RuntimePaths, conninfo: str) -> ProbeObservation:
     database = PostgresDatabase(
         DatabaseSettings.from_conninfo(
             conninfo,
-            connect_timeout_seconds=2,
-            statement_timeout_ms=4_000,
-            lock_timeout_ms=2_000,
+            connect_timeout_seconds=_DATABASE_CONNECT_TIMEOUT_SECONDS,
+            statement_timeout_ms=1_500,
+            lock_timeout_ms=750,
+            transaction_timeout_ms=_DATABASE_TRANSACTION_TIMEOUT_MS,
         )
     )
-    MigrationRunner(database, paths.migration_root).apply_all()
-    row = database.fetch_one(
-        """
-        SELECT
-            current_setting('listen_addresses'),
-            (SELECT extversion FROM pg_extension WHERE extname = 'vector'),
-            (SELECT array_agg(version ORDER BY version) FROM atlas_meta.schema_migrations)
-        """
-    )
+    with database.connect() as connection:
+        MigrationRunner(database, paths.migration_root).apply_all(connection=connection)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    current_setting('listen_addresses'),
+                    (SELECT extversion FROM pg_extension WHERE extname = 'vector'),
+                    (SELECT array_agg(version ORDER BY version) FROM atlas_meta.schema_migrations)
+                """
+            )
+            row = cursor.fetchone()
     if row != ("", _EXPECTED_VECTOR_VERSION, _EXPECTED_MIGRATIONS):
         raise RuntimeError("database readiness does not match Phase 1")
     return _observation(
@@ -576,7 +584,7 @@ def _check_artifact_store(paths: RuntimePaths) -> ProbeObservation:
 
 def _check_offline_policy(conninfo: str) -> ProbeObservation:
     settings = DatabaseSettings.from_conninfo(conninfo)
-    socket_path = settings.socket_directory / ".s.PGSQL.5432"
+    socket_path = settings.socket_directory / f".s.PGSQL.{settings.port}"
     if not socket_path.exists():
         raise RuntimeError("project PostgreSQL socket is unavailable")
     policy = NetworkPolicy.offline(

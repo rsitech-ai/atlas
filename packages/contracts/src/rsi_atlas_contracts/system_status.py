@@ -1,5 +1,6 @@
 from enum import StrEnum
 from typing import Literal, Self
+from unicodedata import category
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -54,9 +55,8 @@ class ComponentStatus(StrictModel):
     def bounded_display_text(cls, value: str | None) -> str | None:
         if value is None:
             return None
-        if value != value.strip() or any(
-            ord(character) < 32 or ord(character) == 127 for character in value
-        ):
+        contains_control = any(category(character).startswith("C") for character in value)
+        if value != value.strip() or contains_control:
             raise ValueError("component display text is invalid")
         return value
 

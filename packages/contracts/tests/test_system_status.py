@@ -99,6 +99,8 @@ def test_system_status_rejects_inconsistent_aggregate_state() -> None:
         ("title", " "),
         ("title", "x" * 81),
         ("summary", "runtime\nprivate"),
+        ("summary", "safe\u0085unsafe"),
+        ("summary", "safe\u202eunsafe"),
         ("summary", "x" * 241),
         ("remediation", " "),
         ("remediation", "x" * 241),

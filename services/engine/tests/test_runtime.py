@@ -7,6 +7,7 @@ from pathlib import Path
 from time import monotonic
 
 import pytest
+import rsi_atlas_engine.runtime as runtime_module
 from rsi_atlas_contracts import ComponentGroup, HealthState, ThermalState
 from rsi_atlas_engine.runtime import (
     COMPONENT_IDS,
@@ -22,6 +23,7 @@ from rsi_atlas_models import ResourceSnapshot
 from rsi_atlas_storage import (
     ContentAddressedArtifactStore,
     DatabaseSettings,
+    MigrationRunner,
     PostgresDatabase,
 )
 
@@ -249,6 +251,93 @@ def test_resource_policy_blocks_stale_and_future_samples(
     )
 
 
+@pytest.mark.parametrize(
+    "snapshot",
+    [
+        ResourceSnapshot(
+            free_bytes=4 * 1024**3 - 1,
+            swap_bytes=0,
+            thermal=ThermalState.NOMINAL,
+            captured_at=CHECKED_AT,
+        ),
+        ResourceSnapshot(
+            free_bytes=8 * 1024**3,
+            swap_bytes=16 * 1024**3 + 1,
+            thermal=ThermalState.NOMINAL,
+            captured_at=CHECKED_AT,
+        ),
+        ResourceSnapshot(
+            free_bytes=8 * 1024**3,
+            swap_bytes=0,
+            thermal=ThermalState.SERIOUS,
+            captured_at=CHECKED_AT,
+        ),
+    ],
+    ids=["low-memory", "high-swap", "unsafe-thermal"],
+)
+def test_resource_policy_blocks_unsafe_samples(
+    tmp_path: Path,
+    snapshot: ResourceSnapshot,
+) -> None:
+    class SnapshotSampler:
+        def sample(self) -> ResourceSnapshot:
+            return snapshot
+
+    data_root = tmp_path / "runtime"
+    data_root.mkdir(mode=0o700)
+    services = RuntimeServices.from_environment(
+        environ={"RSI_ATLAS_DATA_ROOT": str(data_root)},
+        resource_sampler=SnapshotSampler(),
+        clock=lambda: CHECKED_AT,
+    )
+
+    resource = next(
+        item for item in services.status().components if item.component_id == "resource_policy"
+    )
+
+    assert resource.state is HealthState.BLOCKED
+    assert resource.remediation is not None
+
+
+@pytest.mark.parametrize(
+    ("check_name", "component_id", "expected_state"),
+    [
+        ("_check_database", "database", HealthState.BLOCKED),
+        ("_check_artifact_store", "artifact_store", HealthState.REPAIRABLE),
+        ("_check_offline_policy", "offline_policy", HealthState.UNSAFE),
+        ("_check_trace_store", "trace_store", HealthState.REPAIRABLE),
+        ("_check_resource_policy", "resource_policy", HealthState.BLOCKED),
+        ("_check_model_registry", "model_registry", HealthState.BLOCKED),
+    ],
+)
+def test_every_fallible_default_probe_maps_failure_to_typed_status(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    check_name: str,
+    component_id: str,
+    expected_state: HealthState,
+) -> None:
+    def fail(*_args: object, **_kwargs: object) -> ProbeObservation:
+        raise RuntimeError("secret=/private/injected")
+
+    monkeypatch.setattr(runtime_module, check_name, fail)
+    data_root = tmp_path / "runtime"
+    data_root.mkdir(mode=0o700)
+    services = RuntimeServices.from_environment(
+        environ={"RSI_ATLAS_DATA_ROOT": str(data_root)},
+        resource_sampler=SafeResourceSampler(),
+        clock=lambda: CHECKED_AT,
+    )
+
+    status = services.status()
+    component = next(item for item in status.components if item.component_id == component_id)
+
+    assert component.state is expected_state
+    assert component.remediation is not None
+    assert "secret" not in status.model_dump_json()
+    assert "/private" not in status.model_dump_json()
+
+
 def test_real_runtime_probes_and_disposable_integrity_recovery(tmp_path: Path) -> None:
     conninfo = os.environ.get("RSI_ATLAS_TEST_DATABASE_URL")
     if conninfo is None:
@@ -340,3 +429,46 @@ def test_database_probe_bounds_migration_lock_contention(tmp_path: Path) -> None
     assert elapsed < 5
     assert database.state is HealthState.BLOCKED
     assert database.remediation == ("Start the project-owned PostgreSQL runtime, then refresh.")
+
+
+def test_database_probe_retries_and_recovers_in_same_runtime_services(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conninfo = os.environ.get("RSI_ATLAS_TEST_DATABASE_URL")
+    if conninfo is None:
+        pytest.skip("real PostgreSQL integration URL is required")
+    data_root = tmp_path / "runtime"
+    data_root.mkdir(mode=0o700)
+    original_apply_all = MigrationRunner.apply_all
+    attempts = 0
+
+    def fail_once(
+        runner: MigrationRunner,
+        *,
+        connection: object | None = None,
+    ) -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise RuntimeError("injected migration interruption")
+        original_apply_all(runner, connection=connection)
+
+    monkeypatch.setattr(MigrationRunner, "apply_all", fail_once)
+    services = RuntimeServices.from_environment(
+        environ={"RSI_ATLAS_DATA_ROOT": str(data_root)},
+        database_conninfo=conninfo,
+        resource_sampler=SafeResourceSampler(),
+        clock=lambda: CHECKED_AT,
+    )
+
+    first = services.status()
+    recovered = services.status()
+
+    assert next(item for item in first.components if item.component_id == "database").state is (
+        HealthState.BLOCKED
+    )
+    assert (
+        next(item for item in recovered.components if item.component_id == "database").state
+        is HealthState.HEALTHY
+    )

@@ -25,7 +25,7 @@ struct CommandCenterView: View {
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(isRefreshing)
                 .help("Refresh local runtime status (⌘R)")
-                .accessibilityIdentifier("runtime.refresh")
+                .accessibilityIdentifier(RuntimeAccessibility.refresh)
             }
         }
     }
@@ -40,12 +40,12 @@ struct CommandCenterView: View {
                     Label(status.profile.displayName, systemImage: status.profile.systemImage)
                         .font(.callout.weight(.medium))
                         .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("runtime.profile")
+                        .accessibilityIdentifier(RuntimeAccessibility.profile)
                 } else {
                     Label("Local Runtime", systemImage: "desktopcomputer")
                         .font(.callout.weight(.medium))
                         .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("runtime.profile")
+                        .accessibilityIdentifier(RuntimeAccessibility.profile)
                 }
             }
             Text("Live readiness, integrity, privacy, and resource evidence for the local runtime.")
@@ -63,7 +63,7 @@ struct CommandCenterView: View {
         case .idle, .loading:
             ProgressView("Checking local runtime…")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .accessibilityIdentifier("runtime.loading")
+                .accessibilityIdentifier(RuntimeAccessibility.loading)
 
         case let .loaded(status, isRefreshing, refreshFailure):
             List {
@@ -81,12 +81,12 @@ struct CommandCenterView: View {
                             Image(systemName: "clock.badge.exclamationmark")
                                 .foregroundStyle(.orange)
                         }
-                        .accessibilityIdentifier("runtime.stale_status")
+                        .accessibilityIdentifier(RuntimeAccessibility.staleStatus)
 
                         Button("Retry Status Check") {
                             Task { await store.reload() }
                         }
-                        .accessibilityIdentifier("runtime.retry")
+                        .accessibilityIdentifier(RuntimeAccessibility.retry)
                     }
                 }
 
@@ -94,7 +94,7 @@ struct CommandCenterView: View {
                     HStack(alignment: .firstTextBaseline) {
                         Label(status.state.displayName, systemImage: status.state.systemImage)
                             .foregroundStyle(status.state.tint)
-                            .accessibilityIdentifier("runtime.overall_state")
+                            .accessibilityIdentifier(RuntimeAccessibility.overallState)
                         Spacer()
                         if isRefreshing {
                             ProgressView()
@@ -105,7 +105,7 @@ struct CommandCenterView: View {
                             "Checked \(status.checkedAt.formatted(date: .abbreviated, time: .standard))"
                         )
                         .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("runtime.checked_at")
+                        .accessibilityIdentifier(RuntimeAccessibility.checkedAt)
                     }
                 }
 
@@ -123,7 +123,7 @@ struct CommandCenterView: View {
                     } header: {
                         Text(section.title)
                             .textCase(nil)
-                            .accessibilityIdentifier("runtime.group.\(section.group.rawValue)")
+                            .accessibilityIdentifier(RuntimeAccessibility.group(section.group))
                     }
                 }
             }
@@ -140,9 +140,9 @@ struct CommandCenterView: View {
                     Task { await store.reload() }
                 }
                 .keyboardShortcut(.defaultAction)
-                .accessibilityIdentifier("runtime.retry")
+                .accessibilityIdentifier(RuntimeAccessibility.retry)
             }
-            .accessibilityIdentifier("runtime.error_state")
+            .accessibilityIdentifier(RuntimeAccessibility.errorState)
         }
     }
 

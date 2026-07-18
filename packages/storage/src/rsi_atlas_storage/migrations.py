@@ -3,7 +3,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from rsi_atlas_storage.database import PostgresDatabase
+from psycopg import Connection
+
+from rsi_atlas_storage.database import PostgresDatabase, Row
 
 _MIGRATION_NAME = re.compile(r"^(?P<version>[0-9]{4})_[a-z0-9_]+\.sql$")
 _MIGRATION_LOCK_ID = 0x52534941544C4153
@@ -26,9 +28,17 @@ class MigrationRunner:
         self._database = database
         self._migration_directory = migration_directory
 
-    def apply_all(self) -> None:
+    def apply_all(self, *, connection: Connection[Row] | None = None) -> None:
         migrations = self._load_migrations()
-        with self._database.connect() as connection, connection.cursor() as cursor:
+        if connection is not None:
+            self._apply(connection, migrations)
+            return
+        with self._database.connect() as owned_connection:
+            self._apply(owned_connection, migrations)
+
+    @staticmethod
+    def _apply(connection: Connection[Row], migrations: tuple[Migration, ...]) -> None:
+        with connection.cursor() as cursor:
             cursor.execute("SELECT pg_advisory_xact_lock(%s)", (_MIGRATION_LOCK_ID,))
             cursor.execute("CREATE SCHEMA IF NOT EXISTS atlas_meta")
             cursor.execute(

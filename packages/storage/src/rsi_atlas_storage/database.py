@@ -14,7 +14,8 @@ from psycopg.conninfo import conninfo_to_dict, make_conninfo
 Row = tuple[Any, ...]
 ParameterValue = object
 _SERVICE_PARAMETER = re.compile(r"(?:^|[?&\s])(service|servicefile)\s*=", re.IGNORECASE)
-_UNSAFE_LIBPQ_ENVIRONMENT = ("PGSERVICE", "PGSERVICEFILE", "PGHOSTADDR")
+_UNSAFE_LIBPQ_ENVIRONMENT = ("PGSERVICE", "PGSERVICEFILE", "PGHOSTADDR", "PGPORT")
+_POSTGRES_PORT = 5432
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +24,7 @@ class DatabaseSettings:
     socket_directory: Path
     user: str
     database: str
+    port: int
 
     @classmethod
     def from_conninfo(
@@ -32,6 +34,7 @@ class DatabaseSettings:
         connect_timeout_seconds: int | None = None,
         statement_timeout_ms: int | None = None,
         lock_timeout_ms: int | None = None,
+        transaction_timeout_ms: int | None = None,
     ) -> "DatabaseSettings":
         if _SERVICE_PARAMETER.search(conninfo):
             raise ValueError("libpq service and servicefile configuration is forbidden")
@@ -53,11 +56,16 @@ class DatabaseSettings:
         raw_database = parsed.get("dbname")
         if not isinstance(raw_database, str) or not raw_database:
             raise ValueError("RSI Atlas PostgreSQL requires an explicit database")
+        raw_port = parsed.get("port")
+        if raw_port is not None and str(raw_port) != str(_POSTGRES_PORT):
+            raise ValueError("RSI Atlas PostgreSQL requires fixed port 5432")
+        parsed["port"] = str(_POSTGRES_PORT)
         cls._apply_runtime_deadlines(
             parsed,
             connect_timeout_seconds=connect_timeout_seconds,
             statement_timeout_ms=statement_timeout_ms,
             lock_timeout_ms=lock_timeout_ms,
+            transaction_timeout_ms=transaction_timeout_ms,
         )
         socket_directory = Path(raw_host)
         cls._validate_socket_directory(socket_directory)
@@ -66,6 +74,7 @@ class DatabaseSettings:
             socket_directory=socket_directory,
             user=raw_user,
             database=raw_database,
+            port=_POSTGRES_PORT,
         )
 
     @staticmethod
@@ -75,11 +84,13 @@ class DatabaseSettings:
         connect_timeout_seconds: int | None,
         statement_timeout_ms: int | None,
         lock_timeout_ms: int | None,
+        transaction_timeout_ms: int | None,
     ) -> None:
         configured = (
             connect_timeout_seconds,
             statement_timeout_ms,
             lock_timeout_ms,
+            transaction_timeout_ms,
         )
         if all(value is None for value in configured):
             return
@@ -90,11 +101,15 @@ class DatabaseSettings:
             or not 1 <= statement_timeout_ms <= 60_000
             or type(lock_timeout_ms) is not int
             or not 1 <= lock_timeout_ms <= 60_000
+            or type(transaction_timeout_ms) is not int
+            or not 1 <= transaction_timeout_ms <= 60_000
         ):
             raise ValueError("runtime database deadlines are invalid")
         parsed["connect_timeout"] = str(connect_timeout_seconds)
         parsed["options"] = (
-            f"-c statement_timeout={statement_timeout_ms} -c lock_timeout={lock_timeout_ms}"
+            f"-c statement_timeout={statement_timeout_ms} "
+            f"-c lock_timeout={lock_timeout_ms} "
+            f"-c transaction_timeout={transaction_timeout_ms}"
         )
 
     def assert_safe_environment(self) -> None:

@@ -140,6 +140,18 @@ struct SystemStatusDecodingTests {
         let status = try decode(omitted)
         #expect(status.components[0].remediation == nil)
     }
+
+    @Test(arguments: ["safe\u{0085}unsafe", "safe\u{202E}unsafe"])
+    func rejectsUnicodeControlAndFormatText(_ summary: String) throws {
+        var invalid = try fixturePayload()
+        var components = try #require(invalid["components"] as? [[String: Any]])
+        components[0]["summary"] = summary
+        invalid["components"] = components
+
+        #expect(throws: DecodingError.self) {
+            try decode(invalid)
+        }
+    }
 }
 
 private func fixtureURL() throws -> URL {
