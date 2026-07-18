@@ -204,9 +204,9 @@ def _database_error(payload: bytes) -> SecurePathError:
     return SecurePathError("PostgreSQL bootstrap server rejected the operation")
 
 
-def _validate_ready(payload: bytes) -> None:
-    if len(payload) != 1 or payload not in {b"I", b"T", b"E"}:
-        raise SecurePathError("PostgreSQL bootstrap protocol ReadyForQuery is invalid")
+def _validate_idle_ready(payload: bytes) -> None:
+    if payload != b"I":
+        raise SecurePathError("PostgreSQL bootstrap ReadyForQuery must be idle")
 
 
 def _parse_data_row(payload: bytes) -> tuple[Optional[str], ...]:  # noqa: UP045
@@ -239,7 +239,7 @@ def _parse_data_row(payload: bytes) -> tuple[Optional[str], ...]:  # noqa: UP045
     return tuple(columns)
 
 
-def _validate_row_description(payload: bytes) -> None:
+def _validate_row_description(payload: bytes) -> int:
     if len(payload) < 2:
         raise SecurePathError("PostgreSQL bootstrap RowDescription is truncated")
     field_count = struct.unpack("!H", payload[:2])[0]
@@ -262,13 +262,18 @@ def _validate_row_description(payload: bytes) -> None:
         offset += 18
     if offset != len(payload):
         raise SecurePathError("PostgreSQL bootstrap RowDescription has trailing bytes")
+    return field_count
 
 
 def _query(
     connection: socket.socket,
     query: str,
     budget: Optional[ProtocolBudget] = None,  # noqa: UP045 - system Python 3.9
+    *,
+    expected_command: str,
 ) -> list[tuple[Optional[str], ...]]:  # noqa: UP045 - macOS system Python 3.9
+    if expected_command not in {"select", "create_database"}:
+        raise SecurePathError("PostgreSQL bootstrap expected command is invalid")
     active_budget = budget or ProtocolBudget()
     query_payload = query.encode("utf-8") + b"\0"
     if len(query_payload) > MAX_VALUE_BYTES:
@@ -281,35 +286,79 @@ def _query(
     except OSError as error:
         raise SecurePathError("PostgreSQL bootstrap protocol I/O failed") from error
     rows: list[tuple[Optional[str], ...]] = []  # noqa: UP045
+    described_columns: Optional[int] = None  # noqa: UP045 - system Python 3.9
     command_complete = False
     while True:
         message_type, payload = _read_message(connection, active_budget)
         if message_type == b"D":
+            if expected_command == "create_database":
+                raise SecurePathError("PostgreSQL bootstrap CREATE DATABASE returned a DataRow")
+            if command_complete:
+                raise SecurePathError(
+                    "PostgreSQL bootstrap DataRow arrived after command completion"
+                )
+            if described_columns is None:
+                raise SecurePathError("PostgreSQL bootstrap DataRow arrived before RowDescription")
             if len(rows) >= MAX_ROWS:
                 raise SecurePathError("PostgreSQL bootstrap returned too many rows")
-            rows.append(_parse_data_row(payload))
+            row = _parse_data_row(payload)
+            if len(row) != described_columns:
+                raise SecurePathError(
+                    "PostgreSQL bootstrap DataRow column count does not match RowDescription"
+                )
+            if rows:
+                raise SecurePathError("PostgreSQL bootstrap SELECT returned too many rows")
+            if row != ("1",):
+                raise SecurePathError("PostgreSQL bootstrap SELECT result value is invalid")
+            rows.append(row)
         elif message_type == b"T":
-            _validate_row_description(payload)
+            if expected_command == "create_database":
+                raise SecurePathError(
+                    "PostgreSQL bootstrap CREATE DATABASE returned a RowDescription"
+                )
+            if command_complete:
+                raise SecurePathError(
+                    "PostgreSQL bootstrap RowDescription arrived after command completion"
+                )
+            if described_columns is not None:
+                raise SecurePathError("PostgreSQL bootstrap RowDescription was duplicated")
+            described_columns = _validate_row_description(payload)
+            if described_columns != 1:
+                raise SecurePathError(
+                    "PostgreSQL bootstrap SELECT RowDescription column count is invalid"
+                )
         elif message_type == b"C":
+            if command_complete:
+                raise SecurePathError("PostgreSQL bootstrap CommandComplete was duplicated")
             if not payload or payload[-1:] != b"\0":
                 raise SecurePathError("PostgreSQL bootstrap CommandComplete is invalid")
             try:
-                payload[:-1].decode("utf-8")
+                completion_tag = payload[:-1].decode("utf-8")
             except UnicodeDecodeError as error:
                 raise SecurePathError(
                     "PostgreSQL bootstrap CommandComplete encoding is invalid"
                 ) from error
-            command_complete = True
-        elif message_type == b"I":
-            if payload:
-                raise SecurePathError("PostgreSQL bootstrap EmptyQueryResponse is invalid")
+            if expected_command == "select":
+                if described_columns is None:
+                    raise SecurePathError(
+                        "PostgreSQL bootstrap CommandComplete arrived before RowDescription"
+                    )
+                expected_tag = f"SELECT {len(rows)}"
+            else:
+                if described_columns is not None or rows:
+                    raise SecurePathError(
+                        "PostgreSQL bootstrap CREATE DATABASE returned a result set"
+                    )
+                expected_tag = "CREATE DATABASE"
+            if completion_tag != expected_tag:
+                raise SecurePathError("PostgreSQL bootstrap CommandComplete tag is invalid")
             command_complete = True
         elif message_type == b"N":
             _validate_error_fields(payload)
         elif message_type == b"E":
             raise _database_error(payload)
         elif message_type == b"Z":
-            _validate_ready(payload)
+            _validate_idle_ready(payload)
             if not command_complete:
                 raise SecurePathError(
                     "PostgreSQL bootstrap ReadyForQuery arrived before command completion"
@@ -367,7 +416,7 @@ def _perform_bootstrap(connection: socket.socket, user: str, database: str) -> N
         elif message_type == b"E":
             raise _database_error(payload)
         elif message_type == b"Z":
-            _validate_ready(payload)
+            _validate_idle_ready(payload)
             if not authenticated:
                 raise SecurePathError(
                     "PostgreSQL bootstrap ReadyForQuery arrived before authentication"
@@ -379,9 +428,15 @@ def _perform_bootstrap(connection: socket.socket, user: str, database: str) -> N
         connection,
         f"SELECT 1 FROM pg_database WHERE datname = '{database}'",
         budget,
+        expected_command="select",
     )
     if not rows:
-        _query(connection, f'CREATE DATABASE "{database}"', budget)
+        _query(
+            connection,
+            f'CREATE DATABASE "{database}"',
+            budget,
+            expected_command="create_database",
+        )
     try:
         connection.settimeout(budget.timeout())
         connection.sendall(b"X" + struct.pack("!I", 4))

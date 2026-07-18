@@ -59,6 +59,19 @@ def _backend_message(message_type: bytes, payload: bytes) -> bytes:
     return message_type + struct.pack("!I", len(payload) + 4) + payload
 
 
+def _row_description(field_count: int) -> bytes:
+    fields = b"".join(
+        f"column_{index}".encode() + b"\0" + (b"\0" * 18) for index in range(field_count)
+    )
+    return struct.pack("!H", field_count) + fields
+
+
+def _data_row(values: list[bytes]) -> bytes:
+    return struct.pack("!H", len(values)) + b"".join(
+        struct.pack("!i", len(value)) + value for value in values
+    )
+
+
 @pytest.fixture(scope="session")
 def postgres_database() -> Iterator[PostgresDatabase]:
     conninfo = os.environ["RSI_ATLAS_TEST_DATABASE_URL"]
@@ -725,7 +738,7 @@ def test_bootstrap_rejects_invalid_data_row_structure(payload: bytes) -> None:
     connection = FakeBootstrapSocket(_backend_message(b"D", payload))
 
     with pytest.raises(secure_path.SecurePathError, match="DataRow"):
-        secure_path._query(connection, "SELECT 1")
+        secure_path._query(connection, "SELECT 1", expected_command="select")
 
 
 def test_bootstrap_rejects_ready_before_authentication() -> None:
@@ -742,6 +755,160 @@ def test_bootstrap_rejects_invalid_ready_state_after_authentication() -> None:
 
     with pytest.raises(secure_path.SecurePathError, match="ReadyForQuery"):
         secure_path._perform_bootstrap(connection, "atlas", "atlas")
+
+
+@pytest.mark.parametrize("transaction_state", [b"T", b"E"])
+def test_bootstrap_requires_idle_ready_after_authentication(
+    transaction_state: bytes,
+) -> None:
+    connection = FakeBootstrapSocket(
+        _backend_message(b"R", struct.pack("!I", 0)) + _backend_message(b"Z", transaction_state)
+    )
+
+    with pytest.raises(secure_path.SecurePathError, match="idle"):
+        secure_path._perform_bootstrap(connection, "atlas", "atlas")
+
+
+def test_select_rejects_data_row_without_description() -> None:
+    connection = FakeBootstrapSocket(
+        _backend_message(b"D", _data_row([b"1"]))
+        + _backend_message(b"C", b"SELECT 1\0")
+        + _backend_message(b"Z", b"I")
+    )
+
+    with pytest.raises(secure_path.SecurePathError, match="RowDescription"):
+        secure_path._query(connection, "SELECT 1", expected_command="select")
+
+
+def test_select_rejects_data_row_column_mismatch() -> None:
+    connection = FakeBootstrapSocket(
+        _backend_message(b"T", _row_description(1))
+        + _backend_message(b"D", _data_row([b"1", b"2"]))
+    )
+
+    with pytest.raises(secure_path.SecurePathError, match="column count"):
+        secure_path._query(connection, "SELECT 1", expected_command="select")
+
+
+def test_select_rejects_unexpected_result_value() -> None:
+    connection = FakeBootstrapSocket(
+        _backend_message(b"T", _row_description(1))
+        + _backend_message(b"D", _data_row([b"unexpected"]))
+    )
+
+    with pytest.raises(secure_path.SecurePathError, match="result value"):
+        secure_path._query(connection, "SELECT 1", expected_command="select")
+
+
+@pytest.mark.parametrize(
+    "messages",
+    [
+        _backend_message(b"T", _row_description(1))
+        + _backend_message(b"C", b"SELECT 0\0")
+        + _backend_message(b"C", b"SELECT 0\0"),
+        _backend_message(b"T", _row_description(1)) + _backend_message(b"C", b"UPDATE 9\0"),
+    ],
+)
+def test_select_rejects_duplicate_or_arbitrary_completion(messages: bytes) -> None:
+    connection = FakeBootstrapSocket(messages)
+
+    with pytest.raises(secure_path.SecurePathError, match="CommandComplete"):
+        secure_path._query(connection, "SELECT 1", expected_command="select")
+
+
+def test_select_rejects_row_after_completion() -> None:
+    connection = FakeBootstrapSocket(
+        _backend_message(b"T", _row_description(1))
+        + _backend_message(b"C", b"SELECT 0\0")
+        + _backend_message(b"D", _data_row([b"1"]))
+    )
+
+    with pytest.raises(secure_path.SecurePathError, match="completion"):
+        secure_path._query(connection, "SELECT 1", expected_command="select")
+
+
+def test_select_rejects_duplicate_data_row() -> None:
+    row = _backend_message(b"D", _data_row([b"1"]))
+    connection = FakeBootstrapSocket(_backend_message(b"T", _row_description(1)) + row + row)
+
+    with pytest.raises(secure_path.SecurePathError, match="too many rows"):
+        secure_path._query(connection, "SELECT 1", expected_command="select")
+
+
+def test_select_rejects_duplicate_row_description() -> None:
+    description = _backend_message(b"T", _row_description(1))
+    connection = FakeBootstrapSocket(description + description)
+
+    with pytest.raises(secure_path.SecurePathError, match="RowDescription"):
+        secure_path._query(connection, "SELECT 1", expected_command="select")
+
+
+@pytest.mark.parametrize("transaction_state", [b"T", b"E"])
+def test_select_requires_idle_ready_after_completion(transaction_state: bytes) -> None:
+    connection = FakeBootstrapSocket(
+        _backend_message(b"T", _row_description(1))
+        + _backend_message(b"C", b"SELECT 0\0")
+        + _backend_message(b"Z", transaction_state)
+    )
+
+    with pytest.raises(secure_path.SecurePathError, match="idle"):
+        secure_path._query(connection, "SELECT 1", expected_command="select")
+
+
+def test_select_rejects_ready_before_completion() -> None:
+    connection = FakeBootstrapSocket(
+        _backend_message(b"T", _row_description(1)) + _backend_message(b"Z", b"I")
+    )
+
+    with pytest.raises(secure_path.SecurePathError, match="before command completion"):
+        secure_path._query(connection, "SELECT 1", expected_command="select")
+
+
+def test_select_allows_structurally_valid_notice_without_changing_state() -> None:
+    connection = FakeBootstrapSocket(
+        _backend_message(b"N", b"Mnotice\0\0")
+        + _backend_message(b"T", _row_description(1))
+        + _backend_message(b"C", b"SELECT 0\0")
+        + _backend_message(b"N", b"Mnotice\0\0")
+        + _backend_message(b"Z", b"I")
+    )
+
+    assert secure_path._query(connection, "SELECT 1", expected_command="select") == []
+
+
+def test_select_rejects_malformed_notice() -> None:
+    connection = FakeBootstrapSocket(_backend_message(b"N", b"unterminated"))
+
+    with pytest.raises(secure_path.SecurePathError, match="ErrorResponse"):
+        secure_path._query(connection, "SELECT 1", expected_command="select")
+
+
+def test_create_database_rejects_row_description_and_data() -> None:
+    for messages in (
+        _backend_message(b"T", _row_description(1)),
+        _backend_message(b"D", _data_row([b"1"])),
+    ):
+        connection = FakeBootstrapSocket(messages)
+
+        with pytest.raises(secure_path.SecurePathError, match="CREATE DATABASE"):
+            secure_path._query(
+                connection,
+                'CREATE DATABASE "atlas"',
+                expected_command="create_database",
+            )
+
+
+def test_create_database_rejects_arbitrary_completion() -> None:
+    connection = FakeBootstrapSocket(
+        _backend_message(b"C", b"CREATE TABLE\0") + _backend_message(b"Z", b"I")
+    )
+
+    with pytest.raises(secure_path.SecurePathError, match="CommandComplete"):
+        secure_path._query(
+            connection,
+            'CREATE DATABASE "atlas"',
+            expected_command="create_database",
+        )
 
 
 def test_bootstrap_handles_error_response_as_stable_domain_error() -> None:
