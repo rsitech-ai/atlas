@@ -51,7 +51,7 @@
 - Consumes: `ArtifactCommandContext`, `ArtifactID`, and `StrictModel`.
 - Produces: `AcquisitionMethod`, `NetworkProfile`, `DocumentLifecycle`, `AdmissionOutcome`, `SafetyCheckState`, `PDFSafetyProfile`, `AcquisitionRequest`, and `DocumentAdmissionRecord`.
 
-- [ ] **Step 1: Write strict enum and model RED tests**
+- [x] **Step 1: Write strict enum and model RED tests**
 
 ```python
 def test_acquisition_request_rejects_unknown_fields() -> None:
@@ -75,13 +75,13 @@ def test_admission_record_cannot_claim_published() -> None:
     assert "published" not in {state.value for state in DocumentLifecycle}
 ```
 
-- [ ] **Step 2: Run contract tests and verify RED**
+- [x] **Step 2: Run contract tests and verify RED**
 
 Run: `uv run pytest packages/contracts/tests/test_acquisition.py -q`
 
 Expected: collection fails because `rsi_atlas_contracts.acquisition` does not exist.
 
-- [ ] **Step 3: Implement the exact boundary models**
+- [x] **Step 3: Implement the exact boundary models**
 
 ```python
 class AcquisitionMethod(StrEnum):
@@ -131,11 +131,11 @@ class AcquisitionRequest(StrictModel):
 
 The full `AdmissionOutcome` enum remains versioned for later Phase 2 workers, but this slice validates that only `quarantine_for_review`, `request_password`, `reject_policy_violation`, `reject_unsafe`, and `mark_exact_duplicate` can appear in a Phase 2A result. `PDFSafetyProfile` records exact byte size, SHA-256, header/EOF evidence, and explicit `pass`, `fail`, or `unknown` states for MIME/signature consistency, page limit, encryption/password state, malformed structures, embedded files, active actions, suspicious references, decompression ratio, source policy, and available disk. `DocumentAdmissionRecord` includes context, request, artifact descriptor, lifecycle, outcome, profile, reason codes, duplicate target when applicable, and recorded time. Add validators for the lifecycle/outcome matrix, artifact/profile hash and size agreement, and duplicate-target consistency.
 
-- [ ] **Step 4: Cover every consistency boundary**
+- [x] **Step 4: Cover every consistency boundary**
 
 Add table-driven tests for every Phase 2A outcome, attempts to emit forbidden accept/admitted/new-version states, empty or control-character filenames, absolute/path-traversal filenames, duplicate reason entries, inconsistent lifecycle, mismatched artifact/profile evidence, and non-UTC timestamps. Original filenames must be leaf names after Unicode NFC normalization. The locator is an opaque `manual-import:<UUID>` value; never persist an absolute local path.
 
-- [ ] **Step 5: Run focused and package verification**
+- [x] **Step 5: Run focused and package verification**
 
 Run:
 
@@ -148,7 +148,7 @@ uv run mypy packages/contracts/src
 
 Expected: all commands pass and the prior artifact/status contracts remain unchanged.
 
-- [ ] **Step 6: Commit Task 1**
+- [x] **Step 6: Commit Task 1**
 
 ```bash
 git add packages/contracts
@@ -170,7 +170,7 @@ git commit -m "feat: define document admission contracts"
 - Consumes: `PDFSafetyProfile`, `AcquisitionRequest`, and exact-duplicate evidence.
 - Produces: `PDFAdmissionPolicy.evaluate(profile: PDFSafetyProfile, request: AcquisitionRequest, duplicate_of: UUID | None) -> PDFAdmissionDecision`, where the decision contains a Phase 2A outcome and stable reason codes.
 
-- [ ] **Step 1: Write policy RED tests with generated minimal PDFs**
+- [x] **Step 1: Write policy RED tests with generated minimal PDFs**
 
 ```python
 def _minimal_pdf(*, body: bytes = b"", pages: int = 1) -> bytes:
@@ -193,21 +193,21 @@ def test_policy_outcomes_are_fail_closed(profile: PDFSafetyProfile, outcome: Adm
     assert reason in decision.reason_codes
 ```
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `uv run pytest packages/ingestion/tests/test_admission.py -q`
 
 Expected: collection fails because the ingestion package is absent.
 
-- [ ] **Step 3: Implement bounded deterministic inspection**
+- [x] **Step 3: Implement bounded deterministic inspection**
 
 The policy first returns `mark_exact_duplicate` for a verified same-workspace artifact. Otherwise a failed signature/MIME/source-policy check is rejected, an authoritative encrypted/password signal requests a password, any failed active-content/embedded-file/reference check is quarantined, and any mandatory `unknown` check is quarantined with `required_check_unknown`. Even an all-pass synthetic profile remains quarantined with `isolated_profiler_not_promoted` because Phase 2A has no promoted safety-profiler identity. The policy performs no byte parsing, filesystem read, network, subprocess, model, or clock work.
 
-- [ ] **Step 4: Prove resource and false-positive boundaries**
+- [x] **Step 4: Prove resource and false-positive boundaries**
 
 Test every mandatory check as unknown, every fail priority, verified duplicate precedence, conflicting duplicate evidence, attempted all-pass admission, filename normalization, and deterministic output for identical profiles. Monkeypatch filesystem/socket/subprocess entry points to fail if invoked.
 
-- [ ] **Step 5: Render and visually verify the clean-looking quarantine fixture**
+- [x] **Step 5: Render and visually verify the clean-looking quarantine fixture**
 
 Write the born-digital test fixture only under `tmp/pdfs/`, render it with:
 
@@ -217,7 +217,7 @@ pdftoppm -png tmp/pdfs/admission-born-digital.pdf tmp/pdfs/admission-born-digita
 
 Inspect the PNG for a legible one-page fixture with no clipping or malformed glyphs. Its Phase 2A result must still be `awaiting_review`, not admitted. Remove only the exact `tmp/pdfs/` intermediates after recording the fixture hash in the task report; do not commit generated screenshots.
 
-- [ ] **Step 6: Run package verification and commit Task 2**
+- [x] **Step 6: Run package verification and commit Task 2**
 
 ```bash
 uv lock --check
@@ -244,7 +244,7 @@ git commit -m "feat: add deterministic PDF admission policy"
 - Consumes: `ArtifactCommandContext`, verified `ArtifactDescriptor`, `AcquisitionRequest`, `PDFAdmissionDecision`, and `PostgresDatabase`.
 - Produces: bounded staged-file CAS publication plus `AcquisitionRepository.record(...) -> DocumentAdmissionRecord` with idempotent acquisition identity, exact duplicate linking, append-only history, and a transactional outbox event.
 
-- [ ] **Step 1: Write migration and repository RED tests**
+- [x] **Step 1: Write migration and repository RED tests**
 
 ```python
 def test_exact_duplicate_links_existing_acquisition_without_second_payload(
@@ -265,7 +265,7 @@ def test_exact_duplicate_links_existing_acquisition_without_second_payload(
 
 Also add REDs for bounded streaming without full-payload buffering, short/read-failure staging cleanup, same acquisition replay, same acquisition ID with different hash, concurrent duplicate commands, cross-workspace duplicate isolation, decision/outbox atomicity, and UPDATE/DELETE/TRUNCATE rejection.
 
-- [ ] **Step 2: Run PostgreSQL tests and verify RED**
+- [x] **Step 2: Run PostgreSQL tests and verify RED**
 
 Run:
 
@@ -276,11 +276,11 @@ RSI_ATLAS_TEST_DATABASE_URL="$(./infra/local/postgres.sh test-url)" \
 
 Expected: migration count and repository imports fail because migration `0003` and the repository do not exist.
 
-- [ ] **Step 3: Add the append-only schema**
+- [x] **Step 3: Add the append-only schema**
 
 Create `atlas_ingestion.document_acquisitions`, `atlas_ingestion.document_admission_decisions`, `atlas_ingestion.document_duplicate_links`, and `atlas_ingestion.outbox_events`. Scope primary and foreign keys by tenant/workspace. Use a unique acquisition idempotency key and a workspace-scoped artifact index. Store constrained outcome/lifecycle text, reason arrays, profile/request snapshots as canonical JSONB, actor/trace IDs, and UTC timestamps. Add triggers rejecting UPDATE, DELETE, and TRUNCATE on evidence tables; outbox delivery metadata is appended as events rather than mutating evidence.
 
-- [ ] **Step 4: Implement one-transaction lineage resolution**
+- [x] **Step 4: Implement one-transaction lineage resolution**
 
 Extend `ContentAddressedArtifactStore` with a descriptor-relative `put_file` path that opens one already-staged regular file with `O_NOFOLLOW`, hashes and copies it in bounded chunks into the existing atomic CAS publication path, verifies size before/after, and never owns or deletes the source staging file. `record` validates all boundary models, takes a transaction-scoped advisory lock derived from tenant/workspace/acquisition, and follows this order:
 
@@ -290,7 +290,7 @@ Extend `ContentAddressedArtifactStore` with a descriptor-relative `put_file` pat
 4. Insert the acquisition, append-only decision, optional duplicate link, and one `DocumentAdmissionRecorded` outbox event in the same transaction.
 5. Reconstruct and strictly validate `DocumentAdmissionRecord` from stored values before commit.
 
-- [ ] **Step 5: Run migration, concurrency, and full storage checks**
+- [x] **Step 5: Run migration, concurrency, and full storage checks**
 
 ```bash
 RSI_ATLAS_TEST_DATABASE_URL="$(./infra/local/postgres.sh test-url)" \
@@ -300,9 +300,9 @@ uv run ruff format --check packages/storage
 uv run mypy packages/storage/src
 ```
 
-Expected: migration ledger contains `0001`, `0002`, and `0003`; all existing immutability and tenancy tests pass. Move the checked-in expected migration versions into `MigrationRunner` so runtime readiness and tests consume one source rather than duplicating `0001`/`0002` constants.
+Expected: migration ledger contains every version returned by `MigrationRunner.expected_versions()` (`0001` through invariant hardening migration `0004`); all existing immutability and tenancy tests pass. Runtime readiness and tests consume that one source rather than duplicating migration constants.
 
-- [ ] **Step 6: Commit Task 3**
+- [x] **Step 6: Commit Task 3**
 
 ```bash
 git add migrations packages/storage
@@ -326,7 +326,7 @@ git commit -m "feat: persist immutable document admissions"
 - Consumes: raw PDF bytes plus strict metadata/context.
 - Produces: `DocumentAdmissionService.admit(...) -> DocumentAdmissionRecord`, CLI JSON, and `POST /v1/workspaces/{workspace_id}/documents:admit`.
 
-- [ ] **Step 1: Write raw-first and boundary RED tests**
+- [x] **Step 1: Write raw-first and boundary RED tests**
 
 ```python
 def test_service_retains_raw_artifact_when_policy_requests_review() -> None:
@@ -347,19 +347,19 @@ def test_api_rejects_oversized_body_without_calling_service() -> None:
 
 Cover missing/duplicate identity headers, wrong content type, invalid UUIDs, body stream exceeding the declared size, absent content length, acquisition conflict 409, policy rejection as durable 200 evidence, database failure as 503 with no fabricated record, and strict response validation.
 
-- [ ] **Step 2: Run engine/service tests and verify RED**
+- [x] **Step 2: Run engine/service tests and verify RED**
 
 Run: `uv run pytest packages/ingestion/tests/test_service.py services/engine/tests/test_ingestion_api.py services/engine/tests/test_cli.py -q`
 
 Expected: the service, route, and CLI command do not exist.
 
-- [ ] **Step 3: Implement raw-artifact-first orchestration**
+- [x] **Step 3: Implement raw-artifact-first orchestration**
 
 `DocumentAdmissionService.admit_staged` validates context/request, publishes the owner-private staged regular file with media type `application/pdf`, verifies and registers the artifact through `ArtifactRepository`, builds a conservative `PDFSafetyProfile` from bounded streaming evidence plus Phase 1 disk/source policy, evaluates `PDFAdmissionPolicy`, then records the durable decision. Every structural/decompression/action signal not authoritatively available is `unknown`. Retry uses the same acquisition ID and content hash. Failures never delete CAS bytes; they raise typed errors without converting a missing durable record into success.
 
 `DocumentIngestionServices.from_environment()` derives the exact `RuntimePaths`, socket-only `PostgresDatabase`, migration runner, artifact store/repository, acquisition repository, policy, and service from `RSI_ATLAS_DATA_ROOT`. Refactor shared environment construction rather than copying a second default-root rule.
 
-- [ ] **Step 4: Implement bounded API streaming and direct CLI**
+- [x] **Step 4: Implement bounded API streaming and direct CLI**
 
 The API requires `Content-Type: application/pdf`, a decimal `Content-Length` in `1..33554432`, and UUID headers `X-RSI-Tenant-ID`, `X-RSI-Actor-ID`, `X-RSI-Trace-ID`, `X-RSI-Acquisition-ID`; it accepts a percent-decoded normalized filename query parameter, acquisition method, and collector version. Stream `request.stream()` into one random owner-private file below `<data-root>/staging/imports`, hash/count concurrently, enforce a second independent cap, `fsync`, and reject disconnects/length mismatch. Close and remove only that exact incomplete staging file on cancellation or failure. Never accept a filesystem path or URL.
 
@@ -371,11 +371,11 @@ atlas import-pdf FILE --tenant-id UUID --workspace-id UUID --actor-id UUID --tra
 
 The CLI opens exactly one regular, non-symlink file using descriptor flags, checks owner-readable size before and after the bounded read, and emits the same JSON contract. Exit 0 means a durable decision was recorded, including quarantine/rejection; boundary or persistence failure exits nonzero with sanitized stderr.
 
-- [ ] **Step 5: Prove zero egress and exact-root behavior**
+- [x] **Step 5: Prove zero egress and exact-root behavior**
 
 Run the CLI and API admission commands against a disposable `RSI_ATLAS_DATA_ROOT` under the existing zero-egress verifier. Deny external TCP and mDNS, permit only the exact PostgreSQL Unix socket, and confirm the supervised engine environment contains the same root. Record artifact hash, acquisition ID, outcome, duplicate identity when present, socket/staging owner and modes, and process command.
 
-- [ ] **Step 6: Run full Python verification and commit Task 4**
+- [x] **Step 6: Run full Python verification and commit Task 4**
 
 ```bash
 uv lock --check
@@ -386,6 +386,17 @@ RSI_ATLAS_TEST_DATABASE_URL="$(./infra/local/postgres.sh test-url)" uv run pytes
 git add packages services pyproject.toml uv.lock
 git commit -m "feat: admit immutable PDFs through local boundaries"
 ```
+
+Closure evidence through `ab40fb2`: strict admission contracts and fail-closed policy are
+independently approved; append-only acquisition, decision, duplicate, and outbox evidence is
+transactional and reconstructs across normalized and JSON representations; raw staged PDFs stream
+into CAS before downstream policy or persistence. CAS derives and verifies bounded prefix/suffix
+windows in the same immutable-payload hash pass, so forged safety windows cannot be recorded. The
+CLI and in-process API passed exact disposable-root development zero-egress with external TCP and
+mDNS denied and only the exact PostgreSQL Unix socket allowed. `815` PostgreSQL-configured Python
+tests, lock, Ruff, formatting, mypy, and diff checks pass. Independent final review reports no
+remaining Critical, Important, or Minor findings. This remains development-component evidence,
+not signed release-artifact proof.
 
 ---
 
