@@ -245,12 +245,12 @@ class AcquisitionRepository:
                 o.event_type,
                 o.recorded_at
             FROM atlas_ingestion.document_acquisitions AS a
-            JOIN atlas_ingestion.document_admission_decisions AS d
+            LEFT JOIN atlas_ingestion.document_admission_decisions AS d
               USING (tenant_id, workspace_id, acquisition_id)
             JOIN atlas_core.artifact_contents AS c USING (artifact_id)
             LEFT JOIN atlas_ingestion.document_duplicate_links AS l
               USING (tenant_id, workspace_id, acquisition_id)
-            JOIN atlas_ingestion.outbox_events AS o
+            LEFT JOIN atlas_ingestion.outbox_events AS o
               USING (tenant_id, workspace_id, acquisition_id)
             WHERE a.tenant_id = %s AND a.workspace_id = %s AND a.acquisition_id = %s
             """,

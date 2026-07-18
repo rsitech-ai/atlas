@@ -383,6 +383,68 @@ def test_repository_rejects_divergent_normalized_and_json_decision_evidence(
         connection.rollback()
 
 
+def test_repository_rejects_missing_required_outbox_evidence(
+    postgres_database: PostgresDatabase, tmp_path: Path
+) -> None:
+    context = _context()
+    _, descriptor = _registered_artifact(postgres_database, tmp_path, context)
+    repository = AcquisitionRepository(postgres_database)
+    record = repository.record(_record(context=context, descriptor=descriptor))
+
+    with postgres_database.connect() as connection:
+        connection.execute("SET LOCAL session_replication_role = replica")
+        connection.execute(
+            """
+            DELETE FROM atlas_ingestion.outbox_events
+            WHERE tenant_id = %s AND workspace_id = %s AND acquisition_id = %s
+            """,
+            (
+                context.tenant_id,
+                context.workspace_id,
+                record.request.acquisition_id,
+            ),
+        )
+
+        with pytest.raises(AcquisitionIntegrityError, match="evidence is invalid"):
+            repository._find_with_connection(
+                connection,
+                context=context,
+                acquisition_id=record.request.acquisition_id,
+            )
+        connection.rollback()
+
+
+def test_repository_rejects_missing_required_decision_evidence(
+    postgres_database: PostgresDatabase, tmp_path: Path
+) -> None:
+    context = _context()
+    _, descriptor = _registered_artifact(postgres_database, tmp_path, context)
+    repository = AcquisitionRepository(postgres_database)
+    record = repository.record(_record(context=context, descriptor=descriptor))
+
+    with postgres_database.connect() as connection:
+        connection.execute("SET LOCAL session_replication_role = replica")
+        connection.execute(
+            """
+            DELETE FROM atlas_ingestion.document_admission_decisions
+            WHERE tenant_id = %s AND workspace_id = %s AND acquisition_id = %s
+            """,
+            (
+                context.tenant_id,
+                context.workspace_id,
+                record.request.acquisition_id,
+            ),
+        )
+
+        with pytest.raises(AcquisitionIntegrityError, match="evidence is invalid"):
+            repository._find_with_connection(
+                connection,
+                context=context,
+                acquisition_id=record.request.acquisition_id,
+            )
+        connection.rollback()
+
+
 def test_database_rejects_an_inconsistent_outcome_lifecycle_pair(
     postgres_database: PostgresDatabase, tmp_path: Path
 ) -> None:
