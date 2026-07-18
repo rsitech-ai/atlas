@@ -5,6 +5,7 @@ requires-python = ">=3.11, <3.15"
 members = [
     "rsi-atlas-contracts",
     "rsi-atlas-engine",
+    "rsi-atlas-models",
     "rsi-atlas-observability",
     "rsi-atlas-security",
     "rsi-atlas-storage",
@@ -610,6 +611,17 @@ requires-dist = [
 ]
 
 [[package]]
+name = "rsi-atlas-models"
+version = "0.1.0"
+source = { editable = "packages/models" }
+dependencies = [
+    { name = "rsi-atlas-contracts" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "rsi-atlas-contracts", editable = "packages/contracts" }]
+
+[[package]]
 name = "rsi-atlas-observability"
 version = "0.1.0"
 source = { editable = "packages/observability" }
@@ -651,6 +663,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "rsi-atlas-contracts" },
     { name = "rsi-atlas-engine" },
+    { name = "rsi-atlas-models" },
     { name = "rsi-atlas-observability" },
     { name = "rsi-atlas-security" },
     { name = "rsi-atlas-storage" },
@@ -668,6 +681,7 @@ dev = [
 requires-dist = [
     { name = "rsi-atlas-contracts", editable = "packages/contracts" },
     { name = "rsi-atlas-engine", editable = "services/engine" },
+    { name = "rsi-atlas-models", editable = "packages/models" },
     { name = "rsi-atlas-observability", editable = "packages/observability" },
     { name = "rsi-atlas-security", editable = "packages/security" },
     { name = "rsi-atlas-storage", editable = "packages/storage" },

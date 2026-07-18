@@ -1,0 +1,61 @@
+from enum import StrEnum
+from pathlib import Path
+from uuid import UUID
+
+from pydantic import Field, field_validator
+
+from rsi_atlas_contracts.system_status import StrictModel
+
+
+class ModelCapability(StrEnum):
+    GENERATE = "generate"
+    EMBED = "embed"
+    RERANK = "rerank"
+
+
+class ModelLifecycle(StrEnum):
+    IMPORTED = "imported"
+    VALIDATED = "validated"
+    RETIRED = "retired"
+
+
+class ProviderHealthState(StrEnum):
+    UNAVAILABLE = "unavailable"
+    AVAILABLE = "available"
+
+
+class ResourceClass(StrEnum):
+    LIGHT = "light"
+    HEAVY_MODEL = "heavy_model"
+
+
+class ThermalState(StrEnum):
+    NOMINAL = "nominal"
+    FAIR = "fair"
+    SERIOUS = "serious"
+    CRITICAL = "critical"
+
+
+class ModelArtifact(StrictModel):
+    artifact_id: UUID
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    provider_family: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,63}$")
+    upstream_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$")
+    architecture: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,63}$")
+    parameter_class: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,63}$")
+    quantization: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,63}$")
+    tokenizer_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    context_tokens: int = Field(gt=0, le=10_000_000)
+    license_id: str = Field(pattern=r"^[A-Za-z0-9.-]{1,96}$")
+    source_manifest_id: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    local_path: Path
+    capabilities: frozenset[ModelCapability]
+    approved_tasks: frozenset[str] = Field(default_factory=frozenset)
+    lifecycle: ModelLifecycle = ModelLifecycle.IMPORTED
+
+    @field_validator("local_path")
+    @classmethod
+    def absolute_path(cls, value: Path) -> Path:
+        if not value.is_absolute():
+            raise ValueError("model path must be absolute")
+        return value
