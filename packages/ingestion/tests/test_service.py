@@ -300,6 +300,34 @@ def test_evidence_mismatch_fails_after_raw_publication_without_registration(
     assert acquisitions.record_calls == []
 
 
+@pytest.mark.parametrize("window", ("leading", "trailing"))
+def test_forged_evidence_window_fails_against_immutable_cas_bytes(
+    tmp_path: Path,
+    window: str,
+) -> None:
+    payload = _pdf(header=b"NOT-PDF!", eof=b"missing-eof\n")
+    staged_path = _staged_pdf(tmp_path, payload)
+    service, store, artifacts, acquisitions = _service(tmp_path)
+    changes = (
+        {"leading_bytes": b"%PDF-1.7"}
+        if window == "leading"
+        else {"trailing_bytes": b"x" * (len(payload) - 6) + b"%%EOF\n"}
+    )
+
+    with pytest.raises(StagedPDFEvidenceMismatchError, match="evidence window"):
+        service.admit_staged(
+            context=CONTEXT,
+            request=_request(),
+            staged_path=staged_path,
+            staged_evidence=_evidence(payload, **changes),
+        )
+
+    digest = hashlib.sha256(payload).hexdigest()
+    assert store.read_bytes(ArtifactID(f"sha256:{digest}"), context=CONTEXT) == payload
+    assert artifacts.calls == []
+    assert acquisitions.record_calls == []
+
+
 @pytest.mark.parametrize("failure_boundary", ("artifact_database", "policy", "acquisition"))
 def test_raw_cas_bytes_remain_when_a_later_boundary_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure_boundary: str

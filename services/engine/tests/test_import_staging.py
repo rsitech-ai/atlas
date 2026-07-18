@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from rsi_atlas_contracts import SafetyCheckState
 from rsi_atlas_engine.import_staging import ImportStagingArea, ImportStagingError
+from starlette.requests import ClientDisconnect
 
 
 def _private_directory(path: Path) -> Path:
@@ -17,6 +18,11 @@ def _private_directory(path: Path) -> Path:
 async def _chunks(*payloads: bytes):
     for payload in payloads:
         yield payload
+
+
+async def _disconnecting_chunks(payload: bytes):
+    yield payload
+    raise ClientDisconnect()
 
 
 def test_async_stage_streams_to_owner_private_file_and_records_exact_evidence(
@@ -77,6 +83,21 @@ def test_async_stage_rejects_stream_over_declared_length_and_cleans_up(tmp_path:
 
     with pytest.raises(ImportStagingError, match="length"):
         asyncio.run(area.stage_chunks(_chunks(b"too", b" many"), expected_bytes=3))
+
+    assert tuple(root.iterdir()) == ()
+
+
+def test_async_stage_cleans_partial_file_when_client_disconnects(tmp_path: Path) -> None:
+    root = _private_directory(tmp_path / "staging")
+    area = ImportStagingArea(root)
+
+    with pytest.raises(ClientDisconnect):
+        asyncio.run(
+            area.stage_chunks(
+                _disconnecting_chunks(b"%PDF-1.7\n"),
+                expected_bytes=20,
+            )
+        )
 
     assert tuple(root.iterdir()) == ()
 

@@ -16,9 +16,10 @@ from rsi_atlas_contracts import (
     SafetyCheckState,
 )
 from rsi_atlas_engine.api import create_app
-from rsi_atlas_engine.import_staging import ImportStagingArea
+from rsi_atlas_engine.import_staging import ImportStagingArea, ImportStagingError
 from rsi_atlas_ingestion import StagedPDFEvidence
 from rsi_atlas_storage import AcquisitionConflictError
+from starlette.requests import ClientDisconnect
 
 
 class FakeAdmissionService:
@@ -91,7 +92,12 @@ def _url(workspace_id: UUID | None = None) -> str:
     )
 
 
-def _client(tmp_path: Path, service: FakeAdmissionService) -> tuple[TestClient, Path]:
+def _client(
+    tmp_path: Path,
+    service: FakeAdmissionService,
+    *,
+    raise_server_exceptions: bool = True,
+) -> tuple[TestClient, Path]:
     staging_root = tmp_path / "staging"
     staging_root.mkdir(mode=0o700)
     staging_root.chmod(0o700)
@@ -99,7 +105,7 @@ def _client(tmp_path: Path, service: FakeAdmissionService) -> tuple[TestClient, 
         document_admission_service=service,
         import_staging_area=ImportStagingArea(staging_root),
     )
-    return TestClient(app), staging_root
+    return TestClient(app, raise_server_exceptions=raise_server_exceptions), staging_root
 
 
 def test_admission_endpoint_streams_raw_pdf_and_returns_strict_record(tmp_path: Path) -> None:
@@ -156,6 +162,20 @@ def test_endpoint_rejects_body_longer_than_declared_and_cleans_staging(tmp_path:
     payload = b"%PDF-1.7\n%%EOF\n"
     headers = _headers(payload)
     headers["content-length"] = str(len(payload) - 1)
+
+    response = client.post(_url(), headers=headers, content=payload)
+
+    assert response.status_code == 400
+    assert service.calls == []
+    assert tuple(staging_root.iterdir()) == ()
+
+
+def test_endpoint_rejects_body_shorter_than_declared_and_cleans_staging(tmp_path: Path) -> None:
+    service = FakeAdmissionService()
+    client, staging_root = _client(tmp_path, service)
+    payload = b"%PDF-1.7\n%%EOF\n"
+    headers = _headers(payload)
+    headers["content-length"] = str(len(payload) + 1)
 
     response = client.post(_url(), headers=headers, content=payload)
 
@@ -229,4 +249,90 @@ def test_endpoint_rejects_missing_or_duplicate_identity_header(tmp_path: Path) -
     assert client.post(_url(), headers=missing, content=payload).status_code == 422
     assert client.post(_url(), headers=duplicate, content=payload).status_code == 422
     assert service.calls == []
+    assert tuple(staging_root.iterdir()) == ()
+
+
+def test_endpoint_maps_client_disconnect_to_400(tmp_path: Path) -> None:
+    class DisconnectingStagingArea(ImportStagingArea):
+        async def stage_chunks(self, *args: Any, **kwargs: Any) -> Any:
+            raise ClientDisconnect()
+
+    payload = b"%PDF-1.7\n%%EOF\n"
+    service = FakeAdmissionService()
+    staging_root = tmp_path / "staging"
+    staging_root.mkdir(mode=0o700)
+    app = create_app(
+        document_admission_service=service,
+        import_staging_area=DisconnectingStagingArea(staging_root),
+    )
+
+    response = TestClient(app).post(_url(), headers=_headers(payload), content=payload)
+
+    assert response.status_code == 400
+    assert service.calls == []
+
+
+def test_endpoint_reports_cleanup_failure_without_hiding_it(tmp_path: Path) -> None:
+    class CleanupFailingStaged:
+        def __init__(self, path: Path, evidence: StagedPDFEvidence) -> None:
+            self.path = path
+            self.evidence = evidence
+
+        def cleanup(self) -> None:
+            raise ImportStagingError("injected cleanup failure")
+
+    class CleanupFailingArea(ImportStagingArea):
+        async def stage_chunks(self, *args: Any, **kwargs: Any) -> Any:
+            data = b"%PDF-1.7\n%%EOF\n"
+            path = staging_root / ".injected"
+            path.write_bytes(data)
+            path.chmod(0o600)
+            return CleanupFailingStaged(
+                path,
+                StagedPDFEvidence(
+                    digest=hashlib.sha256(data).hexdigest(),
+                    size_bytes=len(data),
+                    leading_bytes=data[:8],
+                    trailing_bytes=data,
+                    source_policy=SafetyCheckState.PASS,
+                    available_disk=SafetyCheckState.PASS,
+                ),
+            )
+
+    payload = b"%PDF-1.7\n%%EOF\n"
+    service = FakeAdmissionService()
+    staging_root = tmp_path / "staging"
+    staging_root.mkdir(mode=0o700)
+    app = create_app(
+        document_admission_service=service,
+        import_staging_area=CleanupFailingArea(staging_root),
+    )
+
+    response = TestClient(app, raise_server_exceptions=False).post(
+        _url(), headers=_headers(payload), content=payload
+    )
+
+    assert response.status_code == 500
+    assert len(service.calls) == 1
+    (staging_root / ".injected").unlink()
+
+
+def test_endpoint_rejects_invalid_service_result_after_cleanup(tmp_path: Path) -> None:
+    class InvalidResultService(FakeAdmissionService):
+        def admit_staged(self, **call: Any) -> Any:
+            self.calls.append(call)
+            return {"schema_version": "not-a-record"}
+
+    payload = b"%PDF-1.7\n%%EOF\n"
+    service = InvalidResultService()
+    client, staging_root = _client(
+        tmp_path,
+        service,
+        raise_server_exceptions=False,
+    )
+
+    response = client.post(_url(), headers=_headers(payload), content=payload)
+
+    assert response.status_code == 500
+    assert len(service.calls) == 1
     assert tuple(staging_root.iterdir()) == ()

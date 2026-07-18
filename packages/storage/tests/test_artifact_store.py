@@ -50,6 +50,35 @@ def test_changed_bytes_create_a_distinct_artifact(tmp_path: Path) -> None:
     assert first.artifact_id != second.artifact_id
 
 
+def test_evidence_windows_are_derived_while_verifying_immutable_bytes(tmp_path: Path) -> None:
+    store = ContentAddressedArtifactStore(tmp_path)
+    payload = b"%PDF-1.7\n" + (b"bounded-evidence\n" * 100) + b"%%EOF\n"
+    descriptor = store.put_bytes(
+        payload,
+        media_type="application/pdf",
+        context=COMMAND_CONTEXT,
+    )
+
+    leading, trailing = store.read_evidence_windows(
+        descriptor.artifact_id,
+        context=COMMAND_CONTEXT,
+        leading_bytes=8,
+        trailing_bytes=1_024,
+    )
+
+    assert leading == payload[:8]
+    assert trailing == payload[-1_024:]
+
+    store.payload_path(descriptor.artifact_id).write_bytes(b"tampered")
+    with pytest.raises(ArtifactIntegrityError, match="content"):
+        store.read_evidence_windows(
+            descriptor.artifact_id,
+            context=COMMAND_CONTEXT,
+            leading_bytes=8,
+            trailing_bytes=1_024,
+        )
+
+
 def test_put_file_streams_in_bounded_chunks_without_buffering_the_source(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

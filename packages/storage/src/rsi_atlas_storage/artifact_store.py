@@ -128,6 +128,40 @@ class ContentAddressedArtifactStore:
             raise ArtifactIntegrityError("artifact content hash mismatch")
         return descriptor
 
+    def read_evidence_windows(
+        self,
+        artifact_id: ArtifactID,
+        *,
+        context: ArtifactCommandContext,
+        leading_bytes: int,
+        trailing_bytes: int,
+    ) -> tuple[bytes, bytes]:
+        self._require_context(context)
+        for label, value in (
+            ("leading_bytes", leading_bytes),
+            ("trailing_bytes", trailing_bytes),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 4_096:
+                raise ValueError(f"{label} must be an integer in 1..4096")
+        directory_fd = self._validate_artifact_directory(artifact_id)
+        try:
+            descriptor = self._load_descriptor(artifact_id, directory_fd)
+            actual_digest, actual_size, leading, trailing = self._verify_with_windows(
+                directory_fd,
+                "payload",
+                label="payload",
+                leading_bytes=leading_bytes,
+                trailing_bytes=trailing_bytes,
+                max_bytes=descriptor.size_bytes,
+            )
+        finally:
+            os.close(directory_fd)
+        if actual_size != descriptor.size_bytes:
+            raise ArtifactIntegrityError("artifact content size mismatch")
+        if actual_digest != descriptor.digest:
+            raise ArtifactIntegrityError("artifact content hash mismatch")
+        return leading, trailing
+
     def payload_path(self, artifact_id: ArtifactID) -> Path:
         return self._directory_for(artifact_id) / "payload"
 
@@ -290,6 +324,46 @@ class ContentAddressedArtifactStore:
             if not self._same_file_state(initial_state, os.fstat(file_fd)):
                 raise ArtifactIntegrityError(f"artifact {label} changed during verification")
             return digest.hexdigest(), size_bytes
+        except OSError as error:
+            raise ArtifactIntegrityError(f"artifact {label} cannot be verified") from error
+        finally:
+            os.close(file_fd)
+
+    def _verify_with_windows(
+        self,
+        directory_fd: int,
+        name: str,
+        *,
+        label: str,
+        leading_bytes: int,
+        trailing_bytes: int,
+        max_bytes: int,
+    ) -> tuple[str, int, bytes, bytes]:
+        file_fd = self._open_regular_file(directory_fd, name, label=label)
+        try:
+            initial_state = os.fstat(file_fd)
+            digest = hashlib.sha256()
+            leading = bytearray()
+            trailing = bytearray()
+            size_bytes = 0
+            read_limit = max_bytes + 1
+            while size_bytes < read_limit:
+                chunk = os.read(
+                    file_fd,
+                    min(self._STREAM_CHUNK_SIZE, read_limit - size_bytes),
+                )
+                if not chunk:
+                    break
+                digest.update(chunk)
+                if len(leading) < leading_bytes:
+                    leading.extend(chunk[: leading_bytes - len(leading)])
+                trailing.extend(chunk)
+                if len(trailing) > trailing_bytes:
+                    del trailing[:-trailing_bytes]
+                size_bytes += len(chunk)
+            if not self._same_file_state(initial_state, os.fstat(file_fd)):
+                raise ArtifactIntegrityError(f"artifact {label} changed during verification")
+            return digest.hexdigest(), size_bytes, bytes(leading), bytes(trailing)
         except OSError as error:
             raise ArtifactIntegrityError(f"artifact {label} cannot be verified") from error
         finally:

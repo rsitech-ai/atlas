@@ -71,6 +71,15 @@ class ArtifactStorePort(Protocol):
         context: ArtifactCommandContext,
     ) -> ArtifactDescriptor: ...
 
+    def read_evidence_windows(
+        self,
+        artifact_id: ArtifactID,
+        *,
+        context: ArtifactCommandContext,
+        leading_bytes: int,
+        trailing_bytes: int,
+    ) -> tuple[bytes, bytes]: ...
+
 
 class ArtifactRepositoryPort(Protocol):
     def register(
@@ -135,6 +144,19 @@ class DocumentAdmissionService:
             )
         )
         evidence.require_matches(descriptor)
+        immutable_leading, immutable_trailing = self._artifact_store.read_evidence_windows(
+            descriptor.artifact_id,
+            context=command_context,
+            leading_bytes=_LEADING_EVIDENCE_BYTES,
+            trailing_bytes=_TRAILING_EVIDENCE_BYTES,
+        )
+        if (
+            immutable_leading != evidence.leading_bytes
+            or immutable_trailing != evidence.trailing_bytes
+        ):
+            raise StagedPDFEvidenceMismatchError(
+                "staged PDF evidence window does not match the immutable artifact"
+            )
 
         registered = ArtifactDescriptor.model_validate(
             self._artifact_repository.register(
