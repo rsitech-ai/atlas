@@ -158,6 +158,84 @@ def test_staging_root_must_already_be_owner_private(tmp_path: Path) -> None:
         ImportStagingArea(root)
 
 
+def test_initialization_recovers_only_owner_private_orphan_files(tmp_path: Path) -> None:
+    root = _private_directory(tmp_path / "staging")
+    orphan = root / ".import-0123456789abcdef0123456789abcdef"
+    orphan.write_bytes(b"partial request")
+    orphan.chmod(0o600)
+    unrelated = root / "operator-note"
+    unrelated.write_text("preserve")
+    unrelated.chmod(0o600)
+
+    area = ImportStagingArea(root)
+
+    assert not orphan.exists()
+    assert unrelated.read_text() == "preserve"
+    del area
+
+
+@pytest.mark.parametrize("kind", ("symlink", "permissions", "hardlink"))
+def test_initialization_refuses_unsafe_orphan_without_unlinking_it(
+    tmp_path: Path, kind: str
+) -> None:
+    root = _private_directory(tmp_path / "staging")
+    orphan = root / ".import-fedcba9876543210fedcba9876543210"
+    target = tmp_path / "target"
+    target.write_bytes(b"preserve")
+    target.chmod(0o600)
+    if kind == "symlink":
+        orphan.symlink_to(target)
+    else:
+        orphan.write_bytes(b"partial request")
+        orphan.chmod(0o644 if kind == "permissions" else 0o600)
+        if kind == "hardlink":
+            os.link(orphan, tmp_path / "second-link")
+
+    with pytest.raises(ImportStagingError, match="orphan"):
+        ImportStagingArea(root)
+
+    assert os.path.lexists(orphan)
+    assert target.read_bytes() == b"preserve"
+
+
+def test_second_staging_area_cannot_recover_an_active_root(tmp_path: Path) -> None:
+    root = _private_directory(tmp_path / "staging")
+    active = ImportStagingArea(root)
+    payload = b"%PDF-1.7\n%%EOF\n"
+    staged = asyncio.run(active.stage_chunks(_chunks(payload), expected_bytes=len(payload)))
+    staged.cleanup()
+
+    with pytest.raises(ImportStagingError, match="already active"):
+        ImportStagingArea(root)
+
+    del active
+    replacement = ImportStagingArea(root)
+    del replacement
+
+
+def test_leased_directory_descriptor_survives_root_path_replacement(tmp_path: Path) -> None:
+    root = _private_directory(tmp_path / "staging")
+    displaced = tmp_path / "displaced-staging"
+    area = ImportStagingArea(root)
+    root.rename(displaced)
+    _private_directory(root)
+    payload = b"%PDF-1.7\n%%EOF\n"
+
+    staged = asyncio.run(area.stage_chunks(_chunks(payload), expected_bytes=len(payload)))
+    staged_in_displaced_root = displaced / staged.path.name
+
+    assert staged_in_displaced_root.read_bytes() == payload
+    assert tuple(root.iterdir()) == ()
+    replacement = ImportStagingArea(root)
+    assert staged_in_displaced_root.exists()
+
+    staged.cleanup()
+
+    assert not staged_in_displaced_root.exists()
+    del replacement
+    del area
+
+
 def test_cleanup_refuses_to_unlink_a_replaced_file(tmp_path: Path) -> None:
     root = _private_directory(tmp_path / "staging")
     payload = b"%PDF-1.7\n%%EOF\n"

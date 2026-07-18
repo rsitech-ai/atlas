@@ -217,6 +217,37 @@ def test_missing_terminal_eof_is_authoritative_structure_failure(tmp_path: Path)
     assert result.reason_codes == ("malformed_structure",)
 
 
+@pytest.mark.parametrize(
+    ("marker", "profile_field"),
+    (
+        (b"/OpenAction 2 0 R", "active_actions"),
+        (b"/Type /EmbeddedFile", "embedded_files"),
+        (b"/Encrypt 3 0 R", "encryption_password_state"),
+        (b"/URI (https://example.invalid/evidence)", "suspicious_references"),
+        (b"/Type /Page", "page_count_limit"),
+    ),
+)
+def test_unpromoted_marker_signals_remain_unknown_and_quarantined(
+    tmp_path: Path, marker: bytes, profile_field: str
+) -> None:
+    payload = b"%PDF-1.7\n1 0 obj\n<< " + marker + b" >>\nendobj\n%%EOF\n"
+    staged_path = _staged_pdf(tmp_path, payload)
+    service, _, _, _ = _service(tmp_path)
+
+    result = service.admit_staged(
+        context=CONTEXT,
+        request=_request(),
+        staged_path=staged_path,
+        staged_evidence=_evidence(payload),
+    )
+
+    assert getattr(result.profile, profile_field) is SafetyCheckState.UNKNOWN
+    assert result.profile.page_marker_count is None
+    assert result.lifecycle is DocumentLifecycle.AWAITING_REVIEW
+    assert result.outcome is AdmissionOutcome.QUARANTINE_FOR_REVIEW
+    assert result.reason_codes == ("required_check_unknown",)
+
+
 def test_same_workspace_digest_is_recorded_as_exact_duplicate(tmp_path: Path) -> None:
     payload = _pdf()
     staged_path = _staged_pdf(tmp_path, payload)
@@ -427,7 +458,10 @@ def test_service_performs_no_network_subprocess_or_parser_execution(
         raise AssertionError("forbidden boundary used")
 
     monkeypatch.setattr(socket, "socket", forbidden)
+    monkeypatch.setattr(socket, "create_connection", forbidden)
+    monkeypatch.setattr(socket, "getaddrinfo", forbidden)
     monkeypatch.setattr(subprocess, "run", forbidden)
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
     payload = _pdf()
     staged_path = _staged_pdf(tmp_path, payload)
     service, _, _, _ = _service(tmp_path)

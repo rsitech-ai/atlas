@@ -1,8 +1,10 @@
+import fcntl
 import hashlib
 import os
 import secrets
 import stat
 from collections.abc import AsyncIterable
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -23,12 +25,13 @@ class StagedPDF:
     evidence: StagedPDFEvidence
     _device: int
     _inode: int
+    _lease: "_StagingRootLease"
 
     def cleanup(self) -> None:
         parent_fd = -1
         file_fd = -1
         try:
-            parent_fd = os.open(self.path.parent, _directory_open_flags())
+            parent_fd = self._lease.duplicate_descriptor()
             file_fd = os.open(self.path.name, _file_open_flags(), dir_fd=parent_fd)
             state = os.fstat(file_fd)
             if (state.st_dev, state.st_ino) != (self._device, self._inode):
@@ -45,6 +48,34 @@ class StagedPDF:
                 os.close(file_fd)
             if parent_fd >= 0:
                 os.close(parent_fd)
+            self._lease.close()
+
+
+class _StagingRootLease:
+    def __init__(self, descriptor: int) -> None:
+        self._descriptor = descriptor
+
+    def duplicate(self) -> "_StagingRootLease":
+        return _StagingRootLease(self.duplicate_descriptor())
+
+    def duplicate_descriptor(self) -> int:
+        if self._descriptor < 0:
+            raise ImportStagingError("import staging root lease is unavailable")
+        try:
+            return os.dup(self._descriptor)
+        except OSError as error:
+            raise ImportStagingError("import staging root lease cannot be retained") from error
+
+    def close(self) -> None:
+        descriptor = self._descriptor
+        if descriptor < 0:
+            return
+        self._descriptor = -1
+        with suppress(OSError):
+            os.close(descriptor)
+
+    def __del__(self) -> None:
+        self.close()
 
 
 class ImportStagingArea:
@@ -55,7 +86,20 @@ class ImportStagingArea:
             raise ImportStagingError("import staging root must be canonical")
         self._root = root
         root_fd = self._open_root()
-        os.close(root_fd)
+        try:
+            fcntl.flock(root_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            os.close(root_fd)
+            raise ImportStagingError("an import staging area is already active") from error
+        except OSError as error:
+            os.close(root_fd)
+            raise ImportStagingError("import staging root cannot be leased safely") from error
+        self._lease = _StagingRootLease(root_fd)
+        try:
+            self._recover_orphans(root_fd)
+        except BaseException:
+            self._lease.close()
+            raise
 
     async def stage_chunks(
         self,
@@ -89,6 +133,7 @@ class ImportStagingArea:
                 evidence=evidence,
                 _device=state.st_dev,
                 _inode=state.st_ino,
+                _lease=self._lease.duplicate(),
             )
         except BaseException:
             _cleanup_incomplete(root_fd, name, destination_fd)
@@ -132,6 +177,7 @@ class ImportStagingArea:
                     evidence=evidence,
                     _device=destination_state.st_dev,
                     _inode=destination_state.st_ino,
+                    _lease=self._lease.duplicate(),
                 )
             except BaseException:
                 _cleanup_incomplete(root_fd, name, destination_fd)
@@ -167,7 +213,7 @@ class ImportStagingArea:
             raise ImportStagingError("import staging root is missing or unsafe") from error
 
     def _create_file(self) -> tuple[int, str, int]:
-        root_fd = self._open_root()
+        root_fd = self._lease.duplicate_descriptor()
         for _ in range(8):
             name = f".import-{secrets.token_hex(16)}"
             try:
@@ -187,11 +233,50 @@ class ImportStagingArea:
         os.close(root_fd)
         raise ImportStagingError("staging file name collision")
 
-    def _require_disk_capacity(self, expected_bytes: int) -> None:
+    def _recover_orphans(self, root_fd: int) -> None:
+        candidates: list[tuple[str, int, os.stat_result]] = []
         try:
-            filesystem = os.statvfs(self._root)
+            names = os.listdir(root_fd)
+            for name in names:
+                if not _is_staging_name(name):
+                    continue
+                try:
+                    descriptor = os.open(name, _file_open_flags(), dir_fd=root_fd)
+                except OSError as error:
+                    raise ImportStagingError("orphan staging file is unsafe") from error
+                state = os.fstat(descriptor)
+                if (
+                    not stat.S_ISREG(state.st_mode)
+                    or state.st_uid != os.geteuid()
+                    or stat.S_IMODE(state.st_mode) != 0o600
+                    or state.st_nlink != 1
+                ):
+                    os.close(descriptor)
+                    raise ImportStagingError("orphan staging file is unsafe")
+                candidates.append((name, descriptor, state))
+
+            for name, _, expected in candidates:
+                actual = os.stat(name, dir_fd=root_fd, follow_symlinks=False)
+                if _file_identity(actual) != _file_identity(expected):
+                    raise ImportStagingError("orphan staging file changed during recovery")
+            for name, _, _ in candidates:
+                os.unlink(name, dir_fd=root_fd)
+        except ImportStagingError:
+            raise
+        except OSError as error:
+            raise ImportStagingError("orphan staging files cannot be recovered safely") from error
+        finally:
+            for _, descriptor, _ in candidates:
+                os.close(descriptor)
+
+    def _require_disk_capacity(self, expected_bytes: int) -> None:
+        root_fd = self._lease.duplicate_descriptor()
+        try:
+            filesystem = os.fstatvfs(root_fd)
         except OSError as error:
             raise ImportStagingError("available disk cannot be inspected") from error
+        finally:
+            os.close(root_fd)
         available = filesystem.f_bavail * filesystem.f_frsize
         if available < expected_bytes + _DISK_RESERVE_BYTES:
             raise ImportStagingError("available disk is insufficient for import staging")
@@ -277,6 +362,16 @@ def _require_expected_size(value: int) -> None:
         raise TypeError("import size must be an integer")
     if not 1 <= value <= MAX_PDF_BYTES:
         raise ImportStagingError("import size is outside the PDF limit")
+
+
+def _is_staging_name(name: str) -> bool:
+    prefix = ".import-"
+    suffix = name.removeprefix(prefix)
+    return (
+        name.startswith(prefix)
+        and len(suffix) == 32
+        and all(character in "0123456789abcdef" for character in suffix)
+    )
 
 
 def _file_identity(state: os.stat_result) -> tuple[int, ...]:
