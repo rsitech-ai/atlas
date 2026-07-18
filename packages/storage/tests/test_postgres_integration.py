@@ -1,7 +1,9 @@
+import importlib.util
 import os
 import select
 import shutil
 import stat
+import struct
 import subprocess
 import tempfile
 import time
@@ -22,6 +24,39 @@ from rsi_atlas_storage import (
     MigrationRunner,
     PostgresDatabase,
 )
+
+SECURE_PATH_SPEC = importlib.util.spec_from_file_location(
+    "rsi_atlas_secure_path", "infra/local/secure_path.py"
+)
+assert SECURE_PATH_SPEC is not None and SECURE_PATH_SPEC.loader is not None
+secure_path = importlib.util.module_from_spec(SECURE_PATH_SPEC)
+SECURE_PATH_SPEC.loader.exec_module(secure_path)
+
+
+class FakeBootstrapSocket:
+    def __init__(self, payload: bytes = b"", *, timeout_on_recv: bool = False) -> None:
+        self.payload = bytearray(payload)
+        self.timeout_on_recv = timeout_on_recv
+        self.recv_sizes: list[int] = []
+        self.sent: list[bytes] = []
+
+    def recv(self, size: int) -> bytes:
+        self.recv_sizes.append(size)
+        if self.timeout_on_recv:
+            raise TimeoutError("injected timeout")
+        result = bytes(self.payload[:size])
+        del self.payload[:size]
+        return result
+
+    def sendall(self, payload: bytes) -> None:
+        self.sent.append(payload)
+
+    def settimeout(self, timeout: float) -> None:
+        assert timeout > 0
+
+
+def _backend_message(message_type: bytes, payload: bytes) -> bytes:
+    return message_type + struct.pack("!I", len(payload) + 4) + payload
 
 
 @pytest.fixture(scope="session")
@@ -658,6 +693,112 @@ def test_postgres_socket_stays_bound_after_second_ancestor_swap() -> None:
                 capture_output=True,
                 text=True,
             )
+
+
+def test_bootstrap_rejects_oversized_frame_before_payload_read() -> None:
+    connection = FakeBootstrapSocket(b"D" + struct.pack("!I", secure_path.MAX_FRAME_BYTES + 1))
+
+    with pytest.raises(secure_path.SecurePathError, match="frame"):
+        secure_path._read_message(connection)
+
+    assert max(connection.recv_sizes) <= 4
+
+
+def test_bootstrap_rejects_truncated_frame_with_domain_error() -> None:
+    connection = FakeBootstrapSocket(b"D" + struct.pack("!I", 10) + b"\x00")
+
+    with pytest.raises(secure_path.SecurePathError, match="protocol"):
+        secure_path._read_message(connection)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"\x00\x01",
+        b"\x00\x01" + struct.pack("!i", -2),
+        b"\x00\x01" + struct.pack("!i", 5) + b"ab",
+        b"\x00\x01" + struct.pack("!i", 1) + b"\xff",
+        struct.pack("!H", 65),
+    ],
+)
+def test_bootstrap_rejects_invalid_data_row_structure(payload: bytes) -> None:
+    connection = FakeBootstrapSocket(_backend_message(b"D", payload))
+
+    with pytest.raises(secure_path.SecurePathError, match="DataRow"):
+        secure_path._query(connection, "SELECT 1")
+
+
+def test_bootstrap_rejects_ready_before_authentication() -> None:
+    connection = FakeBootstrapSocket(_backend_message(b"Z", b"I"))
+
+    with pytest.raises(secure_path.SecurePathError, match="authentication"):
+        secure_path._perform_bootstrap(connection, "atlas", "atlas")
+
+
+def test_bootstrap_rejects_invalid_ready_state_after_authentication() -> None:
+    connection = FakeBootstrapSocket(
+        _backend_message(b"R", struct.pack("!I", 0)) + _backend_message(b"Z", b"X")
+    )
+
+    with pytest.raises(secure_path.SecurePathError, match="ReadyForQuery"):
+        secure_path._perform_bootstrap(connection, "atlas", "atlas")
+
+
+def test_bootstrap_handles_error_response_as_stable_domain_error() -> None:
+    connection = FakeBootstrapSocket(_backend_message(b"E", b"Mdenied\0\0"))
+
+    with pytest.raises(secure_path.SecurePathError, match="server rejected"):
+        secure_path._perform_bootstrap(connection, "atlas", "atlas")
+
+
+def test_bootstrap_timeout_becomes_stable_domain_error() -> None:
+    connection = FakeBootstrapSocket(timeout_on_recv=True)
+
+    with pytest.raises(secure_path.SecurePathError, match="timed out"):
+        secure_path._read_message(connection)
+
+
+def test_bootstrap_cli_never_leaks_traceback_for_runtime_failure() -> None:
+    result = subprocess.run(
+        ["/usr/bin/python3", "infra/local/secure_path.py", "bootstrap", "atlas", "atlas"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "RSI_ATLAS_BOUND_POSTGRES_FD": "999999"},
+    )
+
+    assert result.returncode == 1
+    assert result.stderr == (
+        "Secure PostgreSQL bootstrap failed: PostgreSQL bootstrap protocol failure\n"
+    )
+    assert "Traceback" not in result.stderr
+
+
+def test_postmaster_and_backend_do_not_retain_bound_directory_fd(
+    postgres_database: PostgresDatabase,
+) -> None:
+    postgres_root = postgres_database.settings.socket_directory.parent
+    postmaster_pid = int((postgres_root / "data" / "postmaster.pid").read_text().splitlines()[0])
+    with postgres_database.connect() as connection:
+        backend_pid = connection.execute("SELECT pg_backend_pid()").fetchone()
+        assert backend_pid is not None
+
+        for process_id in (postmaster_pid, backend_pid[0]):
+            output = subprocess.run(
+                ["lsof", "-a", "-p", str(process_id), "-d", "3-999", "-Fftn"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            records = output.split("f")[1:]
+            retained_directories = {
+                line[1:]
+                for record in records
+                if "\ntDIR\n" in f"\n{record}"
+                for line in record.splitlines()
+                if line.startswith("n")
+            }
+            assert str(postgres_root) not in retained_directories
 
 
 def test_registration_round_trip(postgres_database: PostgresDatabase, tmp_path: Path) -> None:

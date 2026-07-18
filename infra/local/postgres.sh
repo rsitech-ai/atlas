@@ -29,7 +29,7 @@ if [[ "${1:-}" == "--bound" ]]; then
     echo "Bound PostgreSQL directory identity changed." >&2
     exit 1
   }
-  BOUND_FD="${RSI_ATLAS_BOUND_FD:-}"
+  BOUND_FD="${RSI_ATLAS_BOUND_POSTGRES_FD:-}"
   [[ "$BOUND_FD" =~ ^[0-9]+$ && -d "/dev/fd/$BOUND_FD" ]] || {
     echo "Bound PostgreSQL directory descriptor is unavailable." >&2
     exit 1
@@ -61,7 +61,7 @@ require_toolchain() {
     echo "PostgreSQL 17 Homebrew toolchain is missing at $POSTGRES_BIN." >&2
     exit 1
   }
-  case "$($POSTGRES_BIN/postgres --version)" in
+  case "$(run_without_bound_fd "$POSTGRES_BIN/postgres" --version)" in
     "postgres (PostgreSQL) 17.10"*) ;;
     *)
       echo "Expected PostgreSQL 17.10 from $POSTGRES_BIN." >&2
@@ -70,11 +70,20 @@ require_toolchain() {
   esac
 }
 
+close_bound_fd() {
+  eval "exec ${BOUND_FD}>&-"
+}
+
+run_without_bound_fd() (
+  close_bound_fd
+  exec "$@"
+)
+
 initialize_cluster() {
   if [[ -f "$DATA_DIRECTORY/PG_VERSION" ]]; then
     return
   fi
-  "$INITDB" --pgdata="$DATA_DIRECTORY" --username="$DATABASE_USER" \
+  run_without_bound_fd "$INITDB" --pgdata="$DATA_DIRECTORY" --username="$DATABASE_USER" \
     --auth-local=trust --auth-host=reject --encoding=UTF8 --no-locale \
     --data-checksums >/dev/null
   chmod 0700 "$DATA_DIRECTORY"
@@ -82,8 +91,9 @@ initialize_cluster() {
 
 validate_cluster() {
   local checksum_version
-  checksum_version="$($PG_CONTROLDATA "$DATA_DIRECTORY" \
-    | awk -F: '/Data page checksum version/ {gsub(/^[[:space:]]+/, "", $2); print $2}')"
+  checksum_version="$(run_without_bound_fd "$PG_CONTROLDATA" "$DATA_DIRECTORY" \
+    | run_without_bound_fd /usr/bin/awk -F: \
+      '/Data page checksum version/ {gsub(/^[[:space:]]+/, "", $2); print $2}')"
   if [[ -z "$checksum_version" || "$checksum_version" == "0" ]]; then
     echo "PostgreSQL data checksums must be enabled before startup." >&2
     exit 1
@@ -96,7 +106,7 @@ server_options() {
 }
 
 is_running() {
-  "$PG_CTL" --pgdata="$DATA_DIRECTORY" status >/dev/null 2>&1
+  run_without_bound_fd "$PG_CTL" --pgdata="$DATA_DIRECTORY" status >/dev/null 2>&1
 }
 
 lifecycle_test_barrier() {
@@ -117,16 +127,18 @@ start_server() {
   validate_cluster
   lifecycle_test_barrier
   if ! is_running; then
-    "$PG_CTL" --pgdata="$DATA_DIRECTORY" --log="$LOG_FILE" \
+    run_without_bound_fd "$PG_CTL" --pgdata="$DATA_DIRECTORY" --log="$LOG_FILE" \
       --options="$(server_options)" --wait start >/dev/null
   fi
   /usr/bin/python3 "$SECURE_PATH_HELPER" bootstrap "$DATABASE_USER" "$DATABASE_NAME"
+  close_bound_fd
+  unset RSI_ATLAS_BOUND_POSTGRES_FD
 }
 
 stop_server() {
   require_toolchain
   if [[ -f "$DATA_DIRECTORY/PG_VERSION" ]] && is_running; then
-    "$PG_CTL" --pgdata="$DATA_DIRECTORY" --mode=fast --wait stop >/dev/null
+    run_without_bound_fd "$PG_CTL" --pgdata="$DATA_DIRECTORY" --mode=fast --wait stop >/dev/null
   fi
 }
 
