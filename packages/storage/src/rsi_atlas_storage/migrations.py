@@ -6,6 +6,7 @@ from pathlib import Path
 from rsi_atlas_storage.database import PostgresDatabase
 
 _MIGRATION_NAME = re.compile(r"^(?P<version>[0-9]{4})_[a-z0-9_]+\.sql$")
+_MIGRATION_LOCK_ID = 0x52534941544C4153
 
 
 class MigrationIntegrityError(RuntimeError):
@@ -28,6 +29,7 @@ class MigrationRunner:
     def apply_all(self) -> None:
         migrations = self._load_migrations()
         with self._database.connect() as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_xact_lock(%s)", (_MIGRATION_LOCK_ID,))
             cursor.execute("CREATE SCHEMA IF NOT EXISTS atlas_meta")
             cursor.execute(
                 """

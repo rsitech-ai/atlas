@@ -1,4 +1,5 @@
 import os
+import re
 import stat
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -12,6 +13,8 @@ from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
 Row = tuple[Any, ...]
 ParameterValue = object
+_SERVICE_PARAMETER = re.compile(r"(?:^|[?&\s])(service|servicefile)\s*=", re.IGNORECASE)
+_UNSAFE_LIBPQ_ENVIRONMENT = ("PGSERVICE", "PGSERVICEFILE", "PGHOSTADDR")
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,7 +26,11 @@ class DatabaseSettings:
 
     @classmethod
     def from_conninfo(cls, conninfo: str) -> "DatabaseSettings":
+        if _SERVICE_PARAMETER.search(conninfo):
+            raise ValueError("libpq service and servicefile configuration is forbidden")
         parsed = conninfo_to_dict(conninfo)
+        if parsed.get("service"):
+            raise ValueError("libpq service configuration is forbidden")
         raw_host = parsed.get("host")
         if (
             not isinstance(raw_host, str)
@@ -32,9 +39,7 @@ class DatabaseSettings:
             or parsed.get("hostaddr")
             or not Path(raw_host).is_absolute()
         ):
-            raise ValueError(
-                "RSI Atlas PostgreSQL must use one absolute Unix socket directory"
-            )
+            raise ValueError("RSI Atlas PostgreSQL must use one absolute Unix socket directory")
         raw_user = parsed.get("user")
         if not isinstance(raw_user, str) or not raw_user:
             raise ValueError("RSI Atlas PostgreSQL requires an explicit user")
@@ -42,6 +47,24 @@ class DatabaseSettings:
         if not isinstance(raw_database, str) or not raw_database:
             raise ValueError("RSI Atlas PostgreSQL requires an explicit database")
         socket_directory = Path(raw_host)
+        cls._validate_socket_directory(socket_directory)
+        return cls(
+            conninfo=make_conninfo("", **parsed),
+            socket_directory=socket_directory,
+            user=raw_user,
+            database=raw_database,
+        )
+
+    def assert_safe_environment(self) -> None:
+        unsafe = [name for name in _UNSAFE_LIBPQ_ENVIRONMENT if os.environ.get(name)]
+        if unsafe:
+            joined = ", ".join(unsafe)
+            raise ValueError(f"unsafe libpq environment is forbidden: {joined}")
+        self._validate_socket_directory(self.socket_directory)
+
+    @classmethod
+    def _validate_socket_directory(cls, socket_directory: Path) -> None:
+        cls._reject_symlink_chain(socket_directory)
         try:
             socket_stat = socket_directory.stat(follow_symlinks=False)
         except (FileNotFoundError, NotADirectoryError) as error:
@@ -52,12 +75,20 @@ class DatabaseSettings:
             raise ValueError("PostgreSQL Unix socket directory must be owned by current user")
         if stat.S_IMODE(socket_stat.st_mode) & 0o077:
             raise ValueError("PostgreSQL Unix socket directory must be owner-only")
-        return cls(
-            conninfo=make_conninfo("", **parsed),
-            socket_directory=socket_directory,
-            user=raw_user,
-            database=raw_database,
-        )
+
+    @staticmethod
+    def _reject_symlink_chain(path: Path) -> None:
+        current = Path(path.anchor)
+        for component in path.parts[1:]:
+            current /= component
+            try:
+                component_stat = current.lstat()
+            except FileNotFoundError:
+                break
+            if stat.S_ISLNK(component_stat.st_mode):
+                raise ValueError(
+                    f"PostgreSQL Unix socket path must not contain a symlink: {current}"
+                )
 
 
 class PostgresDatabase:
@@ -66,12 +97,11 @@ class PostgresDatabase:
 
     @contextmanager
     def connect(self, *, autocommit: bool = False) -> Iterator[Connection[Row]]:
+        self.settings.assert_safe_environment()
         with psycopg.connect(self.settings.conninfo, autocommit=autocommit) as connection:
             yield connection
 
-    def fetch_value(
-        self, query: str, parameters: Sequence[ParameterValue] | None = None
-    ) -> Any:
+    def fetch_value(self, query: str, parameters: Sequence[ParameterValue] | None = None) -> Any:
         with self.connect(autocommit=True) as connection, connection.cursor() as cursor:
             cursor.execute(query, parameters)
             row = cursor.fetchone()

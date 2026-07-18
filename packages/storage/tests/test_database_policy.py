@@ -9,9 +9,7 @@ def test_database_settings_accept_owner_only_absolute_socket(tmp_path: Path) -> 
     socket_directory = tmp_path / "socket"
     socket_directory.mkdir(mode=0o700)
 
-    settings = DatabaseSettings.from_conninfo(
-        f"host={socket_directory} user=atlas dbname=atlas"
-    )
+    settings = DatabaseSettings.from_conninfo(f"host={socket_directory} user=atlas dbname=atlas")
 
     assert settings.socket_directory == socket_directory
     assert settings.user == "atlas"
@@ -32,6 +30,19 @@ def test_database_settings_reject_non_socket_hosts(conninfo: str) -> None:
         DatabaseSettings.from_conninfo(conninfo)
 
 
+@pytest.mark.parametrize(
+    "conninfo",
+    [
+        "service=remote",
+        "service=remote servicefile=/tmp/pg_service.conf",
+        "servicefile=/tmp/pg_service.conf host=/private/tmp user=atlas dbname=atlas",
+    ],
+)
+def test_database_settings_rejects_libpq_service_configuration(conninfo: str) -> None:
+    with pytest.raises(ValueError, match="service"):
+        DatabaseSettings.from_conninfo(conninfo)
+
+
 def test_database_settings_requires_user_and_database(tmp_path: Path) -> None:
     socket_directory = tmp_path / "socket"
     socket_directory.mkdir(mode=0o700)
@@ -48,9 +59,7 @@ def test_database_settings_rejects_group_or_world_accessible_socket(tmp_path: Pa
     socket_directory.chmod(0o750)
 
     with pytest.raises(ValueError, match="owner-only"):
-        DatabaseSettings.from_conninfo(
-            f"host={socket_directory} user=atlas dbname=atlas"
-        )
+        DatabaseSettings.from_conninfo(f"host={socket_directory} user=atlas dbname=atlas")
 
 
 def test_database_settings_rejects_socket_not_owned_by_current_user(
@@ -67,6 +76,16 @@ def test_database_settings_rejects_socket_not_owned_by_current_user(
     monkeypatch.setattr(Path, "stat", lambda _path, **_kwargs: ForeignOwnerStat())
 
     with pytest.raises(ValueError, match="current user"):
-        DatabaseSettings.from_conninfo(
-            f"host={socket_directory} user=atlas dbname=atlas"
-        )
+        DatabaseSettings.from_conninfo(f"host={socket_directory} user=atlas dbname=atlas")
+
+
+def test_database_settings_rejects_symlink_in_socket_ancestor(tmp_path: Path) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir(mode=0o700)
+    linked_parent = tmp_path / "linked-parent"
+    linked_parent.symlink_to(outside, target_is_directory=True)
+    socket_directory = linked_parent / "socket"
+    socket_directory.mkdir(mode=0o700)
+
+    with pytest.raises(ValueError, match="symlink"):
+        DatabaseSettings.from_conninfo(f"host={socket_directory} user=atlas dbname=atlas")
