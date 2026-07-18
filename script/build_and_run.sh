@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MODE="${1:-run}"
+APP_PROCESS="RSIAtlas"
+APP_DISPLAY_NAME="RSI Atlas"
+BUNDLE_ID="ai.rsitech.RSIAtlas"
+MIN_SYSTEM_VERSION="15.0"
+ENGINE_HOST="127.0.0.1"
+ENGINE_PORT="8765"
+ENGINE_SERVICE_LABEL="ai.rsitech.RSIAtlas.engine"
+ENGINE_SERVICE_DOMAIN="gui/$(id -u)"
+
+case "$MODE" in
+  run|--debug|debug|--logs|logs|--telemetry|telemetry|--verify|verify)
+    ;;
+  *)
+    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    exit 2
+    ;;
+esac
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DIST_DIR="$ROOT_DIR/dist"
+APP_BUNDLE="$DIST_DIR/$APP_PROCESS.app"
+APP_CONTENTS="$APP_BUNDLE/Contents"
+APP_MACOS="$APP_CONTENTS/MacOS"
+APP_BINARY="$APP_MACOS/$APP_PROCESS"
+INFO_PLIST="$APP_CONTENTS/Info.plist"
+ENGINE_LOG="$DIST_DIR/engine.log"
+ENGINE_STATUS_URL="http://$ENGINE_HOST:$ENGINE_PORT/v1/system/status"
+
+owned_app_pids() {
+  local app_pid
+  local app_command
+  while IFS= read -r app_pid; do
+    [[ -n "$app_pid" ]] || continue
+    app_command="$(ps -p "$app_pid" -o command= 2>/dev/null || true)"
+    if [[ "$app_command" == "$APP_BINARY" ]]; then
+      printf '%s\n' "$app_pid"
+    fi
+  done < <(pgrep -x "$APP_PROCESS" 2>/dev/null || true)
+}
+
+stop_owned_app() {
+  local app_pid
+  while IFS= read -r app_pid; do
+    [[ -n "$app_pid" ]] || continue
+    kill "$app_pid"
+  done < <(owned_app_pids)
+
+  local attempt
+  for attempt in {1..30}; do
+    if [[ -z "$(owned_app_pids)" ]]; then
+      return
+    fi
+    sleep 0.1
+  done
+  echo "$APP_DISPLAY_NAME did not stop cleanly." >&2
+  exit 1
+}
+
+stop_owned_engine() {
+  if ! launchctl print "$ENGINE_SERVICE_DOMAIN/$ENGINE_SERVICE_LABEL" >/dev/null 2>&1; then
+    return
+  fi
+
+  launchctl remove "$ENGINE_SERVICE_LABEL" >/dev/null 2>&1 || true
+  local attempt
+  for attempt in {1..50}; do
+    if ! launchctl print "$ENGINE_SERVICE_DOMAIN/$ENGINE_SERVICE_LABEL" >/dev/null 2>&1 \
+      && ! curl --fail --silent "$ENGINE_STATUS_URL" >/dev/null 2>&1; then
+      return
+    fi
+    sleep 0.1
+  done
+  echo "The owned RSI Atlas Engine did not stop cleanly." >&2
+  exit 1
+}
+
+wait_for_engine() {
+  local attempt
+  for attempt in {1..50}; do
+    if curl --fail --silent "$ENGINE_STATUS_URL" >/dev/null 2>&1; then
+      return
+    fi
+    sleep 0.1
+  done
+  echo "RSI Atlas Engine did not become ready at $ENGINE_STATUS_URL." >&2
+  tail -n 30 "$ENGINE_LOG" >&2 || true
+  exit 1
+}
+
+wait_for_app() {
+  local attempt
+  for attempt in {1..30}; do
+    if [[ -n "$(owned_app_pids)" ]]; then
+      return
+    fi
+    sleep 0.1
+  done
+  echo "$APP_DISPLAY_NAME did not launch from $APP_BUNDLE." >&2
+  exit 1
+}
+
+stage_app_bundle() {
+  local build_binary
+  local build_bin_path
+  build_bin_path="$(swift build --package-path "$ROOT_DIR/apps/macos" --show-bin-path)"
+  build_binary="$build_bin_path/$APP_PROCESS"
+
+  rm -rf "$APP_BUNDLE"
+  mkdir -p "$APP_MACOS"
+  cp "$build_binary" "$APP_BINARY"
+  chmod +x "$APP_BINARY"
+
+  cat >"$INFO_PLIST" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleExecutable</key>
+  <string>$APP_PROCESS</string>
+  <key>CFBundleIdentifier</key>
+  <string>$BUNDLE_ID</string>
+  <key>CFBundleName</key>
+  <string>$APP_DISPLAY_NAME</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>$MIN_SYSTEM_VERSION</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>NSPrincipalClass</key>
+  <string>NSApplication</string>
+</dict>
+</plist>
+PLIST
+}
+
+open_app() {
+  /usr/bin/open -n "$APP_BUNDLE"
+}
+
+mkdir -p "$DIST_DIR"
+stop_owned_app
+stop_owned_engine
+
+if curl --fail --silent "$ENGINE_STATUS_URL" >/dev/null 2>&1; then
+  echo "Port $ENGINE_PORT already serves an unowned process; refusing to replace it." >&2
+  exit 1
+fi
+
+cd "$ROOT_DIR"
+uv sync --all-packages
+launchctl submit \
+  -l "$ENGINE_SERVICE_LABEL" \
+  -o "$ENGINE_LOG" \
+  -e "$ENGINE_LOG" \
+  -- "$ROOT_DIR/.venv/bin/uvicorn" rsi_atlas_engine.api:app \
+  --host "$ENGINE_HOST" \
+  --port "$ENGINE_PORT"
+wait_for_engine
+
+swift build --package-path "$ROOT_DIR/apps/macos" --product "$APP_PROCESS"
+stage_app_bundle
+
+case "$MODE" in
+  run)
+    open_app
+    ;;
+  --debug|debug)
+    lldb -- "$APP_BINARY"
+    ;;
+  --logs|logs)
+    open_app
+    /usr/bin/log stream --info --style compact --predicate "process == \"$APP_PROCESS\""
+    ;;
+  --telemetry|telemetry)
+    open_app
+    /usr/bin/log stream --info --style compact --predicate "subsystem == \"$BUNDLE_ID\""
+    ;;
+  --verify|verify)
+    open_app
+    wait_for_app
+    curl --fail --silent --show-error "$ENGINE_STATUS_URL" >/dev/null
+    launchctl print "$ENGINE_SERVICE_DOMAIN/$ENGINE_SERVICE_LABEL" >/dev/null
+    echo "Verified $APP_DISPLAY_NAME and RSI Atlas Engine."
+    ;;
+  *)
+    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    exit 2
+    ;;
+esac

@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling==1.31.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rsi-atlas-engine"
+version = "0.1.0"
+description = "Local deterministic control plane for RSI Atlas"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+  "fastapi==0.139.2",
+  "rsi-atlas-contracts",
+  "uvicorn==0.51.0",
+]
+
+[project.scripts]
+atlas = "rsi_atlas_engine.cli:entrypoint"
+
+[tool.uv.sources]
+rsi-atlas-contracts = { workspace = true }
