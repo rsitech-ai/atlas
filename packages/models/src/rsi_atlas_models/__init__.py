@@ -3,5 +3,13 @@ from rsi_atlas_models.provider import (
     ProviderUnavailableError,
     UnavailableModelProvider,
 )
+from rsi_atlas_models.registry import ModelRegistry, ModelRegistryError, ModelRegistryErrorCode
 
-__all__ = ["ModelProvider", "ProviderUnavailableError", "UnavailableModelProvider"]
+__all__ = [
+    "ModelProvider",
+    "ModelRegistry",
+    "ModelRegistryError",
+    "ModelRegistryErrorCode",
+    "ProviderUnavailableError",
+    "UnavailableModelProvider",
+]
