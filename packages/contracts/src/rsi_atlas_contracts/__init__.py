@@ -1,3 +1,8 @@
+from rsi_atlas_contracts.artifact import (
+    ArtifactDescriptor,
+    ArtifactID,
+    ArtifactIntegrityError,
+)
 from rsi_atlas_contracts.system_status import (
     ComponentStatus,
     HealthState,
@@ -6,6 +11,9 @@ from rsi_atlas_contracts.system_status import (
 )
 
 __all__ = [
+    "ArtifactDescriptor",
+    "ArtifactID",
+    "ArtifactIntegrityError",
     "ComponentStatus",
     "HealthState",
     "RuntimeProfile",
