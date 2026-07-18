@@ -63,3 +63,28 @@ def test_real_ingestion_composition_uses_one_explicit_runtime_root(tmp_path: Pat
     staging_root = data_root / "staging" / "imports"
     assert stat.S_IMODE(staging_root.stat().st_mode) == 0o700
     assert tuple(staging_root.iterdir()) == ()
+
+
+def test_api_and_cli_compositions_use_independent_leased_staging_roots(
+    tmp_path: Path,
+) -> None:
+    conninfo = os.environ.get("RSI_ATLAS_TEST_DATABASE_URL")
+    if conninfo is None:
+        pytest.skip("real PostgreSQL integration URL is required")
+    data_root = tmp_path / "runtime"
+    data_root.mkdir(mode=0o700)
+
+    api_services = DocumentIngestionServices.from_environment(
+        environ={"RSI_ATLAS_DATA_ROOT": str(data_root)},
+        database_conninfo=conninfo,
+        staging_namespace="api",
+    )
+    cli_services = DocumentIngestionServices.from_environment(
+        environ={"RSI_ATLAS_DATA_ROOT": str(data_root)},
+        database_conninfo=conninfo,
+        staging_namespace="cli",
+    )
+
+    assert api_services.staging_area is not cli_services.staging_area
+    assert (data_root / "staging" / "imports").is_dir()
+    assert (data_root / "staging" / "cli-imports").is_dir()

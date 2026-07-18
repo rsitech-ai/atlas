@@ -2,6 +2,7 @@ import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Literal
 
 from rsi_atlas_ingestion import DocumentAdmissionService
 from rsi_atlas_storage import (
@@ -34,11 +35,17 @@ class DocumentIngestionServices:
         environ: Mapping[str, str] | None = None,
         database_conninfo: str | None = None,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        staging_namespace: Literal["api", "cli"] = "api",
     ) -> "DocumentIngestionServices":
         values = os.environ if environ is None else environ
         paths = RuntimePaths.from_environment(environ=values)
         staging_parent = paths.data_root / "staging"
-        staging_root = staging_parent / "imports"
+        staging_names = {"api": "imports", "cli": "cli-imports"}
+        try:
+            staging_name = staging_names[staging_namespace]
+        except KeyError as error:
+            raise ValueError("unsupported ingestion staging namespace") from error
+        staging_root = staging_parent / staging_name
         RuntimePaths._ensure_owner_private_directory(staging_parent)
         RuntimePaths._ensure_owner_private_directory(staging_root)
 

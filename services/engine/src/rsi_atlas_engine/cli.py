@@ -75,7 +75,8 @@ def main(
             args,
             stdout=stdout,
             stderr=stderr,
-            ingestion_factory=ingestion_factory or DocumentIngestionServices.from_environment,
+            ingestion_factory=ingestion_factory
+            or (lambda: DocumentIngestionServices.from_environment(staging_namespace="cli")),
         )
 
     status = (status_factory or RuntimeServices.from_environment().status)()
