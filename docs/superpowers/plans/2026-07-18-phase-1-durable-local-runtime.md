@@ -410,7 +410,7 @@ Closure evidence through `01c6693`: exact import RED retained; 45 focused observ
 - Phase 1 registers metadata and a deterministic unavailable provider only; it does not select or download a model.
 - One heavy resource lease may exist at a time; unsafe memory/swap/thermal snapshots reject admission before model load.
 
-- [ ] **Step 1: Write failing registry and arbiter tests**
+- [x] **Step 1: Write failing registry and arbiter tests**
 
 ```python
 def test_registry_rejects_model_with_wrong_content_hash(tmp_path: Path) -> None:
@@ -429,7 +429,7 @@ def test_registry_rejects_model_with_wrong_content_hash(tmp_path: Path) -> None:
                 quantization="none",
                 tokenizer_sha256="1" * 64,
                 context_tokens=4_096,
-                license_id="fixture-license",
+                license_id="LicenseRef-RSIAtlas-Fixture-Model",
                 source_manifest_artifact_id="sha256:" + "2" * 64,
                 local_path=model_path,
                 capabilities=frozenset({ModelCapability.TEXT_GENERATION}),
@@ -447,17 +447,17 @@ def test_only_one_heavy_lease_is_admitted() -> None:
     assert arbiter.acquire(job_id="evaluation", resource_class=ResourceClass.HEAVY_MODEL, snapshot=SAFE_SNAPSHOT)
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `uv run pytest packages/models/tests -q`
 
 Expected: import failure because the model contracts/package do not exist.
 
-- [ ] **Step 3: Implement immutable registry, provider protocol, and lease state machine**
+- [x] **Step 3: Implement immutable registry, provider protocol, and lease state machine**
 
-The provider protocol exposes `capabilities`, `health`, `generate`, `stream`, and `unload`. Registry promotion requires valid artifact hash, license metadata, capability results, and allowed lifecycle transition. Resource leases are explicit context managers, release idempotently, and never infer safety from model self-report.
+The provider protocol exposes `capabilities`, `health`, `generate`, `stream`, and `unload`. Registry admission requires a valid artifact hash and canonical SPDX or reserved fixture license metadata; Phase 1 refuses production promotion until later typed evaluation and approval evidence exists. Resource leases are explicit context managers, release idempotently, and never infer safety from model self-report.
 
-- [ ] **Step 4: Verify integrity, lifecycle, concurrency, cancellation, and unsafe-resource cases**
+- [x] **Step 4: Verify integrity, lifecycle, concurrency, cancellation, and unsafe-resource cases**
 
 Run:
 
@@ -469,12 +469,14 @@ uv run mypy packages/contracts/src packages/models/src
 
 Expected: invalid hashes/lifecycle transitions fail, one-heavy-model scheduling is deterministic, released/cancelled leases free capacity, and unsafe snapshots return typed rejection.
 
-- [ ] **Step 5: Commit and review Task 5**
+- [x] **Step 5: Commit and review Task 5**
 
 ```bash
 git add packages/contracts packages/models pyproject.toml uv.lock
 git commit -m "feat: add model and resource boundaries"
 ```
+
+Closure evidence through `fe5d47f`: the exact import RED is retained; 132 focused model tests and 619 PostgreSQL-configured repository tests pass; Ruff, formatting, strict source mypy, lock, and diff checks pass. Registry admission reconstructs a validated immutable snapshot, detects synchronized descriptor/parent/path replacement, accepts only canonical SPDX or the exact reserved fixture license form, and cannot promote a Phase 1 candidate to production. The unavailable provider performs no filesystem/network/subprocess work, one-heavy admission is atomic with lease-forgery/cancellation recovery coverage, and the current development-component zero-egress smoke denies external TCP and mDNS while admitting the exact local Unix canary. Independent final review approved `fe5d47f` with no Critical or Important findings. No model was downloaded, loaded, executed, benchmarked, qualified, or promoted.
 
 ### Task 6: Real diagnostics, native Command Center, and Phase 1 end-to-end gate
 

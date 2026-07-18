@@ -8,7 +8,7 @@ RSI Atlas is complete only when all 134 normative acceptance criteria in Section
 
 ## Current evidence boundary
 
-The current Phase 1 chain through `01c6693` proves the opening native-to-engine seam plus immutable local artifacts, Unix-socket PostgreSQL/pgvector development persistence, exact runtime capability policy, and isolated metadata-only OpenTelemetry with owner-private cross-process JSONL storage. Current checks include 487 PostgreSQL-configured Python tests and a development-component trace-write sandbox smoke. This still does not complete a full-release acceptance criterion: native diagnostics do not yet consume the real probes, the model/resource boundary is pending, observability is not end-to-end Swift-to-publication, and the evidence is not a signed release artifact.
+The current Phase 1 chain through `fe5d47f` proves the opening native-to-engine seam plus immutable local artifacts, Unix-socket PostgreSQL/pgvector development persistence, exact runtime capability policy, isolated metadata-only OpenTelemetry with owner-private cross-process JSONL storage, strict model metadata/integrity boundaries, an honest unavailable provider, and deterministic resource admission. Current checks include 619 PostgreSQL-configured Python tests plus development-component trace and model-boundary sandbox smokes. This still does not complete a full-release acceptance criterion: native diagnostics do not yet consume the real probes, no model is downloaded/executed/qualified, observability is not end-to-end Swift-to-publication, and the evidence is not a signed release artifact.
 
 | Phase | Specification scope | Acceptance criteria | Current status | Phase demonstration |
 | --- | --- | --- | --- | --- |
