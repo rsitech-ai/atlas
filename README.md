@@ -6,7 +6,8 @@ The approved product and system design is in [`docs/superpowers/specs/2026-07-18
 
 ## Current slice
 
-The repository completes the reviewed Phase 1 durable local-runtime seam:
+The repository completes the reviewed Phase 1 durable local-runtime seam and Phase 2A secure
+document-admission checkpoint:
 
 - strict, versioned Python runtime-status contracts;
 - an immutable, content-addressed artifact store with integrity verification;
@@ -19,10 +20,24 @@ The repository completes the reviewed Phase 1 durable local-runtime seam:
 - `atlas doctor` and `GET /v1/system/status` on loopback only;
 - a native SwiftUI Command Center with grouped live evidence, stale-state preservation, fault
   remediation, multi-window behavior, keyboard refresh, and accessibility identifiers;
+- strict cross-language acquisition, safety-profile, admission-decision, and durable-record
+  contracts;
+- bounded raw PDF streaming into owner-private staging and immutable content-addressed storage,
+  followed by append-only PostgreSQL acquisition, decision, duplicate-link, and outbox evidence;
+- a conservative admission policy that can quarantine, reject unsafe input, or link an exact
+  same-workspace duplicate, but can never silently promote a document; the versioned contract can
+  represent a password request once Phase 2B supplies authoritative encryption evidence;
+- native and CLI import boundaries with stable acquisition/trace identity, idempotent retry,
+  hard-kill orphan recovery, strict response binding, and no remote fallback;
+- a native Evidence destination showing truthful empty, progress, review, rejected, duplicate,
+  failure, and retry states with accessible identifiers; its password presentation is contract-tested
+  but runtime-unreachable in Phase 2A, where encrypted markers remain unknown and quarantined;
 - a reproducible SwiftPM `.app` build and local engine/app launcher.
 
-Document ingestion, retrieval, qualified model execution, collectors, LangGraph workflows, XPC,
-signing, and release qualification are not implemented yet. The development database is
+Parser execution, OCR/scanned fallback, canonical page/layout provenance, chunking, indexes,
+retrieval, qualified model execution, collectors, LangGraph workflows, XPC, signing, and release
+qualification are not implemented yet. Every imported PDF therefore remains raw immutable evidence
+with a fail-closed admission outcome; it is not parsed or searchable. The development database is
 project-owned; release data placement remains a later packaging gate.
 
 ## Requirements

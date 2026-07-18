@@ -8,19 +8,21 @@ RSI Atlas is complete only when all 134 normative acceptance criteria in Section
 
 ## Current evidence boundary
 
-The reviewed Phase 1 chain through `647c25b` proves the native-to-engine seam, immutable local
-artifacts, Unix-socket PostgreSQL/pgvector persistence, exact runtime capability policy, isolated
-metadata-only OpenTelemetry, strict model/resource boundaries, and eight real bounded diagnostics.
-Current checks include 660 PostgreSQL-configured Python tests, 21 Swift tests, foreground
-fault/recovery and accessibility/appearance/multi-window proof, restart persistence, exact
-process/socket evidence, and development `atlas doctor` zero egress. This does not complete a full
-release criterion: no model is executed/qualified, observability is not end-to-end
-Swift-to-publication, loopback HTTP remains development-only, and the artifact is unsigned.
+The reviewed Phase 1 chain through `647c25b` and Phase 2A chain through `113110c` prove the
+native-to-engine seam, immutable local artifacts, Unix-socket PostgreSQL/pgvector persistence,
+exact runtime capability policy, isolated metadata-only OpenTelemetry, strict model/resource
+boundaries, eight real bounded diagnostics, and raw fail-closed PDF admission with exact-duplicate
+and hard-kill recovery evidence. Current checks include 827 PostgreSQL-configured Python tests, 43
+Swift tests, foreground fault/recovery and accessibility/appearance/multi-window proof, restart
+persistence, exact process/socket evidence, and development admission zero egress. This does not
+complete document intelligence or a full release criterion: no promoted parser, model, chunker,
+index, or workflow runs; observability is not end-to-end Swift-to-publication; loopback HTTP remains
+development-only; and the artifact is unsigned.
 
 | Phase | Specification scope | Acceptance criteria | Current status | Phase demonstration |
 | --- | --- | --- | --- | --- |
 | 1. Foundation and local runtime | §§8–11, 25, 27, 29–32 foundation portions | 1–3, 17, 85–93, 99–102, 112–126, 127–134 foundations | Complete (development evidence) | Native Command Center controls and diagnoses a durable, enforced-offline, observable local runtime with immutable artifacts, PostgreSQL/pgvector, resource/model policy, recovery, and no hard-coded health. |
-| 2. Document intelligence | §§12–15 | 10–24 plus Evidence Inspector portion of 6 | Missing | Native PDF import reaches atomically published exact page evidence through admission, parser fallback, canonicalization, five chunkers, dense/lexical indexes, interrupt/resume, and offline proof. |
+| 2. Document intelligence | §§12–15 | 10–24 plus Evidence Inspector portion of 6 | Phase 2A complete; 2B–2D missing | Native PDF import currently reaches immutable raw evidence and a durable fail-closed decision. Completion still requires promoted parser fallback, canonical page/layout evidence, five chunkers, dense/lexical indexes, interrupt/resume, atomic publication, and complete offline proof. |
 | 3. Retrieval and research | §§16–18 | 4–8, 25–60 | Missing | A frozen material question produces an inspectable plan, hybrid evidence packet, bounded specialist findings, deterministic calculations, exact citations, review, and an editable versioned report. |
 | 4. Multi-chain and quantitative data | §§19–23 | 43–44 and 61–81 | Missing | Bitcoin, EVM, Solana, market, governance, and GitHub fixtures become bitemporal observations/features and support reproducible dossiers and comparison inputs. |
 | 5. Monitoring and comparison | §24 and cross-surface UX | 45, 61, 82–84 plus comparison/timeline UX | Missing | A deterministic material change invalidates affected research, deduplicates an alert, launches targeted research, and appears on the cross-chain timeline/comparison matrix. |

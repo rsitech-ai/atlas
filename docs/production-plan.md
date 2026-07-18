@@ -4,29 +4,37 @@
 
 - Target user: an individual quantitative crypto researcher first; a small crypto hedge-fund research team second.
 - Primary job: turn local and explicitly collected crypto evidence into reproducible, inspectable research.
-- Core workflow: acquire evidence, investigate a material question, inspect lineage, and publish a cited result. This foundation slice implements only local runtime readiness.
+- Core workflow: acquire evidence, investigate a material question, inspect lineage, and publish a
+  cited result. The current checkpoint implements local runtime readiness plus raw, durable,
+  fail-closed PDF admission only.
 - Business model: a professional research workstation; commercialization is outside the foundation slice.
 - Supported macOS versions: macOS 15 or newer on Apple Silicon; the reference hardware has 24–36 GB unified memory.
 - Offline behavior: strict offline is the default. The current engine exposes a development endpoint only on `127.0.0.1` and enables no remote collector, model, telemetry exporter, update check, or remote resource.
-- Data handled: this slice handles only runtime health metadata. It does not import research documents or persist analyst data.
+- Data handled: runtime health metadata plus explicitly selected local PDF bytes, their SHA-256
+  identity, strict safety/admission evidence, workspace/actor/trace context, and append-only history.
+  No parser, embedding, prompt, or model receives document bytes in this checkpoint.
 - Privacy posture: zero egress for private data, prompts, embeddings, traces, reports, and evaluations.
 - V1 scope: the approved design in `docs/superpowers/specs/2026-07-18-rsi-atlas-design.md`, delivered through independently verifiable vertical slices.
-- Explicitly out of scope for this slice: ingestion, retrieval, qualified model execution,
-  collectors, LangGraph, report generation, XPC, signing, notarization, updates, backup, and
-  release recovery.
+- Explicitly out of scope for this checkpoint: promoted PDF profiling, parsing/OCR,
+  canonicalization, chunking/indexing, retrieval, qualified model execution, collectors, LangGraph,
+  report generation, XPC, signing, notarization, updates, backup, and release recovery.
 
 ## Architecture
 
 - Scene model: SwiftUI `WindowGroup` with a foreground native app lifecycle.
 - Window roles: independent Command Center windows are supported; specialist and auxiliary window
   roles are not implemented.
-- Layout model: native sidebar/detail `NavigationSplitView` with one live Command Center destination.
-- State ownership: scene-owned `CommandCenterStore`; loading, latest-request-wins refresh, retained
-  stale evidence, and typed failures are in memory.
+- Layout model: native sidebar/detail `NavigationSplitView` with live Command Center and Evidence
+  destinations.
+- State ownership: scene-owned `CommandCenterStore` and `DocumentImportStore`; both use
+  latest-request-wins behavior, explicit loading/failure states, and retry without fabricated
+  evidence.
 - Persistence: immutable content-addressed artifacts, hash-locked PostgreSQL migrations, pgvector,
-  and metadata-only trace JSONL persist below an exact owner-private data root.
-- Services: a typed Swift loopback client consumes `GET /v1/system/status`; Python shares eight real,
-  bounded probes between that endpoint and `atlas doctor`.
+  append-only acquisition/decision/duplicate/outbox evidence, and metadata-only trace JSONL persist
+  below an exact owner-private data root.
+- Services: typed Swift loopback clients consume `GET /v1/system/status` and file-backed
+  `POST .../documents:admit`; Python shares runtime probes with `atlas doctor` and exposes a direct
+  owner-private `atlas import-pdf` CLI boundary.
 - App Intents / Foundation Models / advanced capabilities: not enabled.
 - Folder/module structure: Swift contract/client/store code is separated from SwiftUI; Python contracts are separated from deterministic services and transport adapters.
 
@@ -44,7 +52,11 @@
 - Platform UI kit/version: system SwiftUI controls on macOS 15+.
 - SF Symbols/Icon Composer status: system SF Symbols are used; custom icon work is not started.
 - Native structures: `WindowGroup`, `NavigationSplitView`, sidebar list, toolbar, keyboard shortcut, progress, list sections, and `ContentUnavailableView`.
-- Adaptive states: loading, healthy, and recoverable engine-unavailable states are implemented. Empty research data, permission, import, and long-data states are outside this slice.
+- Adaptive states: runtime loading/healthy/failure and Evidence empty/uploading/awaiting-review/
+  rejected/duplicate/failure states are implemented. Password presentation is contract-tested for a
+  future authoritative profiler but runtime-unreachable in Phase 2A; encrypted markers remain
+  unknown and quarantined. Parsed research, retrieval, report, and long-data states remain outside
+  this checkpoint.
 - Visual style: restrained native graphite/system surfaces with semantic status accents; no custom chrome or decorative animation.
 - Motion rules: no decorative motion; system progress behavior only.
 - Accessibility requirements: semantic labels and identifiers, separate remediation rows, keyboard
@@ -54,17 +66,22 @@
 
 ## Test Strategy
 
-- Unit tests: 660 PostgreSQL-configured Python tests and 21 Swift tests cover the Phase 1 packages,
-  strict cross-language diagnostics, probe mappings, bounded database retry, unsafe resources,
+- Unit tests: 827 PostgreSQL-configured Python tests and 43 Swift tests cover Phase 1 plus strict
+  acquisition/admission contracts, bounded streaming and responses, immutable raw publication,
+  append-only persistence, duplicate/concurrency/replay isolation, hard-kill staging recovery,
   latest-request permutations, transport cancellation, and native accessibility presentation.
 - Integration tests or mocks: real PostgreSQL 17.10/pgvector 0.8.5 integration runs alongside
   FastAPI `TestClient`; Swift injects a real data-loading boundary and decodes the shared fixture.
-- UI/manual smoke: expected degraded-only-model baseline; PostgreSQL-down unsafe/blocked state and
-  same-window recovery; artifact corruption repairable/recovery; engine-down stale evidence and
-  same-window recovery; 1120×760 and 860×600 content layouts; Light/Dark, increased contrast, large
-  text, Reduce Motion, VoiceOver order, keyboard refresh, and a second window.
+- UI/manual smoke: expected degraded-only-model baseline; PostgreSQL/engine fault recovery; clean,
+  malformed, rejected-signature, encrypted-marker, and exact-duplicate imports; same-request retry;
+  truthful raw hash and quarantine copy; keyboard and VoiceOver order; 1120×760 and 860×600 content
+  layouts; Light/Dark, increased contrast, large text, Reduce Motion, and a second window.
 - Release smoke: not in scope; the staged app is an unsigned local debug artifact.
-- Commands: `uv run pytest -q`, `uv run ruff check packages services`, `uv run mypy packages/contracts/src services/engine/src`, `swift test --package-path apps/macos`, `swift build --package-path apps/macos --product RSIAtlas`, and `./script/build_and_run.sh --verify`.
+- Commands: `uv lock --check`, `uv run ruff check packages services infra`,
+  `uv run ruff format --check packages services infra`, `uv run mypy packages services infra`,
+  `RSI_ATLAS_TEST_DATABASE_URL="$(./infra/local/postgres.sh test-url)" uv run pytest -q`,
+  `swift test --package-path apps/macos`, debug/release Swift product builds, and
+  `./script/build_and_run.sh --verify` when the host resource probe is nominal.
 
 ## Observability
 
@@ -96,3 +113,4 @@
 | 2026-07-18 | Runtime lifecycle | Replaced shell-owned background execution with an explicitly labeled per-user `launchctl` job and condition-based shutdown. | A separate shell confirmed the engine remained `running` and returned the healthy 3-component contract after `build_and_run.sh --verify` exited. | Replace development loopback transport with authenticated release IPC in a separate security milestone. |
 | 2026-07-18 | Independent review | Hardened exact app-process ownership, pre-side-effect mode validation, latest-request-wins refresh, and non-empty diagnostics. | Reviewer re-check found all four findings resolved with no new Critical or Important regression. | Complete real-probe Task 6 and its foreground/fault acceptance matrix. |
 | 2026-07-18 | Phase 1 durable runtime | Connected the native Command Center to exact real probes for PostgreSQL/pgvector, immutable artifacts, offline policy, local traces, resources, models, and contract/API truth. | 660 Python and 21 Swift tests; Ruff/format/mypy/lock/build gates; disposable PostgreSQL/artifact/engine fault recovery; persistence; process/socket proof; development `atlas doctor` zero-egress; foreground compact, appearance, accessibility, and multi-window passes. Independent source review approved `7864630` and the QA delta through `647c25b` with no Critical/Important findings. | Phase 2 document-intelligence admission/import plan; release IPC, signing, backup/restore, and exact release-artifact zero egress remain later gates. |
+| 2026-07-19 | Phase 2A secure admission | Added strict native/Python admission contracts, bounded file-backed upload, raw-first immutable publication, conservative decisions, append-only acquisition history, exact-duplicate isolation, and the native Evidence destination. | 827 Python and 43 Swift tests; hard engine kill and orphan recovery; PostgreSQL-down raw retention and same-ID retry; byte/record persistence across full restart; live API/direct-CLI coexistence; adversarial boundary matrix; foreground import/accessibility/appearance/multi-window proof; independent reviews found no remaining Critical/Important findings through `113110c`. | Phase 2B promoted parser/preflight/canonical-page evidence; release IPC/signing/backup remain later gates. |

@@ -489,7 +489,7 @@ git commit -m "feat: add native immutable PDF admission"
 - Consumes: Tasks 1–5 and the exact disposable runtime.
 - Produces: a reviewed Phase 2A checkpoint and an explicit plan boundary for parser/preflight work.
 
-- [ ] **Step 1: Run the all-up automated gate**
+- [x] **Step 1: Run the all-up automated gate**
 
 ```bash
 uv lock --check
@@ -506,23 +506,23 @@ git diff --check
 
 Expected: no warnings, skipped required integration tests, formatting drift, or contract mismatch.
 
-- [ ] **Step 2: Run fault and restart smokes**
+- [x] **Step 2: Run fault and restart smokes**
 
-Use a disposable owner-private root. Kill the engine during request submission and verify the native app reports failure without a fabricated record or leftover staging file; retry with the same acquisition ID and file and obtain one durable decision. Stop PostgreSQL after raw artifact publication and before decision commit, restore it, retry, and confirm one acquisition plus retained raw bytes. Restart the full stack and verify the acquisition, decision, duplicate link, artifact bytes, actor, trace, safety profile, and reason evidence are unchanged.
+Use a disposable owner-private root. Kill the engine during request submission and verify the native app reports failure without a fabricated record. A hard process death may leave one owner-private partial staging file; restart must recover it through the exclusively leased directory before retry. Retry with the same acquisition ID and file and obtain one durable decision with no staging residue. Stop PostgreSQL after raw artifact publication and before decision commit, restore it, retry, and confirm one acquisition plus retained raw bytes. Restart the full stack and verify the acquisition, decision, duplicate link, artifact bytes, actor, trace, safety profile, and reason evidence are unchanged.
 
-- [ ] **Step 3: Run the security/adversarial matrix**
+- [x] **Step 3: Run the security/adversarial matrix**
 
 Exercise wrong MIME, oversized body, truncated stream, symlink CLI input, active actions, embedded file, encrypted marker, external reference, malformed header/trailer, unresolved page markers, traversal filename, cross-workspace duplicate isolation, acquisition-ID replay conflict, and concurrent duplicate imports. Confirm no parser, model, subprocess, DNS, external TCP, or mDNS access occurs.
 
-- [ ] **Step 4: Reconcile the specification boundary**
+- [x] **Step 4: Reconcile the specification boundary**
 
 Update the acceptance matrix with direct partial evidence for exact-duplicate handling in criterion 10 and boundary/history/offline portions of criteria 17, 19, 23, and 24 only. Keep new-version handling and criteria 11–16, 18, 20–22 explicitly unproven because promoted safety profiling, parsing, scanned fallback, canonical regions, five chunkers, indexes, publication, human interrupts, page citations, and benchmarks do not exist in Phase 2A.
 
-- [ ] **Step 5: Broad independent review and remediation**
+- [x] **Step 5: Broad independent review and remediation**
 
 Request a spec-compliance review and a code-quality/security review over the exact Phase 2A commit range. Resolve every Critical or Important finding, rerun the smallest affected checks, then rerun the full gate. Record accepted review SHA(s), exact test counts, fixture hashes, runtime commands, and remaining boundary in `.superpowers/sdd/phase-2a-report.md`.
 
-- [ ] **Step 6: Commit Phase 2A closure**
+- [x] **Step 6: Commit Phase 2A closure**
 
 ```bash
 git add README.md docs
@@ -545,7 +545,7 @@ Expected: Phase 2A is a truthful durable admission checkpoint, not a claim that 
 - `swift build -c release --package-path apps/macos --product RSIAtlas`
 - `bash -n script/build_and_run.sh infra/local/postgres.sh`
 - `git diff --check`
-- Manual smoke: clean-looking-awaiting-review, password, suspicious, rejected, and duplicate native imports; engine/database interruption and idempotent retry; restart persistence; compact/appearance/accessibility/multi-window; and exact development zero-egress.
+- Manual smoke: clean-looking-awaiting-review, suspicious, rejected, encrypted-marker-unknown, and duplicate native imports; fixture-only password presentation contract; engine/database interruption and idempotent retry; restart persistence; compact/appearance/accessibility/multi-window; and exact development zero-egress.
 
 ## Decision Log
 
@@ -562,6 +562,8 @@ Expected: Phase 2A is a truthful durable admission checkpoint, not a claim that 
 - 2026-07-18: Completed: approved §§12–15, acceptance criteria 10–24, Appendix D, current Phase 1 storage/runtime seams, and PDF tooling constraints reviewed.
 - 2026-07-18: Current: Task 1 strict acquisition/admission contract RED.
 - 2026-07-18: Next: implement Tasks 1–6 sequentially with independent review gates, then write the Phase 2B parser/preflight/canonicalization plan.
+- 2026-07-19: Completed: Tasks 1–6, 827 Python and 43 Swift tests, foreground native evidence, hard-kill/DB-down/restart recovery, live API/direct-CLI coexistence, adversarial and zero-egress matrices, and independent review with no remaining Critical/Important findings through `113110c`.
+- 2026-07-19: Next: Phase 2B promoted parser/preflight/canonical-page evidence; Phase 2A remains raw admission and makes no parsing/searchability claim.
 
 ## Rollback / Recovery
 
