@@ -113,6 +113,12 @@ struct CommandCenterView: View {
                     Section {
                         ForEach(section.components) { component in
                             ComponentStatusRow(component: component)
+                            if let remediation = component.remediation {
+                                ComponentRemediationRow(
+                                    componentID: component.componentID,
+                                    remediation: remediation
+                                )
+                            }
                         }
                     } header: {
                         Text(section.title)
