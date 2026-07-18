@@ -340,16 +340,15 @@ git commit -m "feat: enforce offline runtime policy"
 - All spans include actor/workspace/trace identifiers but reject document bodies, prompts, credentials, analyst notes, or report text as attributes.
 - Offline mode configures no exporter capable of remote transport.
 
-- [ ] **Step 1: Write failing trace and redaction tests**
+- [x] **Step 1: Write failing trace and redaction tests**
 
 ```python
 def test_local_exporter_persists_compact_span_without_private_payload(tmp_path: Path) -> None:
     runtime = TraceRuntime.local(tmp_path / "traces.jsonl")
-    with runtime.tracer.start_as_current_span("atlas.command") as span:
-        span.set_attribute("atlas.workspace.id", str(WORKSPACE_ID))
-        runtime.set_safe_attribute(span, "atlas.command.name", "Doctor")
+    with runtime.start_as_current_span("atlas.command", context=TRACE_CONTEXT) as span:
+        span.set_attribute("atlas.command.name", "Doctor")
         with pytest.raises(SensitiveTraceAttributeError):
-            runtime.set_safe_attribute(span, "document.text", "private")
+            span.set_attribute("document.text", "private")
     runtime.shutdown()
     payload = (tmp_path / "traces.jsonl").read_text()
     assert "atlas.command" in payload
@@ -361,17 +360,17 @@ def test_offline_trace_runtime_has_no_remote_exporter(tmp_path: Path) -> None:
     assert runtime.export_destinations == (tmp_path / "traces.jsonl",)
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `uv run pytest packages/observability/tests -q`
 
 Expected: import failure because the observability package does not exist.
 
-- [ ] **Step 3: Implement local exporter and safe attribute boundary**
+- [x] **Step 3: Implement local exporter and safe attribute boundary**
 
 Use `TracerProvider`, `SimpleSpanProcessor`, and a custom `SpanExporter`. The exporter writes one canonical JSON object per completed span through a locked append, stores hashes/identifiers/timing/status only, and flushes before shutdown. The redaction boundary allowlists names and rejects sensitive namespaces rather than trying to redact arbitrary content after collection.
 
-- [ ] **Step 4: Verify trace persistence, restart, failure, and no-export behavior**
+- [x] **Step 4: Verify trace persistence, restart, failure, and no-export behavior**
 
 Run:
 
@@ -383,12 +382,14 @@ uv run mypy packages/observability/src
 
 Expected: spans survive runtime shutdown/reopen, malformed trace storage produces an actionable diagnostic, sensitive attributes never reach disk, and no remote exporter is configured.
 
-- [ ] **Step 5: Commit and review Task 4**
+- [x] **Step 5: Commit and review Task 4**
 
 ```bash
 git add packages/observability pyproject.toml uv.lock
 git commit -m "feat: add local privacy-safe tracing"
 ```
+
+Closure evidence through `01c6693`: exact import RED retained; 45 focused observability tests and 487 PostgreSQL-configured repository tests pass; Ruff, formatting, strict source mypy, lock, and diff checks pass; real multi-process initialization/append and cross-process partial-prefix poison regressions pass; current development-component zero-egress trace smoke denies external TCP and mDNS, permits the exact Unix canary, writes one owner-private canonical metadata record, and remains explicitly narrower than release proof. Independent final review approved with no findings.
 
 ### Task 5: Resource arbiter and model registry/provider boundary
 
