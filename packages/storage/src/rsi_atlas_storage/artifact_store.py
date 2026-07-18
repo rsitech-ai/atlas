@@ -5,14 +5,26 @@ import tempfile
 from pathlib import Path
 
 from pydantic import ValidationError
-from rsi_atlas_contracts import ArtifactDescriptor, ArtifactID, ArtifactIntegrityError
+from rsi_atlas_contracts import (
+    ArtifactCommandContext,
+    ArtifactDescriptor,
+    ArtifactID,
+    ArtifactIntegrityError,
+)
 
 
 class ContentAddressedArtifactStore:
     def __init__(self, root: Path) -> None:
-        self._root = root.resolve()
+        self._root = root.absolute()
 
-    def put_bytes(self, payload: bytes, *, media_type: str) -> ArtifactDescriptor:
+    def put_bytes(
+        self,
+        payload: bytes,
+        *,
+        media_type: str,
+        context: ArtifactCommandContext,
+    ) -> ArtifactDescriptor:
+        context = self._require_context(context)
         digest = hashlib.sha256(payload).hexdigest()
         descriptor = ArtifactDescriptor(
             artifact_id=ArtifactID(f"sha256:{digest}"),
@@ -20,8 +32,7 @@ class ContentAddressedArtifactStore:
             size_bytes=len(payload),
             media_type=media_type,
         )
-        directory = self._directory_for(descriptor.artifact_id)
-        directory.mkdir(parents=True, exist_ok=True)
+        directory = self._prepare_artifact_directory(descriptor.artifact_id)
         manifest = descriptor.model_dump_json(indent=2).encode("utf-8")
         self._publish_once(directory / "payload", payload)
         self._publish_once(directory / "manifest.json", manifest)
@@ -29,13 +40,17 @@ class ContentAddressedArtifactStore:
             directory / "manifest.sha256",
             hashlib.sha256(manifest).hexdigest().encode("ascii"),
         )
-        return self.verify(descriptor.artifact_id)
+        return self.verify(descriptor.artifact_id, context=context)
 
-    def read_bytes(self, artifact_id: ArtifactID) -> bytes:
+    def read_bytes(self, artifact_id: ArtifactID, *, context: ArtifactCommandContext) -> bytes:
+        self._require_context(context)
         _, payload = self._verified_payload(artifact_id)
         return payload
 
-    def verify(self, artifact_id: ArtifactID) -> ArtifactDescriptor:
+    def verify(
+        self, artifact_id: ArtifactID, *, context: ArtifactCommandContext
+    ) -> ArtifactDescriptor:
+        self._require_context(context)
         descriptor, _ = self._verified_payload(artifact_id)
         return descriptor
 
@@ -46,8 +61,17 @@ class ContentAddressedArtifactStore:
         return self._directory_for(artifact_id) / "manifest.json"
 
     def _directory_for(self, artifact_id: ArtifactID) -> Path:
+        return self._artifact_directory_components(artifact_id)[-1]
+
+    def _artifact_directory_components(self, artifact_id: ArtifactID) -> tuple[Path, ...]:
         digest = self._digest_from(artifact_id)
-        return self._root / "sha256" / digest[:2] / digest[2:4] / digest
+        return (
+            self._root,
+            self._root / "sha256",
+            self._root / "sha256" / digest[:2],
+            self._root / "sha256" / digest[:2] / digest[2:4],
+            self._root / "sha256" / digest[:2] / digest[2:4] / digest,
+        )
 
     @staticmethod
     def _digest_from(artifact_id: ArtifactID) -> str:
@@ -61,8 +85,9 @@ class ContentAddressedArtifactStore:
         return digest
 
     def _verified_payload(self, artifact_id: ArtifactID) -> tuple[ArtifactDescriptor, bytes]:
-        descriptor = self._load_descriptor(artifact_id)
-        payload = self._read_regular_file(self.payload_path(artifact_id), label="payload")
+        directory = self._validate_artifact_directory(artifact_id)
+        descriptor = self._load_descriptor(artifact_id, directory)
+        payload = self._read_regular_file(directory / "payload", label="payload")
         actual_digest = hashlib.sha256(payload).hexdigest()
         if actual_digest != descriptor.digest:
             raise ArtifactIntegrityError("artifact content hash mismatch")
@@ -70,10 +95,10 @@ class ContentAddressedArtifactStore:
             raise ArtifactIntegrityError("artifact content size mismatch")
         return descriptor, payload
 
-    def _load_descriptor(self, artifact_id: ArtifactID) -> ArtifactDescriptor:
-        manifest = self._read_regular_file(self.manifest_path(artifact_id), label="manifest")
+    def _load_descriptor(self, artifact_id: ArtifactID, directory: Path) -> ArtifactDescriptor:
+        manifest = self._read_regular_file(directory / "manifest.json", label="manifest")
         manifest_hash = self._read_regular_file(
-            self._directory_for(artifact_id) / "manifest.sha256", label="manifest hash"
+            directory / "manifest.sha256", label="manifest hash"
         )
         if manifest_hash != hashlib.sha256(manifest).hexdigest().encode("ascii"):
             raise ArtifactIntegrityError("artifact manifest hash mismatch")
@@ -90,9 +115,49 @@ class ContentAddressedArtifactStore:
         if not path.is_file() or path.is_symlink():
             raise ArtifactIntegrityError(f"artifact {label} is missing")
         try:
+            path.chmod(0o600)
             return path.read_bytes()
         except OSError as error:
-            raise ArtifactIntegrityError(f"artifact {label} cannot be read") from error
+            raise ArtifactIntegrityError(f"artifact {label} cannot be secured or read") from error
+
+    def _prepare_artifact_directory(self, artifact_id: ArtifactID) -> Path:
+        components = self._artifact_directory_components(artifact_id)
+        for component in components:
+            self._ensure_private_directory(component)
+        return components[-1]
+
+    def _validate_artifact_directory(self, artifact_id: ArtifactID) -> Path:
+        components = self._artifact_directory_components(artifact_id)
+        for component in components:
+            self._validate_private_directory(component)
+        return components[-1]
+
+    @staticmethod
+    def _ensure_private_directory(path: Path) -> None:
+        if path.is_symlink():
+            raise ArtifactIntegrityError("artifact directory must not be a symlink")
+        try:
+            path.mkdir(mode=0o700)
+        except FileExistsError:
+            pass
+        except OSError as error:
+            raise ArtifactIntegrityError("artifact directory cannot be created") from error
+        ContentAddressedArtifactStore._validate_private_directory(path)
+
+    @staticmethod
+    def _validate_private_directory(path: Path) -> None:
+        if path.is_symlink():
+            raise ArtifactIntegrityError("artifact directory must not be a symlink")
+        if not path.is_dir():
+            raise ArtifactIntegrityError("artifact directory is missing")
+        try:
+            path.chmod(0o700)
+        except OSError as error:
+            raise ArtifactIntegrityError("artifact directory cannot be secured") from error
+
+    @staticmethod
+    def _require_context(context: ArtifactCommandContext) -> ArtifactCommandContext:
+        return ArtifactCommandContext.model_validate(context)
 
     @staticmethod
     def _publish_once(destination: Path, content: bytes) -> None:
@@ -102,6 +167,7 @@ class ContentAddressedArtifactStore:
         staging_path = Path(staging_name)
         try:
             with os.fdopen(file_descriptor, "wb") as staging_file:
+                os.fchmod(staging_file.fileno(), 0o600)
                 staging_file.write(content)
                 staging_file.flush()
                 os.fsync(staging_file.fileno())
@@ -115,5 +181,7 @@ class ContentAddressedArtifactStore:
                     raise ArtifactIntegrityError(
                         "existing immutable artifact file differs"
                     ) from error
+            else:
+                destination.chmod(0o600)
         finally:
             staging_path.unlink(missing_ok=True)

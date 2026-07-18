@@ -1,4 +1,5 @@
 from rsi_atlas_contracts.artifact import (
+    ArtifactCommandContext,
     ArtifactDescriptor,
     ArtifactID,
     ArtifactIntegrityError,
@@ -11,6 +12,7 @@ from rsi_atlas_contracts.system_status import (
 )
 
 __all__ = [
+    "ArtifactCommandContext",
     "ArtifactDescriptor",
     "ArtifactID",
     "ArtifactIntegrityError",

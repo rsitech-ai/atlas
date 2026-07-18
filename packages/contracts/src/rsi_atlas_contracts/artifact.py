@@ -1,4 +1,5 @@
 from typing import Literal, NewType
+from uuid import UUID
 
 from pydantic import Field, model_validator
 
@@ -9,6 +10,13 @@ ArtifactID = NewType("ArtifactID", str)
 
 class ArtifactIntegrityError(RuntimeError):
     """Raised when on-disk artifact evidence is missing or no longer trustworthy."""
+
+
+class ArtifactCommandContext(StrictModel):
+    tenant_id: UUID
+    workspace_id: UUID
+    actor_id: UUID
+    trace_id: UUID
 
 
 class ArtifactDescriptor(StrictModel):
