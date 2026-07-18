@@ -36,6 +36,9 @@ class MigrationRunner:
         with self._database.connect() as owned_connection:
             self._apply(owned_connection, migrations)
 
+    def expected_versions(self) -> tuple[str, ...]:
+        return tuple(migration.version for migration in self._load_migrations())
+
     @staticmethod
     def _apply(connection: Connection[Row], migrations: tuple[Migration, ...]) -> None:
         with connection.cursor() as cursor:

@@ -17,6 +17,8 @@ from rsi_atlas_contracts import (
 
 
 class ContentAddressedArtifactStore:
+    _STREAM_CHUNK_SIZE = 64 * 1024
+
     def __init__(self, root: Path) -> None:
         self._root = root.absolute()
 
@@ -49,6 +51,57 @@ class ContentAddressedArtifactStore:
             os.close(directory_fd)
         return self.verify(descriptor.artifact_id, context=context)
 
+    def put_file(
+        self,
+        source: Path,
+        *,
+        media_type: str,
+        max_bytes: int,
+        context: ArtifactCommandContext,
+    ) -> ArtifactDescriptor:
+        context = self._require_context(context)
+        if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 0:
+            raise ValueError("max_bytes must be a non-negative integer")
+        source_fd = self._open_staged_source(source)
+        try:
+            source_state = self._validate_staged_source(source_fd)
+            if source_state.st_size > max_bytes:
+                raise ArtifactIntegrityError("artifact source exceeds maximum size")
+            digest, size_bytes = self._hash_staged_source(
+                source_fd,
+                source_state=source_state,
+                max_bytes=max_bytes,
+            )
+            descriptor = ArtifactDescriptor(
+                artifact_id=ArtifactID(f"sha256:{digest}"),
+                digest=digest,
+                size_bytes=size_bytes,
+                media_type=media_type,
+            )
+            directory_fd = self._prepare_artifact_directory(descriptor.artifact_id)
+            try:
+                os.lseek(source_fd, 0, os.SEEK_SET)
+                self._publish_source_once(
+                    directory_fd,
+                    "payload",
+                    source_fd,
+                    source_state=source_state,
+                    expected_digest=digest,
+                    expected_size=size_bytes,
+                )
+                manifest = descriptor.model_dump_json(indent=2).encode("utf-8")
+                self._publish_once(directory_fd, "manifest.json", manifest)
+                self._publish_once(
+                    directory_fd,
+                    "manifest.sha256",
+                    hashlib.sha256(manifest).hexdigest().encode("ascii"),
+                )
+            finally:
+                os.close(directory_fd)
+        finally:
+            os.close(source_fd)
+        return self.verify(descriptor.artifact_id, context=context)
+
     def read_bytes(self, artifact_id: ArtifactID, *, context: ArtifactCommandContext) -> bytes:
         self._require_context(context)
         _, payload = self._verified_payload(artifact_id)
@@ -58,7 +111,21 @@ class ContentAddressedArtifactStore:
         self, artifact_id: ArtifactID, *, context: ArtifactCommandContext
     ) -> ArtifactDescriptor:
         self._require_context(context)
-        descriptor, _ = self._verified_payload(artifact_id)
+        directory_fd = self._validate_artifact_directory(artifact_id)
+        try:
+            descriptor = self._load_descriptor(artifact_id, directory_fd)
+            actual_digest, actual_size = self._hash_regular_file(
+                directory_fd,
+                "payload",
+                label="payload",
+                max_bytes=descriptor.size_bytes,
+            )
+        finally:
+            os.close(directory_fd)
+        if actual_size != descriptor.size_bytes:
+            raise ArtifactIntegrityError("artifact content size mismatch")
+        if actual_digest != descriptor.digest:
+            raise ArtifactIntegrityError("artifact content hash mismatch")
         return descriptor
 
     def payload_path(self, artifact_id: ArtifactID) -> Path:
@@ -174,6 +241,16 @@ class ContentAddressedArtifactStore:
             raise
 
     def _read_regular_file(self, directory_fd: int, name: str, *, label: str) -> bytes:
+        file_fd = self._open_regular_file(directory_fd, name, label=label)
+        try:
+            with os.fdopen(file_fd, "rb") as artifact_file:
+                file_fd = -1
+                return artifact_file.read()
+        finally:
+            if file_fd != -1:
+                os.close(file_fd)
+
+    def _open_regular_file(self, directory_fd: int, name: str, *, label: str) -> int:
         try:
             file_fd = os.open(name, self._file_open_flags(), dir_fd=directory_fd)
         except OSError as error:
@@ -182,12 +259,232 @@ class ContentAddressedArtifactStore:
             if not stat.S_ISREG(os.fstat(file_fd).st_mode):
                 raise ArtifactIntegrityError(f"artifact {label} is not a regular file")
             os.fchmod(file_fd, 0o600)
-            with os.fdopen(file_fd, "rb") as artifact_file:
-                file_fd = -1
-                return artifact_file.read()
+            return file_fd
+        except BaseException:
+            os.close(file_fd)
+            raise
+
+    def _hash_regular_file(
+        self,
+        directory_fd: int,
+        name: str,
+        *,
+        label: str,
+        max_bytes: int | None = None,
+    ) -> tuple[str, int]:
+        file_fd = self._open_regular_file(directory_fd, name, label=label)
+        try:
+            initial_state = os.fstat(file_fd)
+            digest = hashlib.sha256()
+            size_bytes = 0
+            read_limit = None if max_bytes is None else max_bytes + 1
+            while read_limit is None or size_bytes < read_limit:
+                read_size = self._STREAM_CHUNK_SIZE
+                if read_limit is not None:
+                    read_size = min(read_size, read_limit - size_bytes)
+                chunk = os.read(file_fd, read_size)
+                if not chunk:
+                    break
+                digest.update(chunk)
+                size_bytes += len(chunk)
+            if not self._same_file_state(initial_state, os.fstat(file_fd)):
+                raise ArtifactIntegrityError(f"artifact {label} changed during verification")
+            return digest.hexdigest(), size_bytes
+        except OSError as error:
+            raise ArtifactIntegrityError(f"artifact {label} cannot be verified") from error
         finally:
-            if file_fd != -1:
-                os.close(file_fd)
+            os.close(file_fd)
+
+    def _open_staged_source(self, source: Path) -> int:
+        absolute_source = Path(os.path.abspath(os.fspath(source)))
+        components = absolute_source.parts
+        if len(components) < 2 or components[0] != os.path.sep:
+            raise ArtifactIntegrityError("artifact source path is unsafe")
+        try:
+            current_fd = os.open(os.path.sep, self._source_directory_open_flags())
+        except OSError as error:
+            raise ArtifactIntegrityError("artifact source path is unsafe") from error
+        try:
+            for component in components[1:-1]:
+                child_fd = os.open(
+                    component,
+                    self._source_directory_open_flags(),
+                    dir_fd=current_fd,
+                )
+                os.close(current_fd)
+                current_fd = child_fd
+            try:
+                return os.open(components[-1], self._file_open_flags(), dir_fd=current_fd)
+            except OSError as error:
+                raise ArtifactIntegrityError(
+                    "artifact source is missing, symlinked, or unsafe"
+                ) from error
+        except OSError as error:
+            raise ArtifactIntegrityError("artifact source path is symlinked or unsafe") from error
+        finally:
+            os.close(current_fd)
+
+    @staticmethod
+    def _validate_staged_source(source_fd: int) -> os.stat_result:
+        try:
+            source_state = os.fstat(source_fd)
+        except OSError as error:
+            raise ArtifactIntegrityError("artifact source cannot be inspected") from error
+        if not stat.S_ISREG(source_state.st_mode):
+            raise ArtifactIntegrityError("artifact source is not a regular file")
+        if source_state.st_uid != os.geteuid():
+            raise ArtifactIntegrityError("artifact source is not owned by the current user")
+        if stat.S_IMODE(source_state.st_mode) & 0o077:
+            raise ArtifactIntegrityError("artifact source is not owner-private")
+        if source_state.st_nlink != 1:
+            raise ArtifactIntegrityError("artifact source has unsafe hard links")
+        return source_state
+
+    def _hash_staged_source(
+        self,
+        source_fd: int,
+        *,
+        source_state: os.stat_result,
+        max_bytes: int,
+    ) -> tuple[str, int]:
+        digest = hashlib.sha256()
+        remaining = source_state.st_size
+        size_bytes = 0
+        try:
+            while remaining:
+                chunk = os.read(source_fd, min(self._STREAM_CHUNK_SIZE, remaining))
+                if not chunk:
+                    raise ArtifactIntegrityError("artifact source produced a short read")
+                digest.update(chunk)
+                size_bytes += len(chunk)
+                remaining -= len(chunk)
+            if os.read(source_fd, 1):
+                raise ArtifactIntegrityError("artifact source exceeds maximum size")
+            if size_bytes > max_bytes:
+                raise ArtifactIntegrityError("artifact source exceeds maximum size")
+            if not self._same_file_state(source_state, os.fstat(source_fd)):
+                raise ArtifactIntegrityError("artifact source changed during hashing")
+            return digest.hexdigest(), size_bytes
+        except OSError as error:
+            raise ArtifactIntegrityError("artifact source cannot be read") from error
+
+    def _publish_source_once(
+        self,
+        directory_fd: int,
+        name: str,
+        source_fd: int,
+        *,
+        source_state: os.stat_result,
+        expected_digest: str,
+        expected_size: int,
+    ) -> None:
+        staging_name, staging_fd = self._create_staging_file(directory_fd)
+        try:
+            actual_digest, actual_size = self._copy_source_to_staging(
+                source_fd,
+                staging_fd,
+                expected_size=expected_size,
+            )
+            try:
+                os.fsync(staging_fd)
+            except OSError as error:
+                raise ArtifactIntegrityError(
+                    "artifact staging file cannot be synchronized"
+                ) from error
+            if not self._same_file_state(source_state, os.fstat(source_fd)):
+                raise ArtifactIntegrityError("artifact source changed during publication")
+            if actual_size != expected_size:
+                raise ArtifactIntegrityError("artifact source produced a short read")
+            if actual_digest != expected_digest:
+                raise ArtifactIntegrityError("artifact source changed during publication")
+            os.close(staging_fd)
+            staging_fd = -1
+            try:
+                os.link(
+                    staging_name,
+                    name,
+                    src_dir_fd=directory_fd,
+                    dst_dir_fd=directory_fd,
+                    follow_symlinks=False,
+                )
+            except (NotImplementedError, TypeError) as error:
+                raise ArtifactIntegrityError(
+                    "secure artifact publication is unsupported"
+                ) from error
+            except FileExistsError as error:
+                existing_digest, existing_size = self._hash_regular_file(
+                    directory_fd,
+                    name,
+                    label="stored file",
+                    max_bytes=expected_size,
+                )
+                if existing_digest != expected_digest or existing_size != expected_size:
+                    raise ArtifactIntegrityError(
+                        "existing immutable artifact file differs"
+                    ) from error
+        finally:
+            if staging_fd != -1:
+                os.close(staging_fd)
+            try:
+                os.unlink(staging_name, dir_fd=directory_fd)
+            except FileNotFoundError:
+                pass
+            except OSError as error:
+                raise ArtifactIntegrityError("artifact staging file cannot be removed") from error
+
+    def _copy_source_to_staging(
+        self, source_fd: int, staging_fd: int, *, expected_size: int
+    ) -> tuple[str, int]:
+        digest = hashlib.sha256()
+        remaining = expected_size
+        size_bytes = 0
+        try:
+            while remaining:
+                chunk = os.read(source_fd, min(self._STREAM_CHUNK_SIZE, remaining))
+                if not chunk:
+                    raise ArtifactIntegrityError("artifact source produced a short read")
+                self._write_all(staging_fd, chunk)
+                digest.update(chunk)
+                size_bytes += len(chunk)
+                remaining -= len(chunk)
+            if os.read(source_fd, 1):
+                raise ArtifactIntegrityError("artifact source changed during publication")
+            return digest.hexdigest(), size_bytes
+        except OSError as error:
+            raise ArtifactIntegrityError("artifact source cannot be staged") from error
+
+    @staticmethod
+    def _write_all(file_fd: int, content: bytes) -> None:
+        remaining = memoryview(content)
+        while remaining:
+            written = os.write(file_fd, remaining)
+            if written == 0:
+                raise ArtifactIntegrityError("artifact staging file produced a short write")
+            remaining = remaining[written:]
+
+    @staticmethod
+    def _same_file_state(first: os.stat_result, second: os.stat_result) -> bool:
+        return (
+            first.st_dev,
+            first.st_ino,
+            first.st_mode,
+            first.st_nlink,
+            first.st_uid,
+            first.st_gid,
+            first.st_size,
+            first.st_mtime_ns,
+            first.st_ctime_ns,
+        ) == (
+            second.st_dev,
+            second.st_ino,
+            second.st_mode,
+            second.st_nlink,
+            second.st_uid,
+            second.st_gid,
+            second.st_size,
+            second.st_mtime_ns,
+            second.st_ctime_ns,
+        )
 
     def _publish_once(self, directory_fd: int, name: str, content: bytes) -> None:
         staging_name, staging_fd = self._create_staging_file(directory_fd)
@@ -271,6 +568,13 @@ class ContentAddressedArtifactStore:
             return os.O_RDONLY | os.O_NOFOLLOW
         except AttributeError as error:
             raise ArtifactIntegrityError("secure artifact files are unsupported") from error
+
+    @staticmethod
+    def _source_directory_open_flags() -> int:
+        try:
+            return os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        except AttributeError as error:
+            raise ArtifactIntegrityError("secure artifact sources are unsupported") from error
 
     @staticmethod
     def _staging_open_flags() -> int:

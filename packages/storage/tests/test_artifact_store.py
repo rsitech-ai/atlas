@@ -50,6 +50,197 @@ def test_changed_bytes_create_a_distinct_artifact(tmp_path: Path) -> None:
     assert first.artifact_id != second.artifact_id
 
 
+def test_put_file_streams_in_bounded_chunks_without_buffering_the_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "staged.pdf"
+    payload = b"%PDF-1.7\n" + (b"atlas evidence\n" * 12_000) + b"%%EOF\n"
+    source.write_bytes(payload)
+    source.chmod(0o600)
+    store = ContentAddressedArtifactStore(tmp_path / "artifacts")
+    original_read = artifact_store_module.os.read
+    requested_sizes: list[int] = []
+
+    def bounded_read(file_descriptor: int, size: int) -> bytes:
+        requested_sizes.append(size)
+        return original_read(file_descriptor, size)
+
+    monkeypatch.setattr(artifact_store_module.os, "read", bounded_read)
+
+    artifact = store.put_file(
+        source,
+        media_type="application/pdf",
+        max_bytes=len(payload),
+        context=COMMAND_CONTEXT,
+    )
+
+    assert artifact.size_bytes == len(payload)
+    assert artifact.digest == hashlib.sha256(payload).hexdigest()
+    assert store.read_bytes(artifact.artifact_id, context=COMMAND_CONTEXT) == payload
+    assert requested_sizes
+    assert max(requested_sizes) <= 64 * 1024
+
+
+def test_put_file_rejects_payload_over_explicit_limit(tmp_path: Path) -> None:
+    source = tmp_path / "staged.pdf"
+    source.write_bytes(b"12345")
+    source.chmod(0o600)
+    artifact_root = tmp_path / "artifacts"
+    store = ContentAddressedArtifactStore(artifact_root)
+
+    with pytest.raises(ArtifactIntegrityError, match="maximum size"):
+        store.put_file(
+            source,
+            media_type="application/pdf",
+            max_bytes=4,
+            context=COMMAND_CONTEXT,
+        )
+
+    assert not artifact_root.exists()
+
+
+@pytest.mark.parametrize("unsafe_source", ["symlink", "directory", "public"])
+def test_put_file_rejects_unsafe_source(tmp_path: Path, unsafe_source: str) -> None:
+    source = tmp_path / "staged.pdf"
+    if unsafe_source == "symlink":
+        target = tmp_path / "target.pdf"
+        target.write_bytes(b"trusted")
+        target.chmod(0o600)
+        source.symlink_to(target)
+    elif unsafe_source == "directory":
+        source.mkdir(mode=0o700)
+    else:
+        source.write_bytes(b"trusted")
+        source.chmod(0o644)
+    artifact_root = tmp_path / "artifacts"
+    store = ContentAddressedArtifactStore(artifact_root)
+
+    with pytest.raises(ArtifactIntegrityError, match="source"):
+        store.put_file(
+            source,
+            media_type="application/pdf",
+            max_bytes=1024,
+            context=COMMAND_CONTEXT,
+        )
+
+    assert not artifact_root.exists()
+
+
+def test_put_file_detects_source_mutation_and_removes_cas_staging_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "staged.pdf"
+    source.write_bytes(b"original evidence")
+    source.chmod(0o600)
+    artifact_root = tmp_path / "artifacts"
+    store = ContentAddressedArtifactStore(artifact_root)
+    original_lseek = artifact_store_module.os.lseek
+    mutated = False
+
+    def mutate_before_copy(file_descriptor: int, offset: int, whence: int) -> int:
+        nonlocal mutated
+        if not mutated and offset == 0 and whence == os.SEEK_SET:
+            source.write_bytes(b"modified evidence")
+            mutated = True
+        return original_lseek(file_descriptor, offset, whence)
+
+    monkeypatch.setattr(artifact_store_module.os, "lseek", mutate_before_copy)
+
+    with pytest.raises(ArtifactIntegrityError, match="source changed"):
+        store.put_file(
+            source,
+            media_type="application/pdf",
+            max_bytes=1024,
+            context=COMMAND_CONTEXT,
+        )
+
+    assert mutated
+    assert tuple(artifact_root.rglob(".artifact-*")) == ()
+
+
+def test_put_file_rejects_short_second_read_and_removes_cas_staging_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "staged.pdf"
+    source.write_bytes(b"complete evidence")
+    source.chmod(0o600)
+    artifact_root = tmp_path / "artifacts"
+    store = ContentAddressedArtifactStore(artifact_root)
+    original_lseek = artifact_store_module.os.lseek
+    original_read = artifact_store_module.os.read
+    copying = False
+    injected = False
+
+    def mark_copy(file_descriptor: int, offset: int, whence: int) -> int:
+        nonlocal copying
+        result = original_lseek(file_descriptor, offset, whence)
+        if offset == 0 and whence == os.SEEK_SET:
+            copying = True
+        return result
+
+    def short_read(file_descriptor: int, size: int) -> bytes:
+        nonlocal injected
+        if copying and not injected:
+            injected = True
+            return b""
+        return original_read(file_descriptor, size)
+
+    monkeypatch.setattr(artifact_store_module.os, "lseek", mark_copy)
+    monkeypatch.setattr(artifact_store_module.os, "read", short_read)
+
+    with pytest.raises(ArtifactIntegrityError, match="short read"):
+        store.put_file(
+            source,
+            media_type="application/pdf",
+            max_bytes=1024,
+            context=COMMAND_CONTEXT,
+        )
+
+    assert injected
+    assert tuple(artifact_root.rglob(".artifact-*")) == ()
+
+
+def test_put_file_read_failure_preserves_source_and_removes_cas_staging_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    payload = b"complete evidence"
+    source = tmp_path / "staged.pdf"
+    source.write_bytes(payload)
+    source.chmod(0o600)
+    artifact_root = tmp_path / "artifacts"
+    store = ContentAddressedArtifactStore(artifact_root)
+    original_lseek = artifact_store_module.os.lseek
+    original_read = artifact_store_module.os.read
+    copying = False
+
+    def mark_copy(file_descriptor: int, offset: int, whence: int) -> int:
+        nonlocal copying
+        result = original_lseek(file_descriptor, offset, whence)
+        if offset == 0 and whence == os.SEEK_SET:
+            copying = True
+        return result
+
+    def fail_copy_read(file_descriptor: int, size: int) -> bytes:
+        if copying:
+            raise OSError("injected source read failure")
+        return original_read(file_descriptor, size)
+
+    monkeypatch.setattr(artifact_store_module.os, "lseek", mark_copy)
+    monkeypatch.setattr(artifact_store_module.os, "read", fail_copy_read)
+
+    with pytest.raises(ArtifactIntegrityError, match="source cannot be staged"):
+        store.put_file(
+            source,
+            media_type="application/pdf",
+            max_bytes=1024,
+            context=COMMAND_CONTEXT,
+        )
+
+    assert source.read_bytes() == payload
+    assert stat.S_IMODE(source.stat().st_mode) == 0o600
+    assert tuple(artifact_root.rglob(".artifact-*")) == ()
+
+
 def test_read_rejects_modified_content(tmp_path: Path) -> None:
     store = ContentAddressedArtifactStore(tmp_path)
     artifact = store.put_bytes(b"trusted", media_type="application/pdf", context=COMMAND_CONTEXT)
@@ -66,6 +257,46 @@ def test_verify_rejects_missing_manifest(tmp_path: Path) -> None:
 
     with pytest.raises(ArtifactIntegrityError, match="manifest is missing"):
         store.verify(artifact.artifact_id, context=COMMAND_CONTEXT)
+
+
+def test_verify_hashes_payload_without_loading_it_as_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = ContentAddressedArtifactStore(tmp_path)
+    artifact = store.put_bytes(b"trusted", media_type="application/pdf", context=COMMAND_CONTEXT)
+    original_read_regular_file = store._read_regular_file
+
+    def reject_buffered_payload(directory_fd: int, name: str, *, label: str) -> bytes:
+        if name == "payload":
+            raise AssertionError("verify must not buffer the artifact payload")
+        return original_read_regular_file(directory_fd, name, label=label)
+
+    monkeypatch.setattr(store, "_read_regular_file", reject_buffered_payload)
+
+    assert store.verify(artifact.artifact_id, context=COMMAND_CONTEXT) == artifact
+
+
+def test_verify_stops_at_manifest_declared_payload_size(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = ContentAddressedArtifactStore(tmp_path)
+    artifact = store.put_bytes(b"trusted", media_type="application/pdf", context=COMMAND_CONTEXT)
+    store.payload_path(artifact.artifact_id).write_bytes(b"x" * 1_000_000)
+    original_read = artifact_store_module.os.read
+    bytes_read = 0
+
+    def count_read(file_descriptor: int, size: int) -> bytes:
+        nonlocal bytes_read
+        chunk = original_read(file_descriptor, size)
+        bytes_read += len(chunk)
+        return chunk
+
+    monkeypatch.setattr(artifact_store_module.os, "read", count_read)
+
+    with pytest.raises(ArtifactIntegrityError, match="content size mismatch"):
+        store.verify(artifact.artifact_id, context=COMMAND_CONTEXT)
+
+    assert bytes_read <= artifact.size_bytes + 1
 
 
 def test_verify_rejects_modified_manifest(tmp_path: Path) -> None:

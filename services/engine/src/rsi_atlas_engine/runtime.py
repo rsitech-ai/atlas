@@ -62,7 +62,6 @@ _RUNTIME_CONTEXT = ArtifactCommandContext(
     actor_id=UUID("33333333-3333-4333-8333-333333333333"),
     trace_id=UUID("44444444-4444-4444-8444-444444444444"),
 )
-_EXPECTED_MIGRATIONS = ["0001", "0002"]
 _EXPECTED_VECTOR_VERSION = "0.8.5"
 _LOOPBACK_ORIGIN = "http://127.0.0.1:8765"
 _DIRECTORY_OPEN_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
@@ -546,8 +545,10 @@ def _check_database(paths: RuntimePaths, conninfo: str) -> ProbeObservation:
             transaction_timeout_ms=_DATABASE_TRANSACTION_TIMEOUT_MS,
         )
     )
+    migration_runner = MigrationRunner(database, paths.migration_root)
+    expected_migrations = list(migration_runner.expected_versions())
     with database.connect() as connection:
-        MigrationRunner(database, paths.migration_root).apply_all(connection=connection)
+        migration_runner.apply_all(connection=connection)
         with connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -558,8 +559,8 @@ def _check_database(paths: RuntimePaths, conninfo: str) -> ProbeObservation:
                 """
             )
             row = cursor.fetchone()
-    if row != ("", _EXPECTED_VECTOR_VERSION, _EXPECTED_MIGRATIONS):
-        raise RuntimeError("database readiness does not match Phase 1")
+    if row != ("", _EXPECTED_VECTOR_VERSION, expected_migrations):
+        raise RuntimeError("database readiness does not match checked-in migrations")
     return _observation(
         HealthState.HEALTHY,
         "PostgreSQL and pgvector are ready on the project-owned Unix socket.",

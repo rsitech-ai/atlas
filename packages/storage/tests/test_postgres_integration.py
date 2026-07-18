@@ -102,7 +102,9 @@ def test_migrations_enable_vector_and_are_idempotent(
     assert postgres_database.fetch_value(
         "SELECT extversion FROM pg_extension WHERE extname = 'vector'"
     )
-    assert postgres_database.fetch_value("SELECT count(*) FROM atlas_meta.schema_migrations") == 2
+    assert postgres_database.fetch_value(
+        "SELECT array_agg(version ORDER BY version) FROM atlas_meta.schema_migrations"
+    ) == list(runner.expected_versions())
 
 
 def test_fresh_database_migrations_serialize_concurrent_runners(
@@ -125,7 +127,9 @@ def test_fresh_database_migrations_serialize_concurrent_runners(
             ]
             for future in futures:
                 future.result()
-        assert fresh_database.fetch_value("SELECT count(*) FROM atlas_meta.schema_migrations") == 2
+        assert fresh_database.fetch_value(
+            "SELECT array_agg(version ORDER BY version) FROM atlas_meta.schema_migrations"
+        ) == list(MigrationRunner(fresh_database, Path("migrations")).expected_versions())
     finally:
         with postgres_database.connect(autocommit=True) as connection:
             connection.execute(
@@ -276,7 +280,7 @@ def test_artifact_content_rows_are_database_immutable(
         try:
             with pytest.raises(psycopg.Error, match="immutable"):
                 connection.execute(
-                    "TRUNCATE atlas_core.artifact_references, atlas_core.artifact_contents"
+                    "TRUNCATE atlas_core.artifact_references, atlas_core.artifact_contents CASCADE"
                 )
         finally:
             connection.rollback()
