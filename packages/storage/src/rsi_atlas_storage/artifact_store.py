@@ -1,7 +1,9 @@
+import errno
 import hashlib
 import json
 import os
-import tempfile
+import secrets
+import stat
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -32,14 +34,18 @@ class ContentAddressedArtifactStore:
             size_bytes=len(payload),
             media_type=media_type,
         )
-        directory = self._prepare_artifact_directory(descriptor.artifact_id)
-        manifest = descriptor.model_dump_json(indent=2).encode("utf-8")
-        self._publish_once(directory / "payload", payload)
-        self._publish_once(directory / "manifest.json", manifest)
-        self._publish_once(
-            directory / "manifest.sha256",
-            hashlib.sha256(manifest).hexdigest().encode("ascii"),
-        )
+        directory_fd = self._prepare_artifact_directory(descriptor.artifact_id)
+        try:
+            manifest = descriptor.model_dump_json(indent=2).encode("utf-8")
+            self._publish_once(directory_fd, "payload", payload)
+            self._publish_once(directory_fd, "manifest.json", manifest)
+            self._publish_once(
+                directory_fd,
+                "manifest.sha256",
+                hashlib.sha256(manifest).hexdigest().encode("ascii"),
+            )
+        finally:
+            os.close(directory_fd)
         return self.verify(descriptor.artifact_id, context=context)
 
     def read_bytes(self, artifact_id: ArtifactID, *, context: ArtifactCommandContext) -> bytes:
@@ -61,17 +67,12 @@ class ContentAddressedArtifactStore:
         return self._directory_for(artifact_id) / "manifest.json"
 
     def _directory_for(self, artifact_id: ArtifactID) -> Path:
-        return self._artifact_directory_components(artifact_id)[-1]
-
-    def _artifact_directory_components(self, artifact_id: ArtifactID) -> tuple[Path, ...]:
         digest = self._digest_from(artifact_id)
-        return (
-            self._root,
-            self._root / "sha256",
-            self._root / "sha256" / digest[:2],
-            self._root / "sha256" / digest[:2] / digest[2:4],
-            self._root / "sha256" / digest[:2] / digest[2:4] / digest,
-        )
+        return self._root / "sha256" / digest[:2] / digest[2:4] / digest
+
+    def _artifact_directory_components(self, artifact_id: ArtifactID) -> tuple[str, ...]:
+        digest = self._digest_from(artifact_id)
+        return "sha256", digest[:2], digest[2:4], digest
 
     @staticmethod
     def _digest_from(artifact_id: ArtifactID) -> str:
@@ -85,9 +86,12 @@ class ContentAddressedArtifactStore:
         return digest
 
     def _verified_payload(self, artifact_id: ArtifactID) -> tuple[ArtifactDescriptor, bytes]:
-        directory = self._validate_artifact_directory(artifact_id)
-        descriptor = self._load_descriptor(artifact_id, directory)
-        payload = self._read_regular_file(directory / "payload", label="payload")
+        directory_fd = self._validate_artifact_directory(artifact_id)
+        try:
+            descriptor = self._load_descriptor(artifact_id, directory_fd)
+            payload = self._read_regular_file(directory_fd, "payload", label="payload")
+        finally:
+            os.close(directory_fd)
         actual_digest = hashlib.sha256(payload).hexdigest()
         if actual_digest != descriptor.digest:
             raise ArtifactIntegrityError("artifact content hash mismatch")
@@ -95,10 +99,10 @@ class ContentAddressedArtifactStore:
             raise ArtifactIntegrityError("artifact content size mismatch")
         return descriptor, payload
 
-    def _load_descriptor(self, artifact_id: ArtifactID, directory: Path) -> ArtifactDescriptor:
-        manifest = self._read_regular_file(directory / "manifest.json", label="manifest")
+    def _load_descriptor(self, artifact_id: ArtifactID, directory_fd: int) -> ArtifactDescriptor:
+        manifest = self._read_regular_file(directory_fd, "manifest.json", label="manifest")
         manifest_hash = self._read_regular_file(
-            directory / "manifest.sha256", label="manifest hash"
+            directory_fd, "manifest.sha256", label="manifest hash"
         )
         if manifest_hash != hashlib.sha256(manifest).hexdigest().encode("ascii"):
             raise ArtifactIntegrityError("artifact manifest hash mismatch")
@@ -110,78 +114,155 @@ class ContentAddressedArtifactStore:
             raise ArtifactIntegrityError("artifact manifest identifier mismatch")
         return descriptor
 
-    @staticmethod
-    def _read_regular_file(path: Path, *, label: str) -> bytes:
-        if not path.is_file() or path.is_symlink():
-            raise ArtifactIntegrityError(f"artifact {label} is missing")
+    def _prepare_artifact_directory(self, artifact_id: ArtifactID) -> int:
+        return self._open_artifact_directory(artifact_id, create=True)
+
+    def _validate_artifact_directory(self, artifact_id: ArtifactID) -> int:
+        return self._open_artifact_directory(artifact_id, create=False)
+
+    def _open_artifact_directory(self, artifact_id: ArtifactID, *, create: bool) -> int:
+        current_fd = self._open_root(create=create)
         try:
-            path.chmod(0o600)
-            return path.read_bytes()
-        except OSError as error:
-            raise ArtifactIntegrityError(f"artifact {label} cannot be secured or read") from error
+            for component in self._artifact_directory_components(artifact_id):
+                child_fd = self._open_child_directory(current_fd, component, create=create)
+                os.close(current_fd)
+                current_fd = child_fd
+            return current_fd
+        except BaseException:
+            os.close(current_fd)
+            raise
 
-    def _prepare_artifact_directory(self, artifact_id: ArtifactID) -> Path:
-        components = self._artifact_directory_components(artifact_id)
-        for component in components:
-            self._ensure_private_directory(component)
-        return components[-1]
+    def _open_root(self, *, create: bool) -> int:
+        if create:
+            try:
+                os.mkdir(self._root, mode=0o700)
+            except FileExistsError:
+                pass
+            except OSError as error:
+                raise ArtifactIntegrityError("artifact root cannot be created") from error
+        return self._open_private_directory(self._root, label="artifact root")
 
-    def _validate_artifact_directory(self, artifact_id: ArtifactID) -> Path:
-        components = self._artifact_directory_components(artifact_id)
-        for component in components:
-            self._validate_private_directory(component)
-        return components[-1]
+    def _open_child_directory(self, parent_fd: int, name: str, *, create: bool) -> int:
+        if create:
+            try:
+                os.mkdir(name, mode=0o700, dir_fd=parent_fd)
+            except FileExistsError:
+                pass
+            except OSError as error:
+                raise ArtifactIntegrityError("artifact directory cannot be created") from error
+        return self._open_private_directory(name, parent_fd=parent_fd, label="artifact directory")
 
-    @staticmethod
-    def _ensure_private_directory(path: Path) -> None:
-        if path.is_symlink():
-            raise ArtifactIntegrityError("artifact directory must not be a symlink")
+    def _open_private_directory(
+        self, path: str | Path, *, parent_fd: int | None = None, label: str
+    ) -> int:
         try:
-            path.mkdir(mode=0o700)
-        except FileExistsError:
-            pass
+            directory_fd = os.open(path, self._directory_open_flags(), dir_fd=parent_fd)
         except OSError as error:
-            raise ArtifactIntegrityError("artifact directory cannot be created") from error
-        ContentAddressedArtifactStore._validate_private_directory(path)
-
-    @staticmethod
-    def _validate_private_directory(path: Path) -> None:
-        if path.is_symlink():
-            raise ArtifactIntegrityError("artifact directory must not be a symlink")
-        if not path.is_dir():
-            raise ArtifactIntegrityError("artifact directory is missing")
+            if error.errno in {errno.ELOOP, errno.ENOTDIR}:
+                raise ArtifactIntegrityError(
+                    f"{label} must not be a symlink or non-directory"
+                ) from error
+            raise ArtifactIntegrityError(f"{label} is missing or unsafe") from error
         try:
-            path.chmod(0o700)
+            if not stat.S_ISDIR(os.fstat(directory_fd).st_mode):
+                raise ArtifactIntegrityError(f"{label} is not a directory")
+            os.fchmod(directory_fd, 0o700)
+            return directory_fd
+        except BaseException:
+            os.close(directory_fd)
+            raise
+
+    def _read_regular_file(self, directory_fd: int, name: str, *, label: str) -> bytes:
+        try:
+            file_fd = os.open(name, self._file_open_flags(), dir_fd=directory_fd)
         except OSError as error:
-            raise ArtifactIntegrityError("artifact directory cannot be secured") from error
+            raise ArtifactIntegrityError(f"artifact {label} is missing or unsafe") from error
+        try:
+            if not stat.S_ISREG(os.fstat(file_fd).st_mode):
+                raise ArtifactIntegrityError(f"artifact {label} is not a regular file")
+            os.fchmod(file_fd, 0o600)
+            with os.fdopen(file_fd, "rb") as artifact_file:
+                file_fd = -1
+                return artifact_file.read()
+        finally:
+            if file_fd != -1:
+                os.close(file_fd)
+
+    def _publish_once(self, directory_fd: int, name: str, content: bytes) -> None:
+        staging_name, staging_fd = self._create_staging_file(directory_fd)
+        try:
+            with os.fdopen(staging_fd, "wb") as staging_file:
+                staging_fd = -1
+                staging_file.write(content)
+                staging_file.flush()
+                os.fsync(staging_file.fileno())
+            try:
+                os.link(
+                    staging_name,
+                    name,
+                    src_dir_fd=directory_fd,
+                    dst_dir_fd=directory_fd,
+                    follow_symlinks=False,
+                )
+            except (NotImplementedError, TypeError) as error:
+                raise ArtifactIntegrityError(
+                    "secure artifact publication is unsupported"
+                ) from error
+            except FileExistsError as error:
+                existing = self._read_regular_file(directory_fd, name, label="stored file")
+                if existing != content:
+                    raise ArtifactIntegrityError(
+                        "existing immutable artifact file differs"
+                    ) from error
+        finally:
+            if staging_fd != -1:
+                os.close(staging_fd)
+            try:
+                os.unlink(staging_name, dir_fd=directory_fd)
+            except FileNotFoundError:
+                pass
+            except OSError as error:
+                raise ArtifactIntegrityError("artifact staging file cannot be removed") from error
+
+    def _create_staging_file(self, directory_fd: int) -> tuple[str, int]:
+        for _ in range(8):
+            name = f".artifact-{secrets.token_hex(16)}"
+            try:
+                file_fd = os.open(
+                    name,
+                    self._staging_open_flags(),
+                    mode=0o600,
+                    dir_fd=directory_fd,
+                )
+            except FileExistsError:
+                continue
+            except OSError as error:
+                raise ArtifactIntegrityError("artifact staging file cannot be created") from error
+            os.fchmod(file_fd, 0o600)
+            return name, file_fd
+        raise ArtifactIntegrityError("artifact staging file name collision")
 
     @staticmethod
     def _require_context(context: ArtifactCommandContext) -> ArtifactCommandContext:
         return ArtifactCommandContext.model_validate(context)
 
     @staticmethod
-    def _publish_once(destination: Path, content: bytes) -> None:
-        file_descriptor, staging_name = tempfile.mkstemp(
-            prefix=".artifact-", dir=destination.parent
-        )
-        staging_path = Path(staging_name)
+    def _directory_open_flags() -> int:
         try:
-            with os.fdopen(file_descriptor, "wb") as staging_file:
-                os.fchmod(staging_file.fileno(), 0o600)
-                staging_file.write(content)
-                staging_file.flush()
-                os.fsync(staging_file.fileno())
-            try:
-                os.link(staging_path, destination)
-            except FileExistsError as error:
-                existing = ContentAddressedArtifactStore._read_regular_file(
-                    destination, label="stored file"
-                )
-                if existing != content:
-                    raise ArtifactIntegrityError(
-                        "existing immutable artifact file differs"
-                    ) from error
-            else:
-                destination.chmod(0o600)
-        finally:
-            staging_path.unlink(missing_ok=True)
+            return os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        except AttributeError as error:
+            raise ArtifactIntegrityError("secure artifact directories are unsupported") from error
+
+    @staticmethod
+    def _file_open_flags() -> int:
+        try:
+            return os.O_RDONLY | os.O_NOFOLLOW
+        except AttributeError as error:
+            raise ArtifactIntegrityError("secure artifact files are unsupported") from error
+
+    @staticmethod
+    def _staging_open_flags() -> int:
+        try:
+            return os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+        except AttributeError as error:
+            raise ArtifactIntegrityError("secure artifact files are unsupported") from error

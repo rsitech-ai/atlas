@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import stat
+from contextlib import suppress
 from pathlib import Path
 from typing import cast
 from uuid import UUID
@@ -171,6 +172,38 @@ def test_put_rejects_symlinked_artifact_ancestor(tmp_path: Path) -> None:
         store.put_bytes(b"trusted", media_type="application/pdf", context=COMMAND_CONTEXT)
 
     assert tuple(outside.iterdir()) == ()
+
+
+def test_put_never_publishes_through_an_ancestor_swapped_after_prepare(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "artifacts"
+    outside = tmp_path / "outside"
+    moved = tmp_path / "moved-sha256"
+    outside.mkdir()
+    store = ContentAddressedArtifactStore(root)
+    original_prepare = store._prepare_artifact_directory
+    outside_entries_before: tuple[Path, ...] = ()
+    swapped = False
+
+    def swap_ancestor_after_prepare(artifact_id: ArtifactID) -> int:
+        nonlocal outside_entries_before, swapped
+        directory = original_prepare(artifact_id)
+        digest = str(artifact_id).removeprefix("sha256:")
+        (outside / digest[:2] / digest[2:4] / digest).mkdir(parents=True)
+        outside_entries_before = tuple(outside.rglob("*"))
+        (root / "sha256").rename(moved)
+        (root / "sha256").symlink_to(outside, target_is_directory=True)
+        swapped = True
+        return directory
+
+    monkeypatch.setattr(store, "_prepare_artifact_directory", swap_ancestor_after_prepare)
+
+    with suppress(ArtifactIntegrityError):
+        store.put_bytes(b"trusted", media_type="application/pdf", context=COMMAND_CONTEXT)
+
+    assert swapped
+    assert tuple(outside.rglob("*")) == outside_entries_before
 
 
 def _assert_private_store_modes(root: Path, artifact_directory: Path) -> None:
