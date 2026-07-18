@@ -4,6 +4,7 @@ from enum import StrEnum
 from pathlib import Path
 from uuid import UUID
 
+from packaging.licenses import InvalidLicenseExpression, canonicalize_license_expression
 from pydantic import ConfigDict, Field, field_validator
 
 from rsi_atlas_contracts.system_status import StrictModel
@@ -63,7 +64,7 @@ class ModelArtifact(StrictModel):
     quantization: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,63}$")
     tokenizer_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     context_tokens: int = Field(gt=0, le=10_000_000)
-    license_id: str = Field(pattern=r"^[A-Za-z0-9.-]{1,96}$")
+    license_id: str = Field(min_length=1, max_length=96)
     source_manifest_artifact_id: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     local_path: Path
     capabilities: frozenset[ModelCapability] = Field(max_length=len(ModelCapability))
@@ -115,8 +116,18 @@ class ModelArtifact(StrictModel):
     @field_validator("license_id")
     @classmethod
     def compact_license_identifier(cls, value: str) -> str:
-        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.+-]{0,95}", value) is None:
+        fixture = re.fullmatch(
+            r"LicenseRef-RSIAtlas-Fixture-[A-Za-z0-9][A-Za-z0-9.-]{0,47}",
+            value,
+        )
+        if ("LicenseRef-" in value or "DocumentRef-" in value) and fixture is None:
             raise ValueError("model license identifier is invalid")
+        try:
+            canonical = canonicalize_license_expression(value)
+        except InvalidLicenseExpression as error:
+            raise ValueError("model license identifier is invalid") from error
+        if canonical != value:
+            raise ValueError("model license identifier must use canonical SPDX syntax")
         return value
 
     @field_validator("capability_results", "approved_tasks")

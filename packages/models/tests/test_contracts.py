@@ -33,6 +33,25 @@ def test_lifecycle_closure_includes_terminal_rejected() -> None:
     assert ModelLifecycle.REJECTED.value == "rejected"
 
 
+@pytest.mark.parametrize(
+    "license_id",
+    [
+        "MIT",
+        "Apache-2.0",
+        "MIT OR Apache-2.0",
+        "LicenseRef-RSIAtlas-Fixture-Smoke-Model",
+    ],
+)
+def test_model_artifact_accepts_canonical_spdx_or_reserved_fixture_license(
+    tmp_path: Path,
+    license_id: str,
+) -> None:
+    values = _artifact_values(tmp_path)
+    values["license_id"] = license_id
+
+    assert ModelArtifact(**values).license_id == license_id
+
+
 def _artifact_values(tmp_path: Path) -> dict[str, object]:
     return {
         "artifact_id": uuid4(),
@@ -72,6 +91,11 @@ def _artifact_values(tmp_path: Path) -> dict[str, object]:
         ("context_tokens", 0),
         ("context_tokens", 10_000_001),
         ("license_id", "private license text"),
+        ("license_id", "DefinitelyNotAnSPDXIdentifier"),
+        ("license_id", "LicenseRef-Unreserved-Private"),
+        ("license_id", "MIT OR LicenseRef-Unreserved-Private"),
+        ("license_id", "DocumentRef-External:LicenseRef-Private"),
+        ("license_id", "mit"),
         ("source_manifest_artifact_id", "sha256:" + "C" * 64),
         ("local_path", Path("relative/model.gguf")),
         ("local_path", Path("/tmp/../tmp/model.gguf")),
