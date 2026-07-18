@@ -6,18 +6,24 @@ The approved product and system design is in [`docs/superpowers/specs/2026-07-18
 
 ## Current slice
 
-The repository currently implements the durable foundation of the first Phase 1 seam:
+The repository completes the reviewed Phase 1 durable local-runtime seam:
 
 - strict, versioned Python runtime-status contracts;
 - an immutable, content-addressed artifact store with integrity verification;
 - PostgreSQL 17 persistence with data checksums over an owner-only Unix socket and hash-locked migrations;
 - a pgvector-enabled foundation schema with tenant/workspace authorization and actor/trace provenance;
-- deterministic offline foundation diagnostics;
+- metadata-only owner-private local traces, enforced offline process policy, resource admission,
+  and a model registry with an honest unavailable provider;
+- real dependency-injected runtime diagnostics with exact component/group contracts and typed
+  remediation;
 - `atlas doctor` and `GET /v1/system/status` on loopback only;
-- a native SwiftUI Command Center with loading, healthy, unavailable, and retry states;
+- a native SwiftUI Command Center with grouped live evidence, stale-state preservation, fault
+  remediation, multi-window behavior, keyboard refresh, and accessibility identifiers;
 - a reproducible SwiftPM `.app` build and local engine/app launcher.
 
-Document ingestion, retrieval, local models, collectors, LangGraph workflows, XPC, signing, and release qualification are not implemented yet. The development database is project-owned; release data placement remains a later packaging gate.
+Document ingestion, retrieval, qualified model execution, collectors, LangGraph workflows, XPC,
+signing, and release qualification are not implemented yet. The development database is
+project-owned; release data placement remains a later packaging gate.
 
 ## Requirements
 
@@ -33,7 +39,10 @@ Document ingestion, retrieval, local models, collectors, LangGraph workflows, XP
 ./script/build_and_run.sh --verify
 ```
 
-This syncs the pinned Python workspace, starts the project-owned PostgreSQL cluster under `.local` on an owner-only Unix socket, starts the engine on `127.0.0.1:8765`, builds `RSIAtlas`, stages `dist/RSIAtlas.app`, launches it, and verifies both app processes.
+This syncs the pinned Python workspace, starts the project-owned PostgreSQL cluster under `.local`
+on an owner-only Unix socket, passes that exact data root into the launchd-owned engine on
+`127.0.0.1:8765`, builds `RSIAtlas`, stages `dist/RSIAtlas.app`, launches it, and verifies schema
+`1.1.0` plus the exact degraded-only-model eight-component contract.
 
 The local database never uses the Homebrew service or its default cluster:
 
@@ -49,8 +58,9 @@ Override `RSI_ATLAS_DATA_ROOT` to place the development cluster outside the repo
 
 ```bash
 uv lock --check
-uv run ruff check packages services
-uv run mypy packages/contracts/src packages/storage/src services/engine/src
+uv run ruff check packages services infra
+uv run ruff format --check packages services infra
+uv run mypy packages services infra
 RSI_ATLAS_TEST_DATABASE_URL="$(./infra/local/postgres.sh test-url)" uv run pytest -q
 uv run atlas doctor --json
 swift test --package-path apps/macos

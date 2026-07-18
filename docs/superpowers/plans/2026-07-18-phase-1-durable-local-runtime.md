@@ -503,7 +503,7 @@ Closure evidence through `fe5d47f`: the exact import RED is retained; 132 focuse
 - Produces: real component diagnostics for database, artifact integrity, offline policy, trace storage, resource safety, and model availability; `atlas doctor` remediation text; native grouped Command Center status.
 - Overall health uses the existing explicit severity order and never reports healthy when a required Phase 1 probe is blocked, unsafe, or repairable.
 
-- [ ] **Step 1: Write failing aggregate diagnostic and cross-language contract tests**
+- [x] **Step 1: Write failing aggregate diagnostic and cross-language contract tests**
 
 ```python
 def test_runtime_status_aggregates_real_probe_failure() -> None:
@@ -522,7 +522,7 @@ def test_doctor_json_contains_all_phase_one_components() -> None:
 
 Swift fixtures assert the same schema, reject unknown fields recursively, display remediation only when present, and preserve latest-request-wins behavior.
 
-- [ ] **Step 2: Verify RED in Python and Swift**
+- [x] **Step 2: Verify RED in Python and Swift**
 
 Run:
 
@@ -533,11 +533,11 @@ swift test --package-path apps/macos
 
 Expected: the new probe/remediation and expanded fixture expectations fail against the three constant foundation checks.
 
-- [ ] **Step 3: Implement dependency-injected probes and native presentation**
+- [x] **Step 3: Implement dependency-injected probes and native presentation**
 
 `RuntimeServices.from_environment()` resolves only non-secret paths/profile settings, constructs verified stores/policies, and exposes probes. The engine startup applies migrations before serving readiness. The Swift view groups Storage, Privacy, Observability, Resources, and Engine rows using native `List` sections and semantic colors; absent models display an honest degraded/non-blocking state with no download control.
 
-- [ ] **Step 4: Run deterministic all-up checks**
+- [x] **Step 4: Run deterministic all-up checks**
 
 Run:
 
@@ -553,13 +553,13 @@ bash -n script/build_and_run.sh infra/local/postgres.sh
 
 Expected: all checks pass with no warnings or skipped required integration test.
 
-- [ ] **Step 5: Run fault, egress, and foreground application smoke**
+- [x] **Step 5: Run fault, egress, and foreground application smoke**
 
 Run `./script/build_and_run.sh --verify`, inspect the foreground Command Center, stop PostgreSQL and refresh, verify an actionable blocked state, restore PostgreSQL and recover in the same window, corrupt a disposable artifact and verify repairable integrity output, restart the full stack, and record exact process/service/socket state. Run the development zero-egress verifier while `atlas doctor` and the native refresh execute.
 
 Expected: no raw evidence is lost, the UI never fabricates health, recovery needs no source edit, and no external connection occurs.
 
-- [ ] **Step 6: Commit, broad review, and evidence update**
+- [x] **Step 6: Commit, broad review, and evidence update**
 
 ```bash
 git add README.md apps docs infra packages services script pyproject.toml uv.lock
@@ -567,6 +567,19 @@ git commit -m "feat: complete durable local runtime"
 ```
 
 Update `docs/production-plan.md` with runtime observations, exact test counts, known release-only limitations, and the next Phase 2 blocker. Run a broad Phase 1 branch review and resolve every Critical/Important finding before marking Phase 1 complete.
+
+Closure evidence through `647c25b`: exact REDs were recorded before implementation; 660
+PostgreSQL-configured Python tests and 21 Swift tests pass with Ruff, formatting, strict source
+mypy, lock, shell syntax, debug build, and release build. The launcher verifies schema `1.1.0` and
+the exact degraded-only-model eight-component contract against the same owner-private data root
+used by launchd and PostgreSQL. Foreground proof covers PostgreSQL loss/recovery, artifact
+corruption/recovery, engine loss with stale evidence and same-window recovery, restart persistence,
+1120×760 and 860×600 content layouts, Light/Dark, increased contrast, large text, Reduce Motion,
+VoiceOver accessibility order, keyboard refresh, and a second window. Development zero-egress
+denied external TCP and mDNS while allowing only the exact PostgreSQL socket. Independent source
+review approved `7864630` and the debug-only presentation-QA delta through `647c25b` with no
+Critical or Important findings. The current physical thermal state may honestly block runtime work;
+the degraded-only-model launcher gate is rerun only when the machine returns to nominal/fair.
 
 ## Verification
 
