@@ -43,6 +43,17 @@ def test_runtime_profiles_and_process_roles_are_closed() -> None:
         ProcessRole("unknown")
 
 
+@pytest.mark.parametrize("profile", ["offline", "monitored", "unknown", object()])
+def test_direct_policy_constructor_rejects_mistyped_or_unknown_profile(profile: object) -> None:
+    with pytest.raises(ValueError, match="runtime profile"):
+        NetworkPolicy(
+            profile=profile,  # type: ignore[arg-type]
+            remote_origins=(),
+            loopback_origins=(),
+            unix_socket_paths=(),
+        )
+
+
 def test_network_decision_is_frozen_and_carries_policy_identity() -> None:
     decision = NetworkPolicy.offline().authorize(
         role=ProcessRole.API,

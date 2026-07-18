@@ -72,14 +72,30 @@ COLLECTOR_PRIVATE_DATA = frozenset(
         DataClass.PRIVATE_DATABASE_ROOT,
     }
 )
-NO_KEYCHAIN_ROLES = frozenset(
-    {
-        ProcessRole.DOCUMENT_WORKER,
-        ProcessRole.MODEL_WORKER,
-        ProcessRole.EVALUATION_WORKER,
-        ProcessRole.CODEX_CONTROLLER,
-    }
-)
+APPROVED_READ_DATA = {
+    ProcessRole.API: frozenset({DataClass.REPORTS, DataClass.TRACES}),
+    ProcessRole.ENGINE: frozenset({DataClass.INDEXES, DataClass.FEATURES, DataClass.EVALUATIONS}),
+    ProcessRole.DOCUMENT_WORKER: frozenset({DataClass.PRIVATE_PDFS}),
+    ProcessRole.MODEL_WORKER: frozenset({DataClass.INDEXES, DataClass.PROMPTS}),
+    ProcessRole.DATA_WORKER: frozenset(
+        {DataClass.PUBLIC_SOURCES, DataClass.CHAIN_DATA, DataClass.QUARANTINE}
+    ),
+    ProcessRole.EVALUATION_WORKER: frozenset({DataClass.FEATURES, DataClass.REPORTS}),
+    ProcessRole.COLLECTOR: frozenset({DataClass.PUBLIC_SOURCES, DataClass.CHAIN_DATA}),
+    ProcessRole.EXPORTER: frozenset({DataClass.REPORTS}),
+    ProcessRole.CODEX_CONTROLLER: frozenset({DataClass.CODEX_WORKTREES}),
+}
+APPROVED_WRITE_DATA = {
+    ProcessRole.API: frozenset(),
+    ProcessRole.ENGINE: frozenset({DataClass.TRACES}),
+    ProcessRole.DOCUMENT_WORKER: frozenset({DataClass.INDEXES}),
+    ProcessRole.MODEL_WORKER: frozenset({DataClass.FEATURES}),
+    ProcessRole.DATA_WORKER: frozenset({DataClass.INDEXES}),
+    ProcessRole.EVALUATION_WORKER: frozenset({DataClass.EVALUATIONS}),
+    ProcessRole.COLLECTOR: frozenset({DataClass.QUARANTINE}),
+    ProcessRole.EXPORTER: frozenset(),
+    ProcessRole.CODEX_CONTROLLER: frozenset(),
+}
 ROOT_KEYS = frozenset({"schema_version", "processes"})
 PROCESS_KEYS = frozenset(
     {
@@ -190,12 +206,16 @@ def _parse_process(raw: object) -> ProcessCapability:
     writes = _parse_data_classes(raw["write_data_classes"])
     if reads & writes:
         raise ManifestValidationError("process manifest contains contradictory data grants")
+    if role is ProcessRole.COLLECTOR and (reads | writes) & COLLECTOR_PRIVATE_DATA:
+        raise ManifestValidationError("collector private data grant is prohibited")
+    if not reads.issubset(APPROVED_READ_DATA[role]) or not writes.issubset(
+        APPROVED_WRITE_DATA[role]
+    ):
+        raise ManifestValidationError("process manifest contains unapproved data grant")
     capabilities = _parse_capabilities(raw["capabilities"])
     if capabilities != frozenset({ROLE_CAPABILITY[role]}):
         raise ManifestValidationError("process manifest contains contradictory capability grants")
-    if role is ProcessRole.COLLECTOR and reads & COLLECTOR_PRIVATE_DATA:
-        raise ManifestValidationError("collector private data grant is prohibited")
-    if keychain_access and role in NO_KEYCHAIN_ROLES:
+    if keychain_access and role is not ProcessRole.COLLECTOR:
         raise ManifestValidationError("process role has prohibited Keychain access")
     if shell_authority:
         raise ManifestValidationError("shell authority is prohibited")

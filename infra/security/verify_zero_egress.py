@@ -14,7 +14,10 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from collections.abc import Sequence
+from contextlib import suppress
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NoReturn, TextIO
@@ -38,31 +41,104 @@ class VerificationError(RuntimeError):
     pass
 
 
+@dataclass(frozen=True, slots=True)
+class ExecutableIdentity:
+    path: str
+    descriptor: int
+    sha256: str
+    device: int
+    inode: int
+
+
+@dataclass(frozen=True, slots=True)
+class UnixSocketIdentity:
+    path: str
+    device: int
+    inode: int
+    parent_device: int
+    parent_inode: int
+
+
 def _timestamp() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
-def _sha256_file(path: Path) -> str:
+def _sha256_descriptor(descriptor: int) -> str:
     digest = hashlib.sha256()
     try:
-        with path.open("rb") as source:
-            while chunk := source.read(1024 * 1024):
-                digest.update(chunk)
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        while chunk := os.read(descriptor, 1024 * 1024):
+            digest.update(chunk)
+        os.lseek(descriptor, 0, os.SEEK_SET)
     except OSError as error:
         raise VerificationError("executable identity could not be recorded") from error
     return digest.hexdigest()
 
 
-def _resolve_executable(argv: Sequence[str]) -> tuple[str, str]:
+def _open_executable_identity(argv: Sequence[str]) -> ExecutableIdentity:
     executable = argv[0]
     candidate = executable if os.path.isabs(executable) else shutil.which(executable)
     if candidate is None:
         raise VerificationError("target executable is unavailable")
-    path = Path(candidate).resolve(strict=True)
-    metadata = path.stat()
-    if not stat.S_ISREG(metadata.st_mode) or not os.access(path, os.X_OK):
-        raise VerificationError("target executable is invalid")
-    return str(path), _sha256_file(path)
+    try:
+        path = Path(candidate).resolve(strict=True)
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+        descriptor = os.open(path, flags)
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode) or not os.access(path, os.X_OK):
+            raise VerificationError("target executable is invalid")
+        identity = ExecutableIdentity(
+            path=str(path),
+            descriptor=descriptor,
+            sha256=_sha256_descriptor(descriptor),
+            device=metadata.st_dev,
+            inode=metadata.st_ino,
+        )
+        _validate_executable_identity(identity)
+        return identity
+    except VerificationError:
+        if "descriptor" in locals():
+            os.close(descriptor)
+        raise
+    except OSError as error:
+        if "descriptor" in locals():
+            os.close(descriptor)
+        raise VerificationError("target executable is invalid") from error
+
+
+def _validate_executable_identity(identity: ExecutableIdentity) -> None:
+    try:
+        descriptor_metadata = os.fstat(identity.descriptor)
+        path_metadata = os.stat(identity.path, follow_symlinks=False)
+    except OSError as error:
+        raise VerificationError("executable path identity changed") from error
+    expected = (identity.device, identity.inode)
+    if (
+        not stat.S_ISREG(path_metadata.st_mode)
+        or (descriptor_metadata.st_dev, descriptor_metadata.st_ino) != expected
+        or (path_metadata.st_dev, path_metadata.st_ino) != expected
+    ):
+        raise VerificationError("executable path identity changed")
+
+
+def _executable_evidence(identity: ExecutableIdentity | None) -> dict[str, object]:
+    if identity is None:
+        return {
+            "path": None,
+            "sha256": None,
+            "device": None,
+            "inode": None,
+            "execution_binding": "unavailable",
+            "limitation": "path_execution_not_kernel_bound",
+        }
+    return {
+        "path": identity.path,
+        "sha256": identity.sha256,
+        "device": identity.device,
+        "inode": identity.inode,
+        "execution_binding": "opened_descriptor_hash_with_path_revalidation",
+        "limitation": "path_execution_not_kernel_bound",
+    }
 
 
 def _validate_argv(argv: Sequence[str]) -> tuple[str, ...]:
@@ -84,25 +160,53 @@ def _validate_argv(argv: Sequence[str]) -> tuple[str, ...]:
     return tuple(validated)
 
 
-def _safe_socket_paths(paths: Sequence[str]) -> tuple[str, ...]:
+def _argv_fingerprint(argv: Sequence[str]) -> dict[str, object]:
+    canonical = json.dumps(list(argv), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return {"count": len(argv), "sha256": hashlib.sha256(canonical).hexdigest()}
+
+
+def _capture_socket_identity(path: str) -> UnixSocketIdentity:
+    candidate = Path(path)
+    try:
+        decision = NetworkPolicy.offline(unix_socket_paths=[candidate]).authorize(
+            role=ProcessRole.ENGINE,
+            unix_socket_path=candidate,
+        )
+        metadata = os.stat(candidate, follow_symlinks=False)
+        parent_metadata = os.stat(candidate.parent, follow_symlinks=False)
+    except (OSError, ValueError) as error:
+        raise VerificationError("Unix socket allowance failed validation") from error
+    if not decision.allowed or decision.canonical_destination is None:
+        raise VerificationError("Unix socket allowance failed validation")
+    return UnixSocketIdentity(
+        path=decision.canonical_destination,
+        device=metadata.st_dev,
+        inode=metadata.st_ino,
+        parent_device=parent_metadata.st_dev,
+        parent_inode=parent_metadata.st_ino,
+    )
+
+
+def _safe_socket_paths(paths: Sequence[str]) -> tuple[UnixSocketIdentity, ...]:
     if len(paths) != len(set(paths)):
         raise VerificationError("duplicate Unix socket allowance")
-    validated: list[str] = []
+    validated: list[UnixSocketIdentity] = []
     for raw_path in paths:
         path = Path(raw_path)
         if not SAFE_PROFILE_PATH.fullmatch(raw_path):
             raise VerificationError("Unix socket allowance is not profile-safe")
+        validated.append(_capture_socket_identity(str(path)))
+    return tuple(sorted(validated, key=lambda identity: identity.path))
+
+
+def _revalidate_socket_identities(identities: Sequence[UnixSocketIdentity]) -> None:
+    for expected in identities:
         try:
-            decision = NetworkPolicy.offline(unix_socket_paths=[path]).authorize(
-                role=ProcessRole.ENGINE,
-                unix_socket_path=path,
-            )
-        except ValueError as error:
-            raise VerificationError("Unix socket allowance failed validation") from error
-        if not decision.allowed or decision.canonical_destination is None:
-            raise VerificationError("Unix socket allowance failed validation")
-        validated.append(decision.canonical_destination)
-    return tuple(sorted(validated))
+            current = _capture_socket_identity(expected.path)
+        except VerificationError as error:
+            raise VerificationError("Unix socket identity changed") from error
+        if current != expected:
+            raise VerificationError("Unix socket identity changed")
 
 
 def _sandbox_profile(socket_paths: Sequence[str]) -> str:
@@ -114,32 +218,96 @@ def _sandbox_profile(socket_paths: Sequence[str]) -> str:
     return "\n".join(rules) + "\n"
 
 
-def _terminate_process_group(process: subprocess.Popen[bytes]) -> None:
-    if process.poll() is not None:
-        return
+def _descendant_processes(root_pid: int) -> set[int]:
     try:
-        os.killpg(process.pid, signal.SIGTERM)
+        result = subprocess.run(
+            ["/bin/ps", "-axo", "pid=,ppid="],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise VerificationError("sandbox child cleanup inspection failed") from error
+    children: dict[int, set[int]] = {}
+    try:
+        for line in result.stdout.splitlines():
+            pid_text, parent_text = line.split()
+            children.setdefault(int(parent_text), set()).add(int(pid_text))
+    except (TypeError, ValueError) as error:
+        raise VerificationError("sandbox child cleanup inspection failed") from error
+    descendants: set[int] = set()
+    pending = [root_pid]
+    while pending:
+        parent = pending.pop()
+        for child in children.get(parent, set()):
+            if child not in descendants:
+                descendants.add(child)
+                pending.append(child)
+    return descendants
+
+
+def _process_is_active(process_id: int) -> bool:
+    try:
+        result = subprocess.run(
+            ["/bin/ps", "-p", str(process_id), "-o", "stat="],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=1,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise VerificationError("sandbox child cleanup inspection failed") from error
+    state = result.stdout.strip()
+    return result.returncode == 0 and bool(state) and not state.startswith("Z")
+
+
+def _signal_process(process_id: int, signal_number: signal.Signals) -> None:
+    try:
+        os.kill(process_id, signal_number)
     except ProcessLookupError:
         return
     except OSError as error:
         raise VerificationError("sandbox child cleanup failed") from error
+
+
+def _terminate_process_group(process: subprocess.Popen[bytes]) -> None:
+    descendants = _descendant_processes(process.pid)
+    for process_id in descendants:
+        _signal_process(process_id, signal.SIGTERM)
     try:
-        process.wait(timeout=0.5)
-        return
-    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
         pass
     except OSError as error:
         raise VerificationError("sandbox child cleanup failed") from error
     try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        return
+        process.wait(timeout=0.5)
+    except subprocess.TimeoutExpired:
+        pass
     except OSError as error:
         raise VerificationError("sandbox child cleanup failed") from error
-    try:
-        process.wait(timeout=1)
-    except (OSError, subprocess.TimeoutExpired) as error:
-        raise VerificationError("sandbox child cleanup failed") from error
+    for process_id in descendants:
+        if _process_is_active(process_id):
+            _signal_process(process_id, signal.SIGKILL)
+    if process.poll() is None:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        except OSError as error:
+            raise VerificationError("sandbox child cleanup failed") from error
+        try:
+            process.wait(timeout=1)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise VerificationError("sandbox child cleanup failed") from error
+    deadline = time.monotonic() + 1
+    while time.monotonic() < deadline and any(
+        _process_is_active(process_id) for process_id in descendants
+    ):
+        time.sleep(0.02)
+    if any(_process_is_active(process_id) for process_id in descendants):
+        raise VerificationError("sandbox child cleanup left a surviving descendant")
 
 
 def _run_sandboxed(
@@ -275,8 +443,8 @@ def _failure_evidence(*, start_time: str, argv: Sequence[str]) -> dict[str, Any]
         "schema_version": "1.0.0",
         "evidence_label": EVIDENCE_LABEL,
         "profile": "offline",
-        "argv": list(argv),
-        "executable": {"path": None, "sha256": None},
+        "argv_fingerprint": _argv_fingerprint(argv),
+        "executable": _executable_evidence(None),
         "sandbox_profile_sha256": None,
         "start_time": start_time,
         "end_time": _timestamp(),
@@ -338,6 +506,7 @@ def main(
 ) -> int:
     start_time = _timestamp()
     safe_argv: tuple[str, ...] = ()
+    executable_identity: ExecutableIdentity | None = None
     try:
         arguments = _parser().parse_args(argv)
         if not 0.1 <= arguments.timeout_seconds <= 60:
@@ -345,10 +514,11 @@ def main(
         safe_argv = _command_from_arguments(arguments)
         if not sandbox_executable.is_file() or not os.access(sandbox_executable, os.X_OK):
             raise VerificationError("sandbox support unavailable")
-        socket_paths = _safe_socket_paths(arguments.allow_unix_socket)
+        socket_identities = _safe_socket_paths(arguments.allow_unix_socket)
+        socket_paths = tuple(identity.path for identity in socket_identities)
         profile = _sandbox_profile(socket_paths)
         profile_hash = hashlib.sha256(profile.encode("utf-8")).hexdigest()
-        executable_path, executable_hash = _resolve_executable(safe_argv)
+        executable_identity = _open_executable_identity(safe_argv)
         _validate_mdns_discriminator()
         _validate_profile(sandbox_executable=sandbox_executable, profile=profile)
         mdns_denied = _run_denial_canary(
@@ -366,18 +536,22 @@ def main(
             sandbox_executable=sandbox_executable,
             target_socket_paths=socket_paths,
         )
+        _revalidate_socket_identities(socket_identities)
+        _validate_executable_identity(executable_identity)
         target_status, timed_out = _run_sandboxed(
             sandbox_executable=sandbox_executable,
             profile=profile,
-            argv=[executable_path, *safe_argv[1:]],
+            argv=[executable_identity.path, *safe_argv[1:]],
             timeout_seconds=arguments.timeout_seconds,
         )
+        _validate_executable_identity(executable_identity)
+        _revalidate_socket_identities(socket_identities)
         evidence = {
             "schema_version": "1.0.0",
             "evidence_label": EVIDENCE_LABEL,
             "profile": "offline",
-            "argv": list(safe_argv),
-            "executable": {"path": executable_path, "sha256": executable_hash},
+            "argv_fingerprint": _argv_fingerprint(safe_argv),
+            "executable": _executable_evidence(executable_identity),
             "sandbox_profile_sha256": profile_hash,
             "start_time": start_time,
             "end_time": _timestamp(),
@@ -400,6 +574,10 @@ def main(
             return 1
         print(f"zero-egress verification failed: {error}", file=stderr)
         return 1
+    finally:
+        if executable_identity is not None:
+            with suppress(OSError):
+                os.close(executable_identity.descriptor)
 
 
 if __name__ == "__main__":

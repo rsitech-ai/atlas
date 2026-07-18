@@ -56,6 +56,28 @@ NO_KEYCHAIN_ROLES = (
     ProcessRole.EVALUATION_WORKER,
     ProcessRole.CODEX_CONTROLLER,
 )
+APPROVED_READS = {
+    ProcessRole.API: {"reports", "traces"},
+    ProcessRole.ENGINE: {"indexes", "features", "evaluations"},
+    ProcessRole.DOCUMENT_WORKER: {"private_pdfs"},
+    ProcessRole.MODEL_WORKER: {"indexes", "prompts"},
+    ProcessRole.DATA_WORKER: {"public_sources", "chain_data", "quarantine"},
+    ProcessRole.EVALUATION_WORKER: {"features", "reports"},
+    ProcessRole.COLLECTOR: {"public_sources", "chain_data"},
+    ProcessRole.EXPORTER: {"reports"},
+    ProcessRole.CODEX_CONTROLLER: {"codex_worktrees"},
+}
+APPROVED_WRITES = {
+    ProcessRole.API: set(),
+    ProcessRole.ENGINE: {"traces"},
+    ProcessRole.DOCUMENT_WORKER: {"indexes"},
+    ProcessRole.MODEL_WORKER: {"features"},
+    ProcessRole.DATA_WORKER: {"indexes"},
+    ProcessRole.EVALUATION_WORKER: {"evaluations"},
+    ProcessRole.COLLECTOR: {"quarantine"},
+    ProcessRole.EXPORTER: set(),
+    ProcessRole.CODEX_CONTROLLER: set(),
+}
 
 
 def _process(role: ProcessRole) -> dict[str, object]:
@@ -172,12 +194,60 @@ def test_collector_cannot_read_private_data(private_data: str) -> None:
         parse_process_capability_manifest(_manifest(collector))
 
 
+@pytest.mark.parametrize("private_data", COLLECTOR_PRIVATE_DATA)
+def test_collector_cannot_write_private_data(private_data: str) -> None:
+    collector = _replace(_process(ProcessRole.COLLECTOR), write_data_classes=[private_data])
+
+    with pytest.raises(ManifestValidationError, match="collector private data"):
+        parse_process_capability_manifest(_manifest(collector))
+
+
+@pytest.mark.parametrize("role", tuple(ProcessRole))
+@pytest.mark.parametrize("field", ["read_data_classes", "write_data_classes"])
+def test_each_role_rejects_data_grants_outside_approved_matrix(
+    role: ProcessRole,
+    field: str,
+) -> None:
+    approved = APPROVED_READS[role] if field == "read_data_classes" else APPROVED_WRITES[role]
+    unapproved = next(data.value for data in DataClass if data.value not in approved)
+    process = _replace(_process(role), **{field: [unapproved]})
+
+    with pytest.raises(ManifestValidationError, match="data grant"):
+        parse_process_capability_manifest(_manifest(process))
+
+
 @pytest.mark.parametrize("role", NO_KEYCHAIN_ROLES)
 def test_untrusted_and_engineering_workers_cannot_access_keychain(role: ProcessRole) -> None:
     process = _replace(_process(role), keychain_access=True)
 
     with pytest.raises(ManifestValidationError, match="Keychain"):
         parse_process_capability_manifest(_manifest(process))
+
+
+@pytest.mark.parametrize(
+    "role",
+    tuple(role for role in ProcessRole if role is not ProcessRole.COLLECTOR),
+)
+def test_keychain_grant_is_rejected_outside_approved_role(role: ProcessRole) -> None:
+    process = _replace(_process(role), keychain_access=True)
+
+    with pytest.raises(ManifestValidationError, match="Keychain"):
+        parse_process_capability_manifest(_manifest(process))
+
+
+def test_collector_accepts_only_approved_keychain_network_and_data_subset() -> None:
+    collector = _replace(
+        _process(ProcessRole.COLLECTOR),
+        read_data_classes=["public_sources"],
+        write_data_classes=["quarantine"],
+        keychain_access=True,
+        network_destinations=["https://rpc.example:443"],
+    )
+
+    parsed = parse_process_capability_manifest(_manifest(collector))[0]
+
+    assert parsed.keychain_access is True
+    assert parsed.network_destinations == ("https://rpc.example:443",)
 
 
 @pytest.mark.parametrize("role", tuple(ProcessRole))

@@ -227,6 +227,8 @@ class NetworkPolicy:
         loopback_origins: Iterable[str],
         unix_socket_paths: Iterable[Path],
     ) -> None:
+        if not isinstance(profile, RuntimeProfile):
+            raise ValueError("invalid RSI Atlas runtime profile")
         self.profile = profile
         self._remote_origins = _canonical_unique_origins(
             remote_origins,

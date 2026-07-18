@@ -1,18 +1,27 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import io
 import json
+import socket
 import stat
 import subprocess
 import sys
+import tempfile
 import time
+from contextlib import closing
 from pathlib import Path
 from types import ModuleType
 
 import pytest
 
 VERIFIER_PATH = Path("infra/security/verify_zero_egress.py")
+
+
+def _argv_fingerprint(argv: list[str]) -> dict[str, object]:
+    canonical = json.dumps(argv, ensure_ascii=False, separators=(",", ":")).encode()
+    return {"count": len(argv), "sha256": hashlib.sha256(canonical).hexdigest()}
 
 
 def _load_verifier() -> ModuleType:
@@ -67,7 +76,9 @@ def test_argv_boundary_is_not_evaluated_by_a_shell(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     evidence = json.loads(result.stdout)
-    assert evidence["argv"][-1] == literal
+    assert "argv" not in evidence
+    assert evidence["argv_fingerprint"] == _argv_fingerprint([sys.executable, "-c", code, literal])
+    assert literal not in result.stdout
     assert not marker.exists()
 
 
@@ -212,8 +223,35 @@ def test_resolved_executable_identity_matches_executed_path(tmp_path: Path) -> N
 
     assert result.returncode == 0, result.stderr
     evidence = json.loads(result.stdout)
-    assert evidence["argv"] == [str(executable_alias)]
+    assert evidence["argv_fingerprint"] == _argv_fingerprint([str(executable_alias)])
     assert evidence["executable"]["path"] == str(Path("/usr/bin/true").resolve())
+    assert (
+        evidence["executable"]["execution_binding"]
+        == "opened_descriptor_hash_with_path_revalidation"
+    )
+    assert evidence["executable"]["limitation"] == "path_execution_not_kernel_bound"
+    assert isinstance(evidence["executable"]["device"], int)
+    assert isinstance(evidence["executable"]["inode"], int)
+
+
+def test_executable_replacement_during_target_fails_closed(tmp_path: Path) -> None:
+    executable = tmp_path / "replace-self"
+    replacement = tmp_path / "original"
+    executable.write_text(
+        "#!/usr/bin/python3\n"
+        "import pathlib,sys\n"
+        "path=pathlib.Path(sys.argv[1])\n"
+        "path.rename(path.with_name('original'))\n"
+        "path.write_text('#!/usr/bin/python3\\nraise SystemExit(0)\\n')\n"
+    )
+    executable.chmod(0o700)
+
+    result = _run_verifier("--", str(executable), str(executable))
+
+    assert result.returncode == 1
+    assert "executable path identity changed" in result.stderr
+    assert json.loads(result.stdout)["result"] == "failed"
+    assert replacement.exists()
 
 
 def test_child_start_failure_is_stable_and_has_no_traceback(tmp_path: Path) -> None:
@@ -270,16 +308,71 @@ def test_timeout_terminates_only_the_target_process_group(tmp_path: Path) -> Non
     assert not marker.exists()
 
 
+def test_timeout_terminates_detached_child_descendant(tmp_path: Path) -> None:
+    marker = tmp_path / "detached-orphan-marker"
+    code = (
+        "import subprocess,sys,time; "
+        "subprocess.Popen([sys.executable,'-c',"
+        f'"import time,pathlib; time.sleep(1); pathlib.Path({str(marker)!r}).touch()"], '
+        "start_new_session=True); time.sleep(10)"
+    )
+
+    result = _run_verifier(
+        "--timeout-seconds",
+        "0.3",
+        "--",
+        sys.executable,
+        "-c",
+        code,
+        timeout=10,
+    )
+
+    assert result.returncode != 0
+    assert json.loads(result.stdout)["target"]["timed_out"] is True
+    time.sleep(1.2)
+    assert not marker.exists()
+
+
+def test_allowed_unix_socket_replacement_during_target_fails_closed() -> None:
+    with tempfile.TemporaryDirectory(prefix="as-", dir=tempfile.gettempdir()) as directory:
+        root = Path(directory).resolve()
+        root.chmod(0o700)
+        socket_path = root / "allowed.sock"
+        with closing(socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)) as server:
+            server.bind(str(socket_path))
+            socket_path.chmod(0o600)
+            code = (
+                "import os,socket,sys; path=sys.argv[1]; os.unlink(path); "
+                "replacement=socket.socket(socket.AF_UNIX); replacement.bind(path); "
+                "os.chmod(path,0o600); replacement.close()"
+            )
+
+            result = _run_verifier(
+                "--allow-unix-socket",
+                str(socket_path),
+                "--",
+                sys.executable,
+                "-c",
+                code,
+                str(socket_path),
+            )
+
+        assert result.returncode == 1
+        assert "Unix socket identity changed" in result.stderr
+        socket_path.unlink(missing_ok=True)
+
+
 def test_evidence_is_privacy_safe_and_has_no_captured_payload_or_environment() -> None:
     result = _run_verifier("--", "/usr/bin/true")
 
     assert result.returncode == 0, result.stderr
     evidence = json.loads(result.stdout)
     assert "environment" not in evidence
+    assert "argv" not in evidence
     assert "stdout" not in evidence["target"]
     assert "stderr" not in evidence["target"]
     assert set(evidence) == {
-        "argv",
+        "argv_fingerprint",
         "canaries",
         "end_time",
         "evidence_label",
@@ -291,3 +384,14 @@ def test_evidence_is_privacy_safe_and_has_no_captured_payload_or_environment() -
         "start_time",
         "target",
     }
+
+
+def test_unlabeled_argument_value_is_never_persisted_in_evidence() -> None:
+    opaque_value = "opaque-value-9384"
+    result = _run_verifier("--", sys.executable, "-c", "pass", opaque_value)
+
+    assert result.returncode == 0, result.stderr
+    assert opaque_value not in result.stdout
+    assert json.loads(result.stdout)["argv_fingerprint"] == _argv_fingerprint(
+        [sys.executable, "-c", "pass", opaque_value]
+    )
