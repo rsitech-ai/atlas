@@ -567,13 +567,13 @@ def _run_sandboxed(
                 process,
                 deadline=time.monotonic() + min(timeout_seconds, 3),
             )
-        except VerificationError:
+        except VerificationError as handshake_error:
             rejected_status = process.poll()
             if rejected_status is None:
                 try:
                     rejected_status = process.wait(timeout=0.1)
                 except subprocess.TimeoutExpired:
-                    raise
+                    raise handshake_error from None
             _cleanup_tracked_processes(process, tracker)
             return rejected_status, False
         tracker.observe(target_id, expected_parent=process.pid)

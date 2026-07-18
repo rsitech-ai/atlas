@@ -433,6 +433,50 @@ def test_process_tracker_initialization_failure_is_stable(
     assert "Traceback" not in stderr.getvalue()
 
 
+def test_stalled_supervisor_handshake_is_stable_and_cleans_lineage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verifier = _load_verifier()
+    marker = tmp_path / "stalled-supervisor-child"
+    child_code = f"import pathlib,time; time.sleep(1); pathlib.Path({str(marker)!r}).touch()"
+    stalled_supervisor = (
+        "import subprocess,sys,time; "
+        f"subprocess.Popen([sys.executable,'-c',{child_code!r}], start_new_session=True); "
+        "time.sleep(10)"
+    )
+    monkeypatch.setattr(verifier, "_SUPERVISOR_CODE", stalled_supervisor)
+    monkeypatch.setattr(verifier, "_validate_profile", lambda **kwargs: None)
+    monkeypatch.setattr(verifier, "_validate_mdns_discriminator", lambda: None)
+    monkeypatch.setattr(verifier, "_run_denial_canary", lambda **kwargs: True)
+    monkeypatch.setattr(verifier, "_run_unix_canary", lambda **kwargs: True)
+    cleanup_calls = 0
+    cleanup_tracked_processes = verifier._cleanup_tracked_processes
+
+    def record_cleanup(process: object, tracker: object) -> None:
+        nonlocal cleanup_calls
+        cleanup_calls += 1
+        cleanup_tracked_processes(process, tracker)
+
+    monkeypatch.setattr(verifier, "_cleanup_tracked_processes", record_cleanup)
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    status = verifier.main(
+        ["--timeout-seconds", "0.1", "--", "/usr/bin/true"],
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 1
+    assert "process tracker handshake failed" in stderr.getvalue()
+    assert "Traceback" not in stderr.getvalue()
+    assert json.loads(stdout.getvalue())["result"] == "failed"
+    assert cleanup_calls == 1
+    time.sleep(1.2)
+    assert not marker.exists()
+
+
 def test_allowed_unix_socket_replacement_during_target_fails_closed() -> None:
     with tempfile.TemporaryDirectory(prefix="as-", dir=tempfile.gettempdir()) as directory:
         root = Path(directory).resolve()
