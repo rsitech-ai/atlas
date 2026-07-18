@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Historical ledger note:** This plan predates the durable SDD checkbox ledger. Its task checkboxes were not updated during execution; the authoritative completion evidence is the Progress Log and `docs/production-plan.md`. Compact/minimum-window, Light appearance, VoiceOver, large text, increased contrast, and Reduce Motion runtime acceptance remain unverified.
+
 **Goal:** Build the first RSI Atlas vertical slice: a typed offline Python runtime status contract and `atlas doctor` command, exposed over loopback and rendered by a native SwiftUI Command Center with honest loading, healthy, and unavailable states.
 
 **Execution status:** Completed locally on `feat/andrzej_atlas_foundation`; final verification passed with 11 Python tests, 8 Swift tests, a real app launch, surviving per-user engine job, engine-down recovery, and independent re-review. No push was performed.
@@ -17,7 +19,7 @@
 - Health vocabulary is exactly `healthy`, `degraded`, `blocked`, `unsafe`, and `repairable`.
 - Cross-boundary payloads reject unknown fields and carry schema version `1.0.0`.
 - Deterministic status computation is separate from FastAPI, CLI, and SwiftUI I/O.
-- The UI uses native sidebar/detail structures, semantic colors, keyboard-accessible refresh, honest error recovery, Light/Dark adaptation, and Reduce Motion-safe behavior.
+- The UI uses native sidebar/detail structures, semantic colors, keyboard-accessible refresh, and honest error recovery. Source-level semantic styling should adapt to Light/Dark and no decorative animation is present, but appearance, contrast, text-size, and Reduce Motion runtime acceptance remain unverified.
 - No trading, wallet, signing, or private-key capability is introduced.
 - The repository remains on `feat/andrzej_atlas_foundation`; no push or PR is authorized.
 
@@ -298,7 +300,7 @@ public struct SystemStatus: Codable, Sendable, Equatable {
 
     public static var decoder: JSONDecoder {
         let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        // Models use explicit CodingKeys for snake_case boundary fields.
         decoder.dateDecodingStrategy = .iso8601
         return decoder
     }
@@ -514,13 +516,13 @@ Inspect the foreground app at minimum and typical window sizes, retry once with 
 - `swift test --package-path apps/macos`
 - `swift build --package-path apps/macos`
 - `./script/build_and_run.sh --verify`
-- Manual smoke: healthy foundation state, engine-unavailable recovery, minimum/typical window behavior, foreground relaunch.
+- Manual smoke: healthy foundation state, engine-unavailable recovery, and foreground relaunch. Compact/minimum-window behavior remains unverified.
 
 ## Plan Self-Review
 
 - Spec coverage: this plan covers only the first Phase 1 contract/UI/runtime seam. PostgreSQL, artifact storage, OpenTelemetry, resource supervision, and model registry remain separate vertical slices.
 - Placeholders: none; deferred capabilities are named as explicit non-goals or blockers.
-- Type consistency: Python `snake_case` keys map through Swift `.convertFromSnakeCase`; enum values and schema version match exactly.
+- Type consistency: Python `snake_case` keys map through explicit Swift `CodingKeys`; enum values and schema version match exactly.
 - Dependency direction: contracts know no transport or UI; engine adapters depend on contracts; Swift core knows no SwiftUI; SwiftUI depends on the core client/store.
 
 ## Decision Log
