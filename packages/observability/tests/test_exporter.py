@@ -3,6 +3,7 @@ import stat
 from pathlib import Path
 
 import pytest
+import rsi_atlas_observability.exporter as exporter_module
 from rsi_atlas_observability.exporter import LocalJSONLSpanExporter, TraceStorageError
 from rsi_atlas_observability.tracing import TraceRuntime
 
@@ -67,4 +68,23 @@ def test_fifo_and_destination_replacement_fail_closed(tmp_path: Path) -> None:
     destination.chmod(0o600)
 
     assert exporter.force_flush() is False
+    exporter.shutdown()
+
+
+def test_force_flush_uses_the_cross_process_file_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exporter = LocalJSONLSpanExporter(tmp_path / "traces.jsonl")
+    calls: list[int] = []
+    original_flock = exporter_module.fcntl.flock
+
+    def record_flock(descriptor: int, operation: int) -> None:
+        calls.append(operation)
+        original_flock(descriptor, operation)
+
+    monkeypatch.setattr(exporter_module.fcntl, "flock", record_flock)
+
+    assert exporter.force_flush() is True
+    assert calls == [exporter_module.fcntl.LOCK_EX, exporter_module.fcntl.LOCK_UN]
     exporter.shutdown()

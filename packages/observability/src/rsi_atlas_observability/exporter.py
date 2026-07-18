@@ -339,7 +339,12 @@ class LocalJSONLSpanExporter(SpanExporter):
                 return False
             try:
                 self._revalidate_bound_descriptors()
-                os.fsync(self._file_fd)
+                fcntl.flock(self._file_fd, fcntl.LOCK_EX)
+                try:
+                    self._revalidate_bound_descriptors()
+                    os.fsync(self._file_fd)
+                finally:
+                    fcntl.flock(self._file_fd, fcntl.LOCK_UN)
                 return True
             except (OSError, TraceStorageError):
                 self._last_error = "trace storage flush failed"
