@@ -115,6 +115,8 @@ def test_acquisition_request_is_strict_and_uses_an_opaque_locator() -> None:
         r"folder\paper.pdf",
         "paper.txt",
         "paper\u0000.pdf",
+        "report\u202egnp.pdf",
+        "report\u200b.pdf",
         "e\u0301vidence.pdf",
     ),
 )
@@ -145,6 +147,51 @@ def test_acquisition_locator_must_match_the_acquisition_identity() -> None:
 def test_safety_profile_requires_matching_artifact_identity() -> None:
     with pytest.raises(ValidationError, match="artifact"):
         _profile(artifact_id=ArtifactID(f"sha256:{'b' * 64}"))
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("size_bytes", "512"),
+        ("size_bytes", True),
+        ("eof_marker_present", "false"),
+        ("page_marker_count", "1"),
+    ),
+)
+def test_safety_profile_rejects_coerced_scalar_evidence(field: str, value: object) -> None:
+    payload = _profile().model_dump(mode="json")
+    payload[field] = value
+
+    with pytest.raises(ValidationError, match=field):
+        PDFSafetyProfile.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    (
+        {
+            "header_version": None,
+            "mime_signature_consistency": SafetyCheckState.PASS,
+        },
+        {
+            "eof_marker_present": False,
+            "mime_signature_consistency": SafetyCheckState.PASS,
+        },
+        {
+            "header_version": None,
+            "malformed_structure": SafetyCheckState.PASS,
+        },
+        {
+            "page_marker_count": None,
+            "page_count_limit": SafetyCheckState.PASS,
+        },
+    ),
+)
+def test_safety_profile_rejects_contradictory_raw_and_check_evidence(
+    changes: dict[str, object],
+) -> None:
+    with pytest.raises(ValidationError, match="evidence"):
+        _profile(**changes)
 
 
 @pytest.mark.parametrize(

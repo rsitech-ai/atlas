@@ -5,7 +5,7 @@ from typing import Literal
 from unicodedata import category, normalize
 from uuid import UUID
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, StrictBool, StrictInt, field_validator, model_validator
 
 from rsi_atlas_contracts.artifact import (
     ArtifactCommandContext,
@@ -67,7 +67,11 @@ class AcquisitionRequest(StrictModel):
             raise ValueError("original filename must use Unicode NFC")
         if value in {".", ".."} or PurePath(value).name != value:
             raise ValueError("original filename must be a leaf name")
-        if "/" in value or "\\" in value or any(category(character) == "Cc" for character in value):
+        if (
+            "/" in value
+            or "\\" in value
+            or any(category(character).startswith("C") for character in value)
+        ):
             raise ValueError("original filename contains forbidden characters")
         if not value.casefold().endswith(".pdf"):
             raise ValueError("original filename must have a PDF extension")
@@ -86,10 +90,10 @@ class PDFSafetyProfile(StrictModel):
     policy_version: Literal["phase-2a-1"] = "phase-2a-1"
     artifact_id: ArtifactID = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     digest: str = Field(pattern=r"^[0-9a-f]{64}$")
-    size_bytes: int = Field(ge=1, le=33_554_432)
+    size_bytes: StrictInt = Field(ge=1, le=33_554_432)
     header_version: str | None = Field(default=None, pattern=r"^1\.[0-7]$")
-    eof_marker_present: bool
-    page_marker_count: int | None = Field(default=None, ge=0, le=2_001)
+    eof_marker_present: StrictBool
+    page_marker_count: StrictInt | None = Field(default=None, ge=0, le=2_001)
     mime_signature_consistency: SafetyCheckState
     size_limit: SafetyCheckState
     page_count_limit: SafetyCheckState
@@ -112,6 +116,16 @@ class PDFSafetyProfile(StrictModel):
     def identifier_matches_digest(self) -> "PDFSafetyProfile":
         if self.artifact_id != f"sha256:{self.digest}":
             raise ValueError("safety profile artifact identifier must match its digest")
+        raw_structure_present = self.header_version is not None and self.eof_marker_present
+        if (
+            self.mime_signature_consistency is SafetyCheckState.PASS
+            or self.malformed_structure is SafetyCheckState.PASS
+        ) and not raw_structure_present:
+            raise ValueError("raw PDF evidence cannot support a passing structure check")
+        if self.page_count_limit is SafetyCheckState.PASS and (
+            self.page_marker_count is None or not 1 <= self.page_marker_count <= 2_000
+        ):
+            raise ValueError("raw PDF evidence cannot support a passing page-count check")
         return self
 
 
