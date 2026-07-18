@@ -38,12 +38,12 @@
 
 **Interfaces:**
 - Produces: `ArtifactID`, `ArtifactDescriptor`, `ArtifactIntegrityError`, and `ContentAddressedArtifactStore`.
-- `ContentAddressedArtifactStore.put_bytes(payload: bytes, *, media_type: str) -> ArtifactDescriptor` computes SHA-256, writes atomically, and is idempotent for identical bytes.
-- `ContentAddressedArtifactStore.read_bytes(artifact_id: ArtifactID) -> bytes` re-hashes content before returning it.
-- `ContentAddressedArtifactStore.verify(artifact_id: ArtifactID) -> ArtifactDescriptor` fails closed on missing or modified bytes/manifest.
+- `ContentAddressedArtifactStore.put_bytes(payload: bytes, *, media_type: str, context: ArtifactCommandContext) -> ArtifactDescriptor` computes SHA-256, writes atomically through no-follow directory descriptors, and is idempotent for identical bytes.
+- `ContentAddressedArtifactStore.read_bytes(artifact_id: ArtifactID, *, context: ArtifactCommandContext) -> bytes` re-hashes content before returning it.
+- `ContentAddressedArtifactStore.verify(artifact_id: ArtifactID, *, context: ArtifactCommandContext) -> ArtifactDescriptor` fails closed on missing or modified bytes/manifest.
 - Later tasks persist only the returned descriptor; database metadata never becomes proof that bytes exist.
 
-- [ ] **Step 1: Write failing immutable-store tests**
+- [x] **Step 1: Write failing immutable-store tests**
 
 ```python
 def test_identical_bytes_reuse_one_artifact(tmp_path: Path) -> None:
@@ -76,13 +76,13 @@ def test_invalid_artifact_identifier_cannot_escape_root(tmp_path: Path) -> None:
         store.read_bytes(cast(ArtifactID, "sha256:../../outside"))
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `uv run pytest packages/storage/tests/test_artifact_store.py -q`
 
 Expected: collection fails because `rsi_atlas_storage` and the artifact contracts do not exist.
 
-- [ ] **Step 3: Implement the strict descriptor and atomic store**
+- [x] **Step 3: Implement the strict descriptor and atomic store**
 
 ```python
 class ArtifactDescriptor(StrictModel):
@@ -115,7 +115,7 @@ class ContentAddressedArtifactStore:
 
 `_publish_once` writes to a unique file in the destination directory, flushes and `fsync`s it, links or replaces only when the destination does not exist, verifies an existing destination rather than overwriting it, and removes the staging file in `finally`. Artifact paths are derived only from a validated 64-character lowercase hexadecimal digest under `sha256/<first-two>/<next-two>/<digest>/`.
 
-- [ ] **Step 4: Run focused and boundary verification**
+- [x] **Step 4: Run focused and boundary verification**
 
 Run:
 
@@ -127,7 +127,7 @@ uv run mypy packages/contracts/src packages/storage/src
 
 Expected: artifact tests pass; static checks are clean; a deliberate content mutation raises `ArtifactIntegrityError`.
 
-- [ ] **Step 5: Commit and review Task 1**
+- [x] **Step 5: Commit and review Task 1**
 
 ```bash
 git add .gitignore pyproject.toml uv.lock packages/contracts packages/storage
