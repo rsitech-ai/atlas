@@ -3,6 +3,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import time
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -462,6 +463,120 @@ def test_local_postgres_supports_absolute_data_root_with_spaces() -> None:
                 capture_output=True,
                 text=True,
                 env=environment,
+            )
+
+
+@pytest.mark.parametrize(
+    ("command", "bind_mode", "expected_running"),
+    [
+        ("start", "prepare", True),
+        ("stop", "inspect", False),
+        ("status", "inspect", True),
+        ("restart", "prepare", True),
+    ],
+)
+def test_postgres_lifecycle_stays_bound_after_post_bind_ancestor_swap(
+    command: str, bind_mode: str, expected_running: bool
+) -> None:
+    with tempfile.TemporaryDirectory(prefix=f"atlas-bind-{command}-", dir="/private/tmp") as root:
+        data_root = Path(root) / "root"
+        environment = {**os.environ, "RSI_ATLAS_DATA_ROOT": str(data_root)}
+        subprocess.run(
+            ["./infra/local/postgres.sh", "start"],
+            check=True,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        if command == "start":
+            subprocess.run(
+                ["./infra/local/postgres.sh", "stop"],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
+
+        postgres_root = data_root / "postgres"
+        bound_root = data_root / f"postgres-bound-{command}"
+        outside = Path(root) / "outside"
+        outside.mkdir(mode=0o700)
+        ready = Path(root) / "ready"
+        release = Path(root) / "release"
+        wrapper = """
+import os
+import sys
+import time
+from pathlib import Path
+
+ready, release, script, command = sys.argv[1:]
+Path(ready).touch()
+while not Path(release).exists():
+    time.sleep(0.01)
+os.execve(script, [script, "--bound", command], os.environ)
+"""
+        process = subprocess.Popen(
+            [
+                "/usr/bin/python3",
+                "infra/local/secure_path.py",
+                "exec",
+                bind_mode,
+                str(data_root),
+                "--",
+                "/usr/bin/python3",
+                "-c",
+                wrapper,
+                str(ready),
+                str(release),
+                str(Path("infra/local/postgres.sh").resolve()),
+                command,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=environment,
+        )
+        try:
+            for _ in range(300):
+                if ready.exists() or process.poll() is not None:
+                    break
+                time.sleep(0.01)
+            assert ready.exists(), process.communicate(timeout=1)
+
+            postgres_root.rename(bound_root)
+            postgres_root.symlink_to(outside, target_is_directory=True)
+            release.touch()
+            stdout, stderr = process.communicate(timeout=20)
+
+            assert process.returncode == 0, (stdout, stderr)
+            assert tuple(outside.iterdir()) == ()
+            assert (bound_root / "data" / "PG_VERSION").is_file()
+            status = subprocess.run(
+                [
+                    "/opt/homebrew/opt/postgresql@17/bin/pg_ctl",
+                    f"--pgdata={bound_root / 'data'}",
+                    "status",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            assert (status.returncode == 0) is expected_running
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+            subprocess.run(
+                [
+                    "/opt/homebrew/opt/postgresql@17/bin/pg_ctl",
+                    f"--pgdata={bound_root / 'data'}",
+                    "--mode=fast",
+                    "--wait",
+                    "stop",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
             )
 
 

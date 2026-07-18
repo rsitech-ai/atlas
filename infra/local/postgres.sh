@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
-COMMAND="${1:-}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-DATA_ROOT="${RSI_ATLAS_DATA_ROOT:-$ROOT_DIR/.local}"
-POSTGRES_ROOT="$DATA_ROOT/postgres"
-DATA_DIRECTORY="$POSTGRES_ROOT/data"
-SOCKET_DIRECTORY="$POSTGRES_ROOT/socket"
-LOG_FILE="$POSTGRES_ROOT/postgres.log"
+SCRIPT_PATH="$ROOT_DIR/infra/local/postgres.sh"
+SECURE_PATH_HELPER="$ROOT_DIR/infra/local/secure_path.py"
 POSTGRES_PREFIX="/opt/homebrew/opt/postgresql@17"
 POSTGRES_BIN="$POSTGRES_PREFIX/bin"
 PG_CTL="$POSTGRES_BIN/pg_ctl"
@@ -15,24 +12,31 @@ INITDB="$POSTGRES_BIN/initdb"
 CREATEDB="$POSTGRES_BIN/createdb"
 PSQL="$POSTGRES_BIN/psql"
 PG_CONTROLDATA="$POSTGRES_BIN/pg_controldata"
-SECURE_PATH_HELPER="$ROOT_DIR/infra/local/secure_path.py"
 DATABASE_USER="atlas"
 DATABASE_NAME="atlas"
+BOUND_MODE=0
 
-case "$DATA_ROOT" in
-  /*) ;;
-  *)
-    echo "RSI_ATLAS_DATA_ROOT must be an absolute path." >&2
-    exit 2
-    ;;
-esac
-
-case "$DATA_ROOT" in
-  *"'"*|*$'\n'*)
-    echo "RSI_ATLAS_DATA_ROOT contains unsupported characters." >&2
-    exit 2
-    ;;
-esac
+if [[ "${1:-}" == "--bound" ]]; then
+  BOUND_MODE=1
+  COMMAND="${2:-}"
+  [[ "${RSI_ATLAS_BOUND_POSTGRES:-}" == "1" ]] || {
+    echo "Internal PostgreSQL lifecycle requires a securely bound directory." >&2
+    exit 1
+  }
+  bound_identity="$(stat -f '%d:%i' .)"
+  expected_identity="${RSI_ATLAS_BOUND_DEVICE:-}:${RSI_ATLAS_BOUND_INODE:-}"
+  [[ "$bound_identity" == "$expected_identity" ]] || {
+    echo "Bound PostgreSQL directory identity changed." >&2
+    exit 1
+  }
+  POSTGRES_ROOT="$(pwd -P)"
+  DATA_DIRECTORY="data"
+  SOCKET_DIRECTORY="$POSTGRES_ROOT/socket"
+  LOG_FILE="postgres.log"
+else
+  COMMAND="${1:-}"
+  DATA_ROOT="${RSI_ATLAS_DATA_ROOT:-$ROOT_DIR/.local}"
+fi
 
 usage() {
   echo "usage: $0 {start|stop|restart|status|test-url}" >&2
@@ -50,21 +54,6 @@ require_toolchain() {
       echo "Expected PostgreSQL 17.10 from $POSTGRES_BIN." >&2
       exit 1
       ;;
-  esac
-}
-
-prepare_roots() {
-  umask 077
-  /usr/bin/python3 "$SECURE_PATH_HELPER" prepare "$DATA_ROOT"
-}
-
-inspect_roots() {
-  local inspect_status=0
-  /usr/bin/python3 "$SECURE_PATH_HELPER" inspect "$DATA_ROOT" || inspect_status=$?
-  case "$inspect_status" in
-    0) return 0 ;;
-    3) return 3 ;;
-    *) exit "$inspect_status" ;;
   esac
 }
 
@@ -109,7 +98,6 @@ run_createdb() (
 
 start_server() {
   require_toolchain
-  prepare_roots
   initialize_cluster
   validate_cluster
   if ! is_running; then
@@ -125,13 +113,45 @@ start_server() {
 
 stop_server() {
   require_toolchain
-  if ! inspect_roots; then
-    return
-  fi
   if [[ -f "$DATA_DIRECTORY/PG_VERSION" ]] && is_running; then
     "$PG_CTL" --pgdata="$DATA_DIRECTORY" --mode=fast --wait stop >/dev/null
   fi
 }
+
+case "$COMMAND" in
+  start|stop|restart|status|test-url)
+    ;;
+  *)
+    usage
+    ;;
+esac
+
+if [[ "$BOUND_MODE" == 0 ]]; then
+  case "$DATA_ROOT" in
+    /*) ;;
+    *)
+      echo "RSI_ATLAS_DATA_ROOT must be an absolute path." >&2
+      exit 2
+      ;;
+  esac
+  case "$DATA_ROOT" in
+    *"'"*|*$'\n'*)
+      echo "RSI_ATLAS_DATA_ROOT contains unsupported characters." >&2
+      exit 2
+      ;;
+  esac
+  bind_mode="prepare"
+  if [[ "$COMMAND" == "stop" || "$COMMAND" == "status" ]]; then
+    bind_mode="inspect"
+  fi
+  bound_status=0
+  /usr/bin/python3 "$SECURE_PATH_HELPER" exec "$bind_mode" "$DATA_ROOT" -- \
+    "$SCRIPT_PATH" --bound "$COMMAND" || bound_status=$?
+  if [[ "$COMMAND" == "stop" && "$bound_status" == 3 ]]; then
+    exit 0
+  fi
+  exit "$bound_status"
+fi
 
 case "$COMMAND" in
   start)
@@ -146,15 +166,10 @@ case "$COMMAND" in
     ;;
   status)
     require_toolchain
-    inspect_roots
     is_running
     ;;
   test-url)
-    prepare_roots
     printf "host='%s' user='%s' dbname='%s'\n" \
       "$SOCKET_DIRECTORY" "$DATABASE_USER" "$DATABASE_NAME"
-    ;;
-  *)
-    usage
     ;;
 esac
