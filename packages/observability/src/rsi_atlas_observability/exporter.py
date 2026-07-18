@@ -100,6 +100,7 @@ class LocalJSONLSpanExporter(SpanExporter):
         self._file_fd = -1
         self._parent_identity: tuple[int, int] | None = None
         self._file_identity: tuple[int, int] | None = None
+        self._validated_size = 0
         with _INITIALIZATION_LOCK:
             try:
                 self._parent_fd, self._parent_identity = self._open_parent()
@@ -190,6 +191,11 @@ class LocalJSONLSpanExporter(SpanExporter):
             payload.extend(block)
         if len(payload) > _MAX_FILE_BYTES:
             raise TraceStorageError("existing trace storage exceeds maximum size")
+        self._validate_jsonl_payload(bytes(payload))
+        self._validated_size = file_size
+        os.lseek(self._file_fd, 0, os.SEEK_END)
+
+    def _validate_jsonl_payload(self, payload: bytes) -> None:
         if payload and not payload.endswith(b"\n"):
             raise TraceStorageError("existing trace storage is invalid")
         for line in payload.splitlines(keepends=True):
@@ -205,7 +211,26 @@ class LocalJSONLSpanExporter(SpanExporter):
             canonical = json.dumps(parsed, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
             if canonical != decoded:
                 raise TraceStorageError("existing trace storage is invalid")
-        os.lseek(self._file_fd, 0, os.SEEK_END)
+
+    def _validate_shared_tail(self) -> None:
+        file_size = os.fstat(self._file_fd).st_size
+        if file_size < self._validated_size or file_size > _MAX_FILE_BYTES:
+            raise TraceStorageError("trace storage size is invalid")
+        remaining = file_size - self._validated_size
+        if remaining == 0:
+            return
+        payload = bytearray()
+        while len(payload) < remaining:
+            block = os.pread(
+                self._file_fd,
+                min(64 * 1024, remaining - len(payload)),
+                self._validated_size + len(payload),
+            )
+            if not block:
+                raise TraceStorageError("trace storage tail is invalid")
+            payload.extend(block)
+        self._validate_jsonl_payload(bytes(payload))
+        self._validated_size = file_size
 
     def _validate_record(self, record: object) -> None:
         if type(record) is not dict or set(record) != _RECORD_KEYS:
@@ -347,10 +372,12 @@ class LocalJSONLSpanExporter(SpanExporter):
                     fcntl.flock(self._file_fd, fcntl.LOCK_EX)
                     try:
                         self._revalidate_bound_descriptors()
+                        self._validate_shared_tail()
                         if os.fstat(self._file_fd).st_size + len(payload) > _MAX_FILE_BYTES:
                             raise TraceStorageError("trace storage exceeds maximum size")
                         self._write_all(payload)
                         os.fsync(self._file_fd)
+                        self._validated_size += len(payload)
                     finally:
                         fcntl.flock(self._file_fd, fcntl.LOCK_UN)
                 self._last_error = None
@@ -379,9 +406,11 @@ class LocalJSONLSpanExporter(SpanExporter):
                         time.sleep(0.001)
                 try:
                     self._revalidate_bound_descriptors()
+                    self._validate_shared_tail()
                     os.fsync(self._file_fd)
                 finally:
                     fcntl.flock(self._file_fd, fcntl.LOCK_UN)
+                self._last_error = None
                 return True
             except (OSError, TraceStorageError):
                 self._last_error = "trace storage flush failed"

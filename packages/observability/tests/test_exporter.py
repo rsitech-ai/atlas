@@ -64,6 +64,21 @@ def _open_trace_file(destination: str, attempted: object, opened: object) -> Non
     exporter.shutdown()
 
 
+def _open_then_write_trace_process(
+    destination: str,
+    ready: object,
+    start: object,
+    result: object,
+) -> None:
+    runtime = TraceRuntime.local(Path(destination))
+    ready.set()  # type: ignore[attr-defined]
+    start.wait(10)  # type: ignore[attr-defined]
+    with runtime.start_as_current_span("atlas.command", context=_trace_context()):
+        pass
+    result.put(runtime.force_flush())  # type: ignore[attr-defined]
+    runtime.shutdown()
+
+
 def _fake_span(*, trace_id: int, span_id: int) -> object:
     context = _trace_context().attributes()
     return SimpleNamespace(
@@ -165,6 +180,28 @@ def test_force_flush_uses_the_cross_process_file_lock(
     exporter.shutdown()
 
 
+def test_successful_force_flush_clears_prior_timeout_diagnostic(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exporter = LocalJSONLSpanExporter(tmp_path / "traces.jsonl")
+    original_flock = exporter_module.fcntl.flock
+
+    def unavailable_lock(descriptor: int, operation: int) -> None:
+        if operation == exporter_module.fcntl.LOCK_EX | exporter_module.fcntl.LOCK_NB:
+            raise BlockingIOError
+        original_flock(descriptor, operation)
+
+    monkeypatch.setattr(exporter_module.fcntl, "flock", unavailable_lock)
+    assert exporter.force_flush(timeout_millis=0) is False
+    assert exporter.last_error == "trace storage flush lock timed out"
+
+    monkeypatch.setattr(exporter_module.fcntl, "flock", original_flock)
+    assert exporter.force_flush() is True
+    assert exporter.last_error is None
+    exporter.shutdown()
+
+
 def test_existing_zero_identifier_record_fails_closed(tmp_path: Path) -> None:
     destination = tmp_path / "traces.jsonl"
     record = {
@@ -225,6 +262,70 @@ def test_partial_write_permanently_prevents_later_append(
     assert destination.read_bytes() == corrupted_prefix
 
 
+def test_partial_write_prevents_an_already_open_exporter_from_appending(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    destination = tmp_path / "traces.jsonl"
+    first = TraceRuntime.local(destination)
+    second = TraceRuntime.local(destination)
+    original_write = exporter_module.os.write
+
+    def write_prefix_then_fail(descriptor: int, payload: object) -> int:
+        original_write(descriptor, bytes(payload)[:13])  # type: ignore[arg-type]
+        raise OSError("synthetic partial write")
+
+    monkeypatch.setattr(exporter_module.os, "write", write_prefix_then_fail)
+    with first.start_as_current_span("atlas.command", context=_trace_context()):
+        pass
+    monkeypatch.setattr(exporter_module.os, "write", original_write)
+    corrupted_prefix = destination.read_bytes()
+
+    with second.start_as_current_span("atlas.command", context=_trace_context()):
+        pass
+
+    assert second.force_flush() is False
+    assert destination.read_bytes() == corrupted_prefix
+    first.shutdown()
+    second.shutdown()
+
+
+def test_partial_write_prevents_an_already_open_process_from_appending(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    destination = tmp_path / "traces.jsonl"
+    first = TraceRuntime.local(destination)
+    context = multiprocessing.get_context("spawn")
+    ready = context.Event()
+    start = context.Event()
+    result = context.Queue()
+    second = context.Process(
+        target=_open_then_write_trace_process,
+        args=(str(destination), ready, start, result),
+    )
+    second.start()
+    assert ready.wait(10)
+    original_write = exporter_module.os.write
+
+    def write_prefix_then_fail(descriptor: int, payload: object) -> int:
+        original_write(descriptor, bytes(payload)[:13])  # type: ignore[arg-type]
+        raise OSError("synthetic partial write")
+
+    monkeypatch.setattr(exporter_module.os, "write", write_prefix_then_fail)
+    with first.start_as_current_span("atlas.command", context=_trace_context()):
+        pass
+    monkeypatch.setattr(exporter_module.os, "write", original_write)
+    corrupted_prefix = destination.read_bytes()
+    start.set()
+    second.join(timeout=10)
+
+    assert second.exitcode == 0
+    assert result.get(timeout=2) is False
+    assert destination.read_bytes() == corrupted_prefix
+    first.shutdown()
+
+
 @pytest.mark.parametrize(
     ("trace_id", "span_id"),
     [
@@ -258,13 +359,14 @@ def test_capacity_is_rechecked_after_each_cross_process_lock(
     destination = tmp_path / "traces.jsonl"
     first = LocalJSONLSpanExporter(destination)
     second = LocalJSONLSpanExporter(destination)
-    payload = b"x" * 60
+    record = first._span_record(_fake_span(trace_id=1, span_id=1))  # type: ignore[arg-type]
+    payload = first._encode_record(record)
     barrier = threading.Barrier(2)
     original_flock = exporter_module.fcntl.flock
 
-    monkeypatch.setattr(exporter_module, "_MAX_FILE_BYTES", 100)
-    monkeypatch.setattr(first, "_span_record", lambda span: {})
-    monkeypatch.setattr(second, "_span_record", lambda span: {})
+    monkeypatch.setattr(exporter_module, "_MAX_FILE_BYTES", len(payload))
+    monkeypatch.setattr(first, "_span_record", lambda span: record)
+    monkeypatch.setattr(second, "_span_record", lambda span: record)
     monkeypatch.setattr(first, "_encode_record", lambda record: payload)
     monkeypatch.setattr(second, "_encode_record", lambda record: payload)
 
