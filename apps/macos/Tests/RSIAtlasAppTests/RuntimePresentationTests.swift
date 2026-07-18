@@ -5,6 +5,28 @@ import Testing
 
 struct RuntimePresentationTests {
     @Test
+    func qaPresentationOverridesAreExactAndOptIn() {
+        #expect(QAPresentationOptions.parse(arguments: ["RSIAtlas"]) == QAPresentationOptions(
+            forceLight: false,
+            increaseContrast: false,
+            useLargeText: false,
+            reduceMotion: false
+        ))
+        #expect(QAPresentationOptions.parse(arguments: [
+            "RSIAtlas",
+            "--qa-light",
+            "--qa-increase-contrast",
+            "--qa-large-text",
+            "--qa-reduce-motion",
+        ]) == QAPresentationOptions(
+            forceLight: true,
+            increaseContrast: true,
+            useLargeText: true,
+            reduceMotion: true
+        ))
+    }
+
+    @Test
     func exposesStableGroupAndStateIdentifiers() {
         #expect(ComponentGroup.allCases.map(RuntimeAccessibility.group) == [
             "runtime.group.storage",
