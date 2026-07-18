@@ -116,11 +116,11 @@ class PDFSafetyProfile(StrictModel):
     def identifier_matches_digest(self) -> "PDFSafetyProfile":
         if self.artifact_id != f"sha256:{self.digest}":
             raise ValueError("safety profile artifact identifier must match its digest")
-        raw_structure_present = self.header_version is not None and self.eof_marker_present
-        if (
-            self.mime_signature_consistency is SafetyCheckState.PASS
-            or self.malformed_structure is SafetyCheckState.PASS
-        ) and not raw_structure_present:
+        if self.mime_signature_consistency is SafetyCheckState.PASS and self.header_version is None:
+            raise ValueError("raw PDF evidence cannot support a passing signature check")
+        if self.malformed_structure is SafetyCheckState.PASS and (
+            self.header_version is None or not self.eof_marker_present
+        ):
             raise ValueError("raw PDF evidence cannot support a passing structure check")
         if self.page_count_limit is SafetyCheckState.PASS and (
             self.page_marker_count is None or not 1 <= self.page_marker_count <= 2_000

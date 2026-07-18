@@ -175,7 +175,7 @@ def test_safety_profile_rejects_coerced_scalar_evidence(field: str, value: objec
         },
         {
             "eof_marker_present": False,
-            "mime_signature_consistency": SafetyCheckState.PASS,
+            "malformed_structure": SafetyCheckState.PASS,
         },
         {
             "header_version": None,
@@ -192,6 +192,17 @@ def test_safety_profile_rejects_contradictory_raw_and_check_evidence(
 ) -> None:
     with pytest.raises(ValidationError, match="evidence"):
         _profile(**changes)
+
+
+def test_safety_profile_can_truthfully_record_valid_header_and_malformed_trailer() -> None:
+    profile = _profile(
+        eof_marker_present=False,
+        mime_signature_consistency=SafetyCheckState.PASS,
+        malformed_structure=SafetyCheckState.FAIL,
+    )
+
+    assert profile.mime_signature_consistency is SafetyCheckState.PASS
+    assert profile.malformed_structure is SafetyCheckState.FAIL
 
 
 @pytest.mark.parametrize(

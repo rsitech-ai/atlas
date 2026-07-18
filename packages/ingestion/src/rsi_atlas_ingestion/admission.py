@@ -93,7 +93,7 @@ class PDFAdmissionPolicy:
                 ("decompression_ratio", "decompression_ratio_unsafe"),
                 ("embedded_files", "embedded_files_detected"),
                 ("malformed_structure", "malformed_structure"),
-                ("page_count_limit", "page_limit_unresolved"),
+                ("page_count_limit", "page_count_limit_exceeded"),
                 ("suspicious_references", "suspicious_references_detected"),
             ),
         )

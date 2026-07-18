@@ -108,7 +108,11 @@ def test_exact_duplicate_precedes_other_policy_outcomes() -> None:
             AdmissionOutcome.QUARANTINE_FOR_REVIEW,
             "decompression_ratio_unsafe",
         ),
-        ("page_count_limit", AdmissionOutcome.QUARANTINE_FOR_REVIEW, "page_limit_unresolved"),
+        (
+            "page_count_limit",
+            AdmissionOutcome.QUARANTINE_FOR_REVIEW,
+            "page_count_limit_exceeded",
+        ),
         ("available_disk", AdmissionOutcome.QUARANTINE_FOR_REVIEW, "available_disk_insufficient"),
     ),
 )
