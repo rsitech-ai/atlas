@@ -23,6 +23,7 @@ from rsi_atlas_contracts import (
 )
 from rsi_atlas_storage import (
     AcquisitionConflictError,
+    AcquisitionIntegrityError,
     AcquisitionRepository,
     ArtifactRepository,
     ContentAddressedArtifactStore,
@@ -178,6 +179,65 @@ def test_exact_replay_returns_one_acquisition_decision_and_event(
     ) == (1, 1, 1)
 
 
+def test_outbox_failure_rolls_back_acquisition_and_decision(
+    postgres_database: PostgresDatabase, tmp_path: Path
+) -> None:
+    context = _context()
+    _, descriptor = _registered_artifact(postgres_database, tmp_path, context)
+    repository = AcquisitionRepository(postgres_database)
+    record = _record(context=context, descriptor=descriptor)
+    with postgres_database.connect() as connection:
+        connection.execute(
+            """
+            CREATE OR REPLACE FUNCTION atlas_ingestion.test_reject_outbox_insert()
+            RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN
+                RAISE EXCEPTION 'injected outbox failure';
+            END;
+            $$
+            """
+        )
+        connection.execute(
+            """
+            CREATE TRIGGER test_reject_outbox_insert
+            BEFORE INSERT ON atlas_ingestion.outbox_events
+            FOR EACH ROW EXECUTE FUNCTION atlas_ingestion.test_reject_outbox_insert()
+            """
+        )
+    try:
+        with pytest.raises(psycopg.Error, match="injected outbox failure"):
+            repository.record(record)
+    finally:
+        with postgres_database.connect() as connection:
+            connection.execute(
+                "DROP TRIGGER test_reject_outbox_insert ON atlas_ingestion.outbox_events"
+            )
+            connection.execute("DROP FUNCTION atlas_ingestion.test_reject_outbox_insert()")
+
+    assert postgres_database.fetch_one(
+        """
+        SELECT
+          (SELECT count(*) FROM atlas_ingestion.document_acquisitions
+           WHERE tenant_id = %s AND workspace_id = %s AND acquisition_id = %s),
+          (SELECT count(*) FROM atlas_ingestion.document_admission_decisions
+           WHERE tenant_id = %s AND workspace_id = %s AND acquisition_id = %s),
+          (SELECT count(*) FROM atlas_ingestion.document_duplicate_links
+           WHERE tenant_id = %s AND workspace_id = %s AND acquisition_id = %s),
+          (SELECT count(*) FROM atlas_ingestion.outbox_events
+           WHERE tenant_id = %s AND workspace_id = %s AND acquisition_id = %s)
+        """,
+        tuple(
+            value
+            for _ in range(4)
+            for value in (
+                context.tenant_id,
+                context.workspace_id,
+                record.request.acquisition_id,
+            )
+        ),
+    ) == (0, 0, 0, 0)
+
+
 def test_reusing_acquisition_identity_for_different_evidence_fails(
     postgres_database: PostgresDatabase, tmp_path: Path
 ) -> None:
@@ -288,6 +348,39 @@ def test_find_never_crosses_workspace_scope(
         )
         is None
     )
+
+
+def test_repository_rejects_divergent_normalized_and_json_decision_evidence(
+    postgres_database: PostgresDatabase, tmp_path: Path
+) -> None:
+    context = _context()
+    _, descriptor = _registered_artifact(postgres_database, tmp_path, context)
+    repository = AcquisitionRepository(postgres_database)
+    record = repository.record(_record(context=context, descriptor=descriptor))
+
+    with postgres_database.connect() as connection:
+        connection.execute("SET LOCAL session_replication_role = replica")
+        connection.execute(
+            """
+            UPDATE atlas_ingestion.document_admission_decisions
+            SET lifecycle = 'rejected', outcome = 'reject_unsafe', reason_codes = %s
+            WHERE tenant_id = %s AND workspace_id = %s AND acquisition_id = %s
+            """,
+            (
+                Jsonb(["pdf_signature_or_mime_invalid"]),
+                context.tenant_id,
+                context.workspace_id,
+                record.request.acquisition_id,
+            ),
+        )
+
+        with pytest.raises(AcquisitionIntegrityError, match="representations differ"):
+            repository._find_with_connection(
+                connection,
+                context=context,
+                acquisition_id=record.request.acquisition_id,
+            )
+        connection.rollback()
 
 
 def test_database_rejects_an_inconsistent_outcome_lifecycle_pair(

@@ -1,3 +1,8 @@
+from rsi_atlas_storage.acquisition_repository import (
+    AcquisitionConflictError,
+    AcquisitionIntegrityError,
+    AcquisitionRepository,
+)
 from rsi_atlas_storage.artifact_repository import ArtifactRepository
 from rsi_atlas_storage.artifact_store import ContentAddressedArtifactStore
 from rsi_atlas_storage.database import DatabaseSettings, PostgresDatabase
@@ -5,6 +10,7 @@ from rsi_atlas_storage.migrations import MigrationIntegrityError, MigrationRunne
 
 __all__ = [
     "AcquisitionConflictError",
+    "AcquisitionIntegrityError",
     "AcquisitionRepository",
     "ArtifactRepository",
     "ContentAddressedArtifactStore",
@@ -13,7 +19,3 @@ __all__ = [
     "MigrationRunner",
     "PostgresDatabase",
 ]
-from rsi_atlas_storage.acquisition_repository import (
-    AcquisitionConflictError,
-    AcquisitionRepository,
-)

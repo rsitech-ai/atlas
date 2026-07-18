@@ -1,14 +1,18 @@
 import hashlib
+from datetime import UTC, datetime
 from uuid import UUID
 
 from psycopg import Connection
 from psycopg.types.json import Jsonb
 from rsi_atlas_contracts import (
+    AcquisitionRequest,
     AdmissionOutcome,
     ArtifactCommandContext,
+    ArtifactDescriptor,
     ArtifactID,
     DocumentAdmissionRecord,
     DocumentLifecycle,
+    PDFSafetyProfile,
 )
 
 from rsi_atlas_storage.database import PostgresDatabase, Row
@@ -16,6 +20,10 @@ from rsi_atlas_storage.database import PostgresDatabase, Row
 
 class AcquisitionConflictError(RuntimeError):
     """Raised when one acquisition identity is reused for different immutable evidence."""
+
+
+class AcquisitionIntegrityError(RuntimeError):
+    """Raised when duplicated durable admission representations no longer agree."""
 
 
 class AcquisitionRepository:
@@ -212,15 +220,90 @@ class AcquisitionRepository:
     ) -> DocumentAdmissionRecord | None:
         row = connection.execute(
             """
-            SELECT d.record
-            FROM atlas_ingestion.document_admission_decisions AS d
-            WHERE d.tenant_id = %s AND d.workspace_id = %s AND d.acquisition_id = %s
+            SELECT
+                a.artifact_id,
+                c.digest,
+                c.schema_version,
+                c.algorithm,
+                c.size_bytes,
+                c.media_type,
+                a.actor_id,
+                a.trace_id,
+                a.request,
+                a.profile,
+                a.recorded_at,
+                d.lifecycle,
+                d.outcome,
+                d.reason_codes,
+                d.duplicate_of_acquisition_id,
+                d.record,
+                d.recorded_at,
+                l.duplicate_of_acquisition_id,
+                l.recorded_at,
+                o.payload,
+                o.event_id,
+                o.event_type,
+                o.recorded_at
+            FROM atlas_ingestion.document_acquisitions AS a
+            JOIN atlas_ingestion.document_admission_decisions AS d
+              USING (tenant_id, workspace_id, acquisition_id)
+            JOIN atlas_core.artifact_contents AS c USING (artifact_id)
+            LEFT JOIN atlas_ingestion.document_duplicate_links AS l
+              USING (tenant_id, workspace_id, acquisition_id)
+            JOIN atlas_ingestion.outbox_events AS o
+              USING (tenant_id, workspace_id, acquisition_id)
+            WHERE a.tenant_id = %s AND a.workspace_id = %s AND a.acquisition_id = %s
             """,
             (context.tenant_id, context.workspace_id, acquisition_id),
         ).fetchone()
         if row is None:
             return None
-        return DocumentAdmissionRecord.model_validate(row[0])
+        try:
+            request = AcquisitionRequest.model_validate(row[8])
+            profile = PDFSafetyProfile.model_validate(row[9])
+            artifact = ArtifactDescriptor(
+                artifact_id=ArtifactID(row[0]),
+                digest=row[1],
+                schema_version=row[2],
+                algorithm=row[3],
+                size_bytes=row[4],
+                media_type=row[5],
+            )
+            reconstructed = DocumentAdmissionRecord(
+                context=ArtifactCommandContext(
+                    tenant_id=context.tenant_id,
+                    workspace_id=context.workspace_id,
+                    actor_id=row[6],
+                    trace_id=row[7],
+                ),
+                request=request,
+                artifact=artifact,
+                profile=profile,
+                lifecycle=row[11],
+                outcome=row[12],
+                reason_codes=tuple(row[13]),
+                duplicate_of_acquisition_id=row[14],
+                recorded_at=_as_utc(row[16]),
+            )
+            record_snapshot = DocumentAdmissionRecord.model_validate(row[15])
+            outbox_snapshot = DocumentAdmissionRecord.model_validate(row[19])
+        except Exception as error:
+            raise AcquisitionIntegrityError("document admission evidence is invalid") from error
+        timestamps = tuple(
+            None if value is None else _as_utc(value)
+            for value in (row[10], row[16], row[18], row[22])
+        )
+        if request.acquisition_id != acquisition_id:
+            raise AcquisitionIntegrityError("document acquisition identity differs")
+        if reconstructed != record_snapshot or reconstructed != outbox_snapshot:
+            raise AcquisitionIntegrityError("document admission representations differ")
+        if reconstructed.duplicate_of_acquisition_id != row[17]:
+            raise AcquisitionIntegrityError("document duplicate-link representation differs")
+        if any(value is not None and value != reconstructed.recorded_at for value in timestamps):
+            raise AcquisitionIntegrityError("document admission timestamps differ")
+        if row[20] != acquisition_id or row[21] != "DocumentAdmissionRecorded":
+            raise AcquisitionIntegrityError("document outbox identity differs")
+        return reconstructed
 
     @staticmethod
     def _find_primary_acquisition(
@@ -270,3 +353,9 @@ def _require_artifact_id(value: ArtifactID) -> ArtifactID:
     ):
         raise ValueError("artifact identifier must be a sha256 lowercase hexadecimal digest")
     return ArtifactID(rendered)
+
+
+def _as_utc(value: datetime) -> datetime:
+    if not isinstance(value, datetime) or value.tzinfo is None:
+        raise AcquisitionIntegrityError("document admission timestamp is invalid")
+    return value.astimezone(UTC)
