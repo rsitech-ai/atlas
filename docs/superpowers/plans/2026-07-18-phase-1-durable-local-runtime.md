@@ -578,7 +578,7 @@ Update `docs/production-plan.md` with runtime observations, exact test counts, k
 - `swift build --package-path apps/macos --product RSIAtlas`
 - `bash -n script/build_and_run.sh infra/local/postgres.sh`
 - `./script/build_and_run.sh --verify`
-- Manual smoke: healthy full Phase 1 status, PostgreSQL-down blocked state, same-window recovery, disposable-artifact corruption detection, relaunch persistence, and development zero-egress recording.
+- Manual smoke: expected degraded-only-model Phase 1 baseline, PostgreSQL-down blocked state, same-window recovery, disposable-artifact corruption detection, relaunch persistence, and development zero-egress recording.
 
 ## Plan self-review
 
