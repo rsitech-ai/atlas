@@ -191,7 +191,8 @@ launchctl submit \
   -l "$ENGINE_SERVICE_LABEL" \
   -o "$ENGINE_LOG" \
   -e "$ENGINE_LOG" \
-  -- "$ROOT_DIR/.venv/bin/uvicorn" rsi_atlas_engine.api:app \
+  -- /usr/bin/env "RSI_ATLAS_DATA_ROOT=$RSI_ATLAS_DATA_ROOT" \
+  "$ROOT_DIR/.venv/bin/uvicorn" rsi_atlas_engine.api:app \
   --host "$ENGINE_HOST" \
   --port "$ENGINE_PORT"
 wait_for_engine
