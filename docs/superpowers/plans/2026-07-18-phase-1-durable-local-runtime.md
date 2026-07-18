@@ -257,7 +257,7 @@ git commit -m "feat: add local PostgreSQL persistence"
 - Offline mode permits owner-only Unix sockets and explicitly configured loopback services; monitored mode grants outbound access only to the collector process and allowlisted HTTPS/RPC destinations.
 - Engine, parser, model, evaluation, and Codex roles default to no outbound network.
 
-- [ ] **Step 1: Write failing capability tests**
+- [x] **Step 1: Write failing capability tests**
 
 ```python
 @pytest.mark.parametrize("role", ["atlas-api", "atlas-worker-document", "atlas-worker-model", "atlas-worker-evaluation", "atlas-codex-controller"])
@@ -274,13 +274,13 @@ def test_monitored_collector_requires_exact_allowlist_match() -> None:
     assert not policy.authorize(role="atlas-collector", scheme="https", host="evil.example", port=443).allowed
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `uv run pytest packages/security/tests -q`
 
 Expected: import failure because the security package does not exist.
 
-- [ ] **Step 3: Implement deterministic policy and manifest validation**
+- [x] **Step 3: Implement deterministic policy and manifest validation**
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -303,7 +303,7 @@ class NetworkPolicy:
 
 Manifest validation rejects unknown roles/capabilities, wildcard destinations, private-data read grants to collectors, Keychain grants to parsers/models/Codex, and any trading/signing/wallet capability.
 
-- [ ] **Step 4: Run policy, manifest, and exact-runtime egress verification**
+- [x] **Step 4: Run policy, manifest, and exact-runtime egress verification**
 
 Run:
 
@@ -316,7 +316,7 @@ uv run mypy packages/security/src infra/security
 
 Expected: deterministic policies pass and the doctor smoke records no external DNS/TCP attempt. This is development-component evidence, not yet exact signed-release zero-egress proof.
 
-- [ ] **Step 5: Commit and review Task 3**
+- [x] **Step 5: Commit and review Task 3**
 
 ```bash
 git add infra/security packages/security pyproject.toml uv.lock
