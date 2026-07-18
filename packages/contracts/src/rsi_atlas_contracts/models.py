@@ -2,7 +2,7 @@ from enum import StrEnum
 from pathlib import Path
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 
 from rsi_atlas_contracts.system_status import StrictModel
 
@@ -11,12 +11,27 @@ class ModelCapability(StrEnum):
     GENERATE = "generate"
     EMBED = "embed"
     RERANK = "rerank"
+    VISION = "vision"
+    AUDIO = "audio"
+    TOOL_CALLING = "tool_calling"
+    JSON = "json"
+    CLASSIFY = "classify"
+    TRANSLATE = "translate"
+    SUMMARIZE = "summarize"
+    CODE = "code"
 
 
 class ModelLifecycle(StrEnum):
     IMPORTED = "imported"
+    QUARANTINED = "quarantined"
+    BENCHMARKING = "benchmarking"
+    CANDIDATE = "candidate"
+    PRODUCTION = "production"
+    DEGRADED = "degraded"
+    DEPRECATED = "deprecated"
     VALIDATED = "validated"
     RETIRED = "retired"
+    REJECTED = "rejected"
 
 
 class ProviderHealthState(StrEnum):
@@ -37,6 +52,7 @@ class ThermalState(StrEnum):
 
 
 class ModelArtifact(StrictModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
     artifact_id: UUID
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     provider_family: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,63}$")

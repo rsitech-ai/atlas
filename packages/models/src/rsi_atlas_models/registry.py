@@ -11,9 +11,16 @@ class ModelRegistryError(RuntimeError):
 
 
 _TRANSITIONS = {
-    ModelLifecycle.IMPORTED: {ModelLifecycle.VALIDATED, ModelLifecycle.RETIRED},
+    ModelLifecycle.IMPORTED: {ModelLifecycle.QUARANTINED, ModelLifecycle.RETIRED},
+    ModelLifecycle.QUARANTINED: {ModelLifecycle.BENCHMARKING, ModelLifecycle.REJECTED},
+    ModelLifecycle.BENCHMARKING: {ModelLifecycle.CANDIDATE, ModelLifecycle.REJECTED},
+    ModelLifecycle.CANDIDATE: {ModelLifecycle.PRODUCTION, ModelLifecycle.REJECTED},
+    ModelLifecycle.PRODUCTION: {ModelLifecycle.DEGRADED, ModelLifecycle.DEPRECATED},
+    ModelLifecycle.DEGRADED: {ModelLifecycle.PRODUCTION, ModelLifecycle.DEPRECATED},
+    ModelLifecycle.DEPRECATED: {ModelLifecycle.RETIRED},
     ModelLifecycle.VALIDATED: {ModelLifecycle.RETIRED},
     ModelLifecycle.RETIRED: set(),
+    ModelLifecycle.REJECTED: set(),
 }
 
 
@@ -22,6 +29,7 @@ class ModelRegistry:
         self._lock = threading.RLock()
         self._by_id: dict[object, ModelArtifact] = {}
         self._hashes: set[str] = set()
+        self._history: dict[object, tuple[ModelArtifact, ...]] = {}
         self._max_bytes = max_bytes
 
     def register(self, artifact: ModelArtifact) -> ModelArtifact:
@@ -30,6 +38,7 @@ class ModelRegistry:
                 raise ModelRegistryError("duplicate model artifact")
             self._validate_file(artifact)
             self._by_id[artifact.artifact_id] = artifact
+            self._history[artifact.artifact_id] = (artifact,)
             self._hashes.add(artifact.sha256)
             return artifact
 
@@ -47,7 +56,15 @@ class ModelRegistry:
                 raise ModelRegistryError("invalid model lifecycle transition")
             current = prior.model_copy(update={"lifecycle": lifecycle})
             self._by_id[artifact_id] = current
+            self._history[artifact_id] = (*self._history[artifact_id], current)
             return current
+
+    def history(self, artifact_id: object) -> tuple[ModelArtifact, ...]:
+        with self._lock:
+            try:
+                return self._history[artifact_id]
+            except KeyError as error:
+                raise ModelRegistryError("model artifact not found") from error
 
     def _validate_file(self, artifact: ModelArtifact) -> None:
         fd = os.open(artifact.local_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
