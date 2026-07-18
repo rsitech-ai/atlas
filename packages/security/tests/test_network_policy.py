@@ -180,6 +180,24 @@ def test_monitored_policy_rejects_canonical_duplicate_origins() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "origin",
+    [
+        " https://rpc.example:443",
+        "https://rpc.example:443 ",
+        "\thttps://rpc.example:443",
+        "https://rpc.example:443\n",
+        "https://rpc.exa\tmple:443",
+        "https://rpc.example:443\x7f",
+    ],
+)
+def test_remote_origin_rejects_all_raw_whitespace_and_control_characters(
+    origin: str,
+) -> None:
+    with pytest.raises(ValueError, match="remote origin"):
+        NetworkPolicy.monitored(allowlisted_origins=[origin])
+
+
 def test_invalid_authorization_destination_fails_closed_without_echo() -> None:
     decision = NetworkPolicy.monitored(allowlisted_origins=["https://rpc.example:443"]).authorize(
         role=ProcessRole.COLLECTOR,
@@ -237,6 +255,24 @@ def test_loopback_requires_an_explicit_literal_allowlist_match() -> None:
     ],
 )
 def test_loopback_configuration_rejects_aliases_and_nonliteral_destinations(
+    origin: str,
+) -> None:
+    with pytest.raises(ValueError, match="loopback origin"):
+        NetworkPolicy.offline(loopback_origins=[origin])
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        " http://127.0.0.1:8765",
+        "http://127.0.0.1:8765 ",
+        "\thttp://127.0.0.1:8765",
+        "http://127.0.0.1:8765\n",
+        "http://127.0.0.\t1:8765",
+        "http://127.0.0.1:8765\x7f",
+    ],
+)
+def test_loopback_origin_rejects_all_raw_whitespace_and_control_characters(
     origin: str,
 ) -> None:
     with pytest.raises(ValueError, match="loopback origin"):

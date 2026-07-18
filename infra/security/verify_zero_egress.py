@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import hashlib
 import json
 import os
 import re
+import select
 import shlex
 import shutil
 import signal
@@ -57,6 +59,67 @@ class UnixSocketIdentity:
     inode: int
     parent_device: int
     parent_inode: int
+
+
+@dataclass(frozen=True, slots=True)
+class ProcessIdentity:
+    pid: int
+    start_seconds: int
+    start_microseconds: int
+
+
+class _ProcBSDInfo(ctypes.Structure):
+    _fields_ = [
+        ("pbi_flags", ctypes.c_uint32),
+        ("pbi_status", ctypes.c_uint32),
+        ("pbi_xstatus", ctypes.c_uint32),
+        ("pbi_pid", ctypes.c_uint32),
+        ("pbi_ppid", ctypes.c_uint32),
+        ("pbi_uid", ctypes.c_uint32),
+        ("pbi_gid", ctypes.c_uint32),
+        ("pbi_ruid", ctypes.c_uint32),
+        ("pbi_rgid", ctypes.c_uint32),
+        ("pbi_svuid", ctypes.c_uint32),
+        ("pbi_svgid", ctypes.c_uint32),
+        ("rfu_1", ctypes.c_uint32),
+        ("pbi_comm", ctypes.c_char * 16),
+        ("pbi_name", ctypes.c_char * 32),
+        ("pbi_nfiles", ctypes.c_uint32),
+        ("pbi_pgid", ctypes.c_uint32),
+        ("pbi_pjobc", ctypes.c_uint32),
+        ("e_tdev", ctypes.c_uint32),
+        ("e_tpgid", ctypes.c_uint32),
+        ("pbi_nice", ctypes.c_int32),
+        ("pbi_start_tvsec", ctypes.c_uint64),
+        ("pbi_start_tvusec", ctypes.c_uint64),
+    ]
+
+
+_PROC_PIDTBSDINFO = 3
+_TRACKING_POLL_SECONDS = 0.001
+_SUPERVISOR_GRACE_SECONDS = 0.05
+_TARGET_GATE_CODE = (
+    "import os,sys; gate=int(sys.argv[1]); "
+    "allowed=os.read(gate,1)==b'G'; os.close(gate); "
+    "raise SystemExit(125) if not allowed else os.execv(sys.argv[2],sys.argv[2:])"
+)
+_SUPERVISOR_CODE = (
+    "import os,subprocess,sys,time; "
+    "control=int(sys.argv[1]); ready=int(sys.argv[2]); target=sys.argv[3:]; "
+    "gate_read,gate_write=os.pipe(); "
+    "child=subprocess.Popen([sys.executable,'-c'," + repr(_TARGET_GATE_CODE) + ","
+    "str(gate_read),*target],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,"
+    "stderr=subprocess.DEVNULL,pass_fds=(gate_read,)); "
+    "os.close(gate_read); os.write(ready,(str(child.pid)+'\\n').encode('ascii')); "
+    "os.close(ready); allowed=os.read(control,1)==b'G'; os.close(control); "
+    "os.write(gate_write,b'G' if allowed else b'X'); os.close(gate_write); "
+    "status=child.wait(); time.sleep(" + repr(_SUPERVISOR_GRACE_SECONDS) + "); "
+    "raise SystemExit(status if status>=0 else 128-status)"
+)
+PROCESS_CLEANUP_EVIDENCE = {
+    "binding": "gated_supervisor_libproc_parentage_and_start_identity_polling",
+    "limitation": "not_kernel_event_bound_short_lived_descendant_may_escape_observation",
+}
 
 
 def _timestamp() -> str:
@@ -218,96 +281,242 @@ def _sandbox_profile(socket_paths: Sequence[str]) -> str:
     return "\n".join(rules) + "\n"
 
 
-def _descendant_processes(root_pid: int) -> set[int]:
+def _load_libproc() -> ctypes.CDLL:
     try:
-        result = subprocess.run(
-            ["/bin/ps", "-axo", "pid=,ppid="],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=2,
+        library = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
+    except OSError as error:
+        raise VerificationError("process tracker unavailable") from error
+    library.proc_pidinfo.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_uint64,
+        ctypes.c_void_p,
+        ctypes.c_int,
+    ]
+    library.proc_pidinfo.restype = ctypes.c_int
+    library.proc_listchildpids.argtypes = [
+        ctypes.c_int,
+        ctypes.c_void_p,
+        ctypes.c_int,
+    ]
+    library.proc_listchildpids.restype = ctypes.c_int
+    return library
+
+
+_LIBPROC: ctypes.CDLL | None = None
+
+
+def _libproc() -> ctypes.CDLL:
+    global _LIBPROC
+    if _LIBPROC is None:
+        _LIBPROC = _load_libproc()
+    return _LIBPROC
+
+
+def _read_process_record(process_id: int) -> tuple[ProcessIdentity, int] | None:
+    record = _ProcBSDInfo()
+    result = _libproc().proc_pidinfo(
+        process_id,
+        _PROC_PIDTBSDINFO,
+        0,
+        ctypes.byref(record),
+        ctypes.sizeof(record),
+    )
+    if result == 0:
+        return None
+    if result != ctypes.sizeof(record) or record.pbi_pid != process_id:
+        raise VerificationError("process tracker inspection failed")
+    return (
+        ProcessIdentity(
+            pid=process_id,
+            start_seconds=int(record.pbi_start_tvsec),
+            start_microseconds=int(record.pbi_start_tvusec),
+        ),
+        int(record.pbi_ppid),
+    )
+
+
+def _read_process_identity(process_id: int) -> ProcessIdentity | None:
+    record = _read_process_record(process_id)
+    return None if record is None else record[0]
+
+
+def _list_child_pids(process_id: int) -> tuple[int, ...]:
+    estimate = _libproc().proc_listchildpids(process_id, None, 0)
+    if estimate < 0:
+        raise VerificationError("process tracker inspection failed")
+    capacity = max(64, estimate + 32)
+    while True:
+        buffer = (ctypes.c_int * capacity)()
+        count = _libproc().proc_listchildpids(
+            process_id,
+            buffer,
+            ctypes.sizeof(buffer),
         )
-    except (OSError, subprocess.SubprocessError) as error:
-        raise VerificationError("sandbox child cleanup inspection failed") from error
-    children: dict[int, set[int]] = {}
+        if count < 0:
+            raise VerificationError("process tracker inspection failed")
+        if count < capacity:
+            return tuple(int(buffer[index]) for index in range(count) if buffer[index] > 0)
+        capacity *= 2
+        if capacity > 1_048_576:
+            raise VerificationError("process tracker inspection failed")
+
+
+def _signal_tracked_process(
+    expected: ProcessIdentity,
+    signal_number: signal.Signals,
+) -> bool:
+    current = _read_process_identity(expected.pid)
+    if current is None:
+        return False
+    if current != expected:
+        raise VerificationError("tracked process identity changed")
     try:
-        for line in result.stdout.splitlines():
-            pid_text, parent_text = line.split()
-            children.setdefault(int(parent_text), set()).add(int(pid_text))
-    except (TypeError, ValueError) as error:
-        raise VerificationError("sandbox child cleanup inspection failed") from error
-    descendants: set[int] = set()
-    pending = [root_pid]
-    while pending:
-        parent = pending.pop()
-        for child in children.get(parent, set()):
-            if child not in descendants:
-                descendants.add(child)
-                pending.append(child)
-    return descendants
-
-
-def _process_is_active(process_id: int) -> bool:
-    try:
-        result = subprocess.run(
-            ["/bin/ps", "-p", str(process_id), "-o", "stat="],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=1,
-        )
-    except (OSError, subprocess.SubprocessError) as error:
-        raise VerificationError("sandbox child cleanup inspection failed") from error
-    state = result.stdout.strip()
-    return result.returncode == 0 and bool(state) and not state.startswith("Z")
-
-
-def _signal_process(process_id: int, signal_number: signal.Signals) -> None:
-    try:
-        os.kill(process_id, signal_number)
+        os.kill(expected.pid, signal_number)
     except ProcessLookupError:
-        return
+        return False
+    except OSError as error:
+        raise VerificationError("sandbox child cleanup failed") from error
+    return True
+
+
+class _DarwinProcessTracker:
+    """Continuously binds observed descendant PIDs to Darwin start identities."""
+
+    def __init__(self, process_id: int) -> None:
+        identity = _read_process_identity(process_id)
+        if identity is None:
+            raise VerificationError("process tracker unavailable")
+        self.root = identity
+        self.identities: dict[int, ProcessIdentity] = {process_id: identity}
+
+    def observe(self, process_id: int, *, expected_parent: int) -> ProcessIdentity:
+        record = _read_process_record(process_id)
+        if record is None or record[1] != expected_parent:
+            raise VerificationError("process tracker handshake failed")
+        identity = record[0]
+        prior = self.identities.get(process_id)
+        if prior is not None and prior != identity:
+            raise VerificationError("tracked process identity changed")
+        self.identities[process_id] = identity
+        return identity
+
+    def refresh(self) -> None:
+        pending = list(self.identities.values())
+        inspected: set[ProcessIdentity] = set()
+        while pending:
+            expected = pending.pop()
+            if expected in inspected:
+                continue
+            inspected.add(expected)
+            current = _read_process_identity(expected.pid)
+            if current is None:
+                continue
+            if current != expected:
+                raise VerificationError("tracked process identity changed")
+            for child_id in _list_child_pids(expected.pid):
+                record = _read_process_record(child_id)
+                if record is None or record[1] != expected.pid:
+                    continue
+                child = record[0]
+                prior = self.identities.get(child_id)
+                if prior is not None and prior != child:
+                    raise VerificationError("tracked process identity changed")
+                if prior is None:
+                    self.identities[child_id] = child
+                    pending.append(child)
+
+    def active(self) -> tuple[ProcessIdentity, ...]:
+        active: list[ProcessIdentity] = []
+        for expected in self.identities.values():
+            current = _read_process_identity(expected.pid)
+            if current is None:
+                continue
+            if current != expected:
+                raise VerificationError("tracked process identity changed")
+            active.append(expected)
+        return tuple(active)
+
+
+def _cleanup_tracked_processes(
+    process: subprocess.Popen[bytes],
+    tracker: _DarwinProcessTracker,
+) -> None:
+    tracker.refresh()
+    active = tracker.active()
+    for identity in active:
+        _signal_tracked_process(identity, signal.SIGTERM)
+    deadline = time.monotonic() + 0.5
+    while time.monotonic() < deadline:
+        tracker.refresh()
+        if not tracker.active():
+            break
+        time.sleep(0.01)
+    for identity in tracker.active():
+        _signal_tracked_process(identity, signal.SIGKILL)
+    deadline = time.monotonic() + 1
+    while time.monotonic() < deadline:
+        if not tracker.active():
+            break
+        time.sleep(0.01)
+    if tracker.active():
+        raise VerificationError("sandbox child cleanup left a surviving descendant")
+    try:
+        process.wait(timeout=0.2)
+    except subprocess.TimeoutExpired as error:
+        raise VerificationError("sandbox child cleanup left a surviving descendant") from error
     except OSError as error:
         raise VerificationError("sandbox child cleanup failed") from error
 
 
-def _terminate_process_group(process: subprocess.Popen[bytes]) -> None:
-    descendants = _descendant_processes(process.pid)
-    for process_id in descendants:
-        _signal_process(process_id, signal.SIGTERM)
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
-    except OSError as error:
-        raise VerificationError("sandbox child cleanup failed") from error
+def _cleanup_untracked_root(
+    process: subprocess.Popen[bytes],
+    identity: ProcessIdentity | None,
+) -> None:
+    if identity is not None:
+        _signal_tracked_process(identity, signal.SIGTERM)
     try:
         process.wait(timeout=0.5)
     except subprocess.TimeoutExpired:
-        pass
-    except OSError as error:
-        raise VerificationError("sandbox child cleanup failed") from error
-    for process_id in descendants:
-        if _process_is_active(process_id):
-            _signal_process(process_id, signal.SIGKILL)
-    if process.poll() is None:
+        if identity is not None:
+            _signal_tracked_process(identity, signal.SIGKILL)
         try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        except OSError as error:
-            raise VerificationError("sandbox child cleanup failed") from error
-        try:
-            process.wait(timeout=1)
+            process.wait(timeout=0.5)
         except (OSError, subprocess.TimeoutExpired) as error:
             raise VerificationError("sandbox child cleanup failed") from error
-    deadline = time.monotonic() + 1
-    while time.monotonic() < deadline and any(
-        _process_is_active(process_id) for process_id in descendants
-    ):
-        time.sleep(0.02)
-    if any(_process_is_active(process_id) for process_id in descendants):
-        raise VerificationError("sandbox child cleanup left a surviving descendant")
+    except OSError as error:
+        raise VerificationError("sandbox child cleanup failed") from error
+
+
+def _read_supervisor_target(
+    descriptor: int,
+    process: subprocess.Popen[bytes],
+    *,
+    deadline: float,
+) -> int:
+    payload = bytearray()
+    while time.monotonic() < deadline and len(payload) <= 32:
+        if process.poll() is not None:
+            break
+        readable, _, _ = select.select([descriptor], [], [], _TRACKING_POLL_SECONDS)
+        if not readable:
+            continue
+        chunk = os.read(descriptor, 32)
+        if not chunk:
+            break
+        payload.extend(chunk)
+        if b"\n" in payload:
+            break
+    try:
+        line, remainder = bytes(payload).split(b"\n", 1)
+        if remainder or not line.isdigit():
+            raise ValueError
+        process_id = int(line)
+    except ValueError as error:
+        raise VerificationError("process tracker handshake failed") from error
+    if process_id <= 0:
+        raise VerificationError("process tracker handshake failed")
+    return process_id
 
 
 def _run_sandboxed(
@@ -317,24 +526,95 @@ def _run_sandboxed(
     argv: Sequence[str],
     timeout_seconds: float,
 ) -> tuple[int | None, bool]:
+    control_read, control_write = os.pipe()
+    ready_read, ready_write = os.pipe()
+    process: subprocess.Popen[bytes] | None = None
+    root_identity: ProcessIdentity | None = None
     try:
         process = subprocess.Popen(
-            [str(sandbox_executable), "-p", profile, "--", *argv],
+            [
+                str(sandbox_executable),
+                "-p",
+                profile,
+                "--",
+                sys.executable,
+                "-c",
+                _SUPERVISOR_CODE,
+                str(control_read),
+                str(ready_write),
+                *argv,
+            ],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
+            pass_fds=(control_read, ready_write),
         )
     except OSError as error:
+        os.close(control_read)
+        os.close(control_write)
+        os.close(ready_read)
+        os.close(ready_write)
         raise VerificationError("sandbox child could not start") from error
+    os.close(control_read)
+    os.close(ready_write)
     try:
-        return process.wait(timeout=timeout_seconds), False
-    except subprocess.TimeoutExpired:
-        _terminate_process_group(process)
-        return None, True
+        root_identity = _read_process_identity(process.pid)
+        tracker = _DarwinProcessTracker(process.pid)
+        try:
+            target_id = _read_supervisor_target(
+                ready_read,
+                process,
+                deadline=time.monotonic() + min(timeout_seconds, 3),
+            )
+        except VerificationError:
+            rejected_status = process.poll()
+            if rejected_status is None:
+                try:
+                    rejected_status = process.wait(timeout=0.1)
+                except subprocess.TimeoutExpired:
+                    raise
+            _cleanup_tracked_processes(process, tracker)
+            return rejected_status, False
+        tracker.observe(target_id, expected_parent=process.pid)
+        os.write(control_write, b"G")
+        deadline = time.monotonic() + timeout_seconds
+        status: int | None = None
+        timed_out = False
+        while True:
+            tracker.refresh()
+            status = process.poll()
+            if status is not None:
+                tracker.refresh()
+                break
+            if time.monotonic() >= deadline:
+                status = None
+                timed_out = True
+                break
+            time.sleep(_TRACKING_POLL_SECONDS)
+        _cleanup_tracked_processes(process, tracker)
+        return status, timed_out
+    except VerificationError:
+        with suppress(OSError):
+            os.close(control_write)
+        if "tracker" in locals():
+            _cleanup_tracked_processes(process, tracker)
+        else:
+            _cleanup_untracked_root(process, root_identity)
+        raise
     except OSError as error:
-        _terminate_process_group(process)
+        with suppress(OSError):
+            os.close(control_write)
+        if "tracker" in locals():
+            _cleanup_tracked_processes(process, tracker)
+        else:
+            _cleanup_untracked_root(process, root_identity)
         raise VerificationError("sandbox child wait failed") from error
+    finally:
+        with suppress(OSError):
+            os.close(control_write)
+        with suppress(OSError):
+            os.close(ready_read)
 
 
 MDNS_CANARY = (
@@ -443,6 +723,7 @@ def _failure_evidence(*, start_time: str, argv: Sequence[str]) -> dict[str, Any]
         "schema_version": "1.0.0",
         "evidence_label": EVIDENCE_LABEL,
         "profile": "offline",
+        "process_cleanup": PROCESS_CLEANUP_EVIDENCE,
         "argv_fingerprint": _argv_fingerprint(argv),
         "executable": _executable_evidence(None),
         "sandbox_profile_sha256": None,
@@ -550,6 +831,7 @@ def main(
             "schema_version": "1.0.0",
             "evidence_label": EVIDENCE_LABEL,
             "profile": "offline",
+            "process_cleanup": PROCESS_CLEANUP_EVIDENCE,
             "argv_fingerprint": _argv_fingerprint(safe_argv),
             "executable": _executable_evidence(executable_identity),
             "sandbox_profile_sha256": profile_hash,

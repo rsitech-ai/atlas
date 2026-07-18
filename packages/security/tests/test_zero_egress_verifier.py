@@ -4,6 +4,8 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
+import signal
 import socket
 import stat
 import subprocess
@@ -54,6 +56,10 @@ def test_real_macos_sandbox_denies_dns_and_external_tcp_but_allows_exact_local_s
     assert evidence["schema_version"] == "1.0.0"
     assert evidence["evidence_label"] == "development_component_evidence"
     assert evidence["profile"] == "offline"
+    assert evidence["process_cleanup"] == {
+        "binding": "gated_supervisor_libproc_parentage_and_start_identity_polling",
+        "limitation": "not_kernel_event_bound_short_lived_descendant_may_escape_observation",
+    }
     assert evidence["result"] == "passed"
     assert evidence["canaries"] == {
         "external_tcp_denied": True,
@@ -124,7 +130,12 @@ def test_missing_sandbox_support_fails_closed(tmp_path: Path) -> None:
 
     assert status == 1
     assert "sandbox support unavailable" in stderr.getvalue()
-    assert "development_component_evidence" in stdout.getvalue()
+    evidence = json.loads(stdout.getvalue())
+    assert evidence["evidence_label"] == "development_component_evidence"
+    assert evidence["process_cleanup"] == {
+        "binding": "gated_supervisor_libproc_parentage_and_start_identity_polling",
+        "limitation": "not_kernel_event_bound_short_lived_descendant_may_escape_observation",
+    }
 
 
 def test_missing_mdns_responder_discriminator_fails_closed(
@@ -333,6 +344,95 @@ def test_timeout_terminates_detached_child_descendant(tmp_path: Path) -> None:
     assert not marker.exists()
 
 
+@pytest.mark.parametrize("target_exit", [0, 7])
+def test_every_target_completion_cleans_detached_child(
+    tmp_path: Path,
+    target_exit: int,
+) -> None:
+    marker = tmp_path / f"completion-orphan-{target_exit}"
+    code = (
+        "import subprocess,sys; "
+        "subprocess.Popen([sys.executable,'-c',"
+        f'"import time,pathlib; time.sleep(1); pathlib.Path({str(marker)!r}).touch()"], '
+        f"start_new_session=True); raise SystemExit({target_exit})"
+    )
+
+    result = _run_verifier("--", sys.executable, "-c", code, timeout=10)
+
+    assert result.returncode == (0 if target_exit == 0 else 1)
+    assert json.loads(result.stdout)["target"]["exit_status"] == target_exit
+    time.sleep(1.2)
+    assert not marker.exists()
+
+
+def test_cleanup_does_not_signal_unrelated_sentinel_process(tmp_path: Path) -> None:
+    marker = tmp_path / "tracked-orphan"
+    sentinel = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(5)"],
+        start_new_session=True,
+    )
+    try:
+        code = (
+            "import subprocess,sys,time; "
+            "subprocess.Popen([sys.executable,'-c',"
+            f'"import time,pathlib; time.sleep(1); pathlib.Path({str(marker)!r}).touch()"], '
+            "start_new_session=True); time.sleep(10)"
+        )
+        result = _run_verifier(
+            "--timeout-seconds",
+            "0.3",
+            "--",
+            sys.executable,
+            "-c",
+            code,
+            timeout=10,
+        )
+
+        assert result.returncode == 1
+        assert sentinel.poll() is None
+    finally:
+        sentinel.terminate()
+        sentinel.wait(timeout=3)
+
+
+def test_pid_identity_mismatch_is_never_signalled(monkeypatch: pytest.MonkeyPatch) -> None:
+    verifier = _load_verifier()
+    expected = verifier.ProcessIdentity(pid=4242, start_seconds=10, start_microseconds=20)
+    actual = verifier.ProcessIdentity(pid=4242, start_seconds=11, start_microseconds=20)
+    signalled: list[tuple[int, signal.Signals]] = []
+    monkeypatch.setattr(verifier, "_read_process_identity", lambda process_id: actual)
+    monkeypatch.setattr(os, "kill", lambda pid, sig: signalled.append((pid, sig)))
+
+    with pytest.raises(verifier.VerificationError, match="process identity changed"):
+        verifier._signal_tracked_process(expected, signal.SIGTERM)
+
+    assert signalled == []
+
+
+def test_process_tracker_initialization_failure_is_stable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verifier = _load_verifier()
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+
+    class FailingTracker:
+        def __init__(self, process_id: int) -> None:
+            raise verifier.VerificationError("process tracker unavailable")
+
+    monkeypatch.setattr(verifier, "_DarwinProcessTracker", FailingTracker)
+
+    status = verifier.main(
+        ["--", sys.executable, "-c", "pass"],
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert status == 1
+    assert "process tracker unavailable" in stderr.getvalue()
+    assert "Traceback" not in stderr.getvalue()
+
+
 def test_allowed_unix_socket_replacement_during_target_fails_closed() -> None:
     with tempfile.TemporaryDirectory(prefix="as-", dir=tempfile.gettempdir()) as directory:
         root = Path(directory).resolve()
@@ -378,6 +478,7 @@ def test_evidence_is_privacy_safe_and_has_no_captured_payload_or_environment() -
         "evidence_label",
         "executable",
         "profile",
+        "process_cleanup",
         "result",
         "sandbox_profile_sha256",
         "schema_version",

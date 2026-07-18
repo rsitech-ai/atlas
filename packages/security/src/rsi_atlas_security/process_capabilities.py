@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -178,7 +179,11 @@ def _parse_remote_destinations(value: object, *, role: ProcessRole) -> tuple[str
     return tuple(destinations)
 
 
-def _parse_process(raw: object) -> ProcessCapability:
+def _parse_process(
+    raw: object,
+    *,
+    expected_collector_destinations: frozenset[str],
+) -> ProcessCapability:
     if not isinstance(raw, dict):
         raise ManifestValidationError("process manifest entry must be an object")
     keys = frozenset(raw)
@@ -208,20 +213,25 @@ def _parse_process(raw: object) -> ProcessCapability:
         raise ManifestValidationError("process manifest contains contradictory data grants")
     if role is ProcessRole.COLLECTOR and (reads | writes) & COLLECTOR_PRIVATE_DATA:
         raise ManifestValidationError("collector private data grant is prohibited")
-    if not reads.issubset(APPROVED_READ_DATA[role]) or not writes.issubset(
-        APPROVED_WRITE_DATA[role]
-    ):
-        raise ManifestValidationError("process manifest contains unapproved data grant")
+    if reads != APPROVED_READ_DATA[role] or writes != APPROVED_WRITE_DATA[role]:
+        raise ManifestValidationError("process manifest violates exact data grant matrix")
     capabilities = _parse_capabilities(raw["capabilities"])
     if capabilities != frozenset({ROLE_CAPABILITY[role]}):
         raise ManifestValidationError("process manifest contains contradictory capability grants")
-    if keychain_access and role is not ProcessRole.COLLECTOR:
-        raise ManifestValidationError("process role has prohibited Keychain access")
+    if keychain_access is not (role is ProcessRole.COLLECTOR):
+        raise ManifestValidationError("process manifest violates exact Keychain access matrix")
     if shell_authority:
         raise ManifestValidationError("shell authority is prohibited")
-    if subprocess_authority and role is not ProcessRole.CODEX_CONTROLLER:
-        raise ManifestValidationError("subprocess authority is prohibited for process role")
+    if subprocess_authority is not (role is ProcessRole.CODEX_CONTROLLER):
+        raise ManifestValidationError("process manifest violates exact subprocess authority matrix")
     destinations = _parse_remote_destinations(raw["network_destinations"], role=role)
+    expected_destinations = (
+        expected_collector_destinations if role is ProcessRole.COLLECTOR else frozenset()
+    )
+    if frozenset(destinations) != expected_destinations:
+        raise ManifestValidationError(
+            "process manifest violates exact collector network destination matrix"
+        )
     return ProcessCapability(
         role=role,
         read_data_classes=reads,
@@ -235,7 +245,29 @@ def _parse_process(raw: object) -> ProcessCapability:
     )
 
 
-def parse_process_capability_manifest(payload: str) -> tuple[ProcessCapability, ...]:
+def _expected_collector_destinations(values: Iterable[str]) -> frozenset[str]:
+    if isinstance(values, (str, bytes)):
+        raise ManifestValidationError("expected collector destination collection is invalid")
+    canonical: set[str] = set()
+    try:
+        for value in values:
+            destination = canonical_remote_origin(value)
+            if destination in canonical:
+                raise ManifestValidationError("duplicate expected collector destination")
+            canonical.add(destination)
+    except ManifestValidationError:
+        raise
+    except (TypeError, ValueError) as error:
+        raise ManifestValidationError("invalid expected collector destination") from error
+    return frozenset(canonical)
+
+
+def parse_process_capability_manifest(
+    payload: str,
+    *,
+    expected_collector_destinations: Iterable[str] = (),
+) -> tuple[ProcessCapability, ...]:
+    expected_destinations = _expected_collector_destinations(expected_collector_destinations)
     try:
         raw = json.loads(payload, object_pairs_hook=_strict_object)
     except ManifestValidationError:
@@ -256,7 +288,10 @@ def parse_process_capability_manifest(payload: str) -> tuple[ProcessCapability, 
     parsed: list[ProcessCapability] = []
     seen_roles: set[ProcessRole] = set()
     for raw_process in processes:
-        process = _parse_process(raw_process)
+        process = _parse_process(
+            raw_process,
+            expected_collector_destinations=expected_destinations,
+        )
         if process.role in seen_roles:
             raise ManifestValidationError("duplicate process role in capability manifest")
         seen_roles.add(process.role)
@@ -264,12 +299,19 @@ def parse_process_capability_manifest(payload: str) -> tuple[ProcessCapability, 
     return tuple(parsed)
 
 
-def load_process_capability_manifest(path: Path) -> tuple[ProcessCapability, ...]:
+def load_process_capability_manifest(
+    path: Path,
+    *,
+    expected_collector_destinations: Iterable[str] = (),
+) -> tuple[ProcessCapability, ...]:
     try:
         payload = path.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as error:
         raise ManifestValidationError("capability manifest could not be read") from error
-    capabilities = parse_process_capability_manifest(payload)
+    capabilities = parse_process_capability_manifest(
+        payload,
+        expected_collector_destinations=expected_collector_destinations,
+    )
     if tuple(capability.role for capability in capabilities) != tuple(ProcessRole):
         raise ManifestValidationError(
             "shipped capability manifest roles are incomplete or unordered"

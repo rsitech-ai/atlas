@@ -83,9 +83,9 @@ APPROVED_WRITES = {
 def _process(role: ProcessRole) -> dict[str, object]:
     return {
         "role": role.value,
-        "read_data_classes": [],
-        "write_data_classes": [],
-        "keychain_access": False,
+        "read_data_classes": sorted(APPROVED_READS[role]),
+        "write_data_classes": sorted(APPROVED_WRITES[role]),
+        "keychain_access": role is ProcessRole.COLLECTOR,
         "network_destinations": [],
         "subprocess_authority": role is ProcessRole.CODEX_CONTROLLER,
         "shell_authority": False,
@@ -113,7 +113,7 @@ def test_manifest_values_are_typed_and_frozen() -> None:
     capability = parse_process_capability_manifest(_manifest(_process(ProcessRole.API)))[0]
 
     assert capability.role is ProcessRole.API
-    assert capability.read_data_classes == frozenset()
+    assert capability.read_data_classes == frozenset({DataClass.REPORTS, DataClass.TRACES})
     assert capability.capabilities == frozenset({"api_control"})
     with pytest.raises(AttributeError):
         capability.role = ProcessRole.COLLECTOR  # type: ignore[misc]
@@ -235,19 +235,108 @@ def test_keychain_grant_is_rejected_outside_approved_role(role: ProcessRole) -> 
         parse_process_capability_manifest(_manifest(process))
 
 
-def test_collector_accepts_only_approved_keychain_network_and_data_subset() -> None:
+def test_collector_accepts_exact_keychain_network_and_data_matrix() -> None:
     collector = _replace(
         _process(ProcessRole.COLLECTOR),
-        read_data_classes=["public_sources"],
+        read_data_classes=["public_sources", "chain_data"],
         write_data_classes=["quarantine"],
         keychain_access=True,
         network_destinations=["https://rpc.example:443"],
     )
 
-    parsed = parse_process_capability_manifest(_manifest(collector))[0]
+    parsed = parse_process_capability_manifest(
+        _manifest(collector),
+        expected_collector_destinations=["https://rpc.example:443"],
+    )[0]
 
     assert parsed.keychain_access is True
     assert parsed.network_destinations == ("https://rpc.example:443",)
+
+
+@pytest.mark.parametrize(
+    "role,field",
+    [
+        (ProcessRole.COLLECTOR, "keychain_access"),
+        (ProcessRole.CODEX_CONTROLLER, "subprocess_authority"),
+    ],
+)
+def test_required_role_authority_cannot_be_removed(
+    role: ProcessRole,
+    field: str,
+) -> None:
+    process = _replace(_process(role), **{field: False})
+
+    with pytest.raises(ManifestValidationError, match="exact"):
+        parse_process_capability_manifest(_manifest(process))
+
+
+@pytest.mark.parametrize("role", tuple(ProcessRole))
+@pytest.mark.parametrize("field", ["read_data_classes", "write_data_classes"])
+def test_each_role_rejects_missing_data_grants_from_exact_matrix(
+    role: ProcessRole,
+    field: str,
+) -> None:
+    process = _process(role)
+    values = process[field]
+    assert isinstance(values, list)
+    if values:
+        process[field] = values[:-1]
+    else:
+        process[field] = [DataClass.PUBLIC_SOURCES.value]
+
+    with pytest.raises(ManifestValidationError, match="exact data grant matrix"):
+        parse_process_capability_manifest(_manifest(process))
+
+
+def test_collector_network_destinations_must_equal_explicit_expected_allowlist() -> None:
+    collector = _replace(
+        _process(ProcessRole.COLLECTOR),
+        network_destinations=["https://rpc.example:443"],
+    )
+    payload = _manifest(collector)
+
+    with pytest.raises(ManifestValidationError, match="collector network destination matrix"):
+        parse_process_capability_manifest(payload)
+    with pytest.raises(ManifestValidationError, match="collector network destination matrix"):
+        parse_process_capability_manifest(
+            payload,
+            expected_collector_destinations=["https://other.example:443"],
+        )
+    with pytest.raises(ManifestValidationError, match="collector network destination matrix"):
+        parse_process_capability_manifest(
+            _manifest(_process(ProcessRole.COLLECTOR)),
+            expected_collector_destinations=["https://rpc.example:443"],
+        )
+
+
+def test_expected_collector_allowlist_rejects_canonical_duplicates() -> None:
+    with pytest.raises(ManifestValidationError, match="duplicate expected collector"):
+        parse_process_capability_manifest(
+            _manifest(_process(ProcessRole.COLLECTOR)),
+            expected_collector_destinations=[
+                "https://RPC.EXAMPLE:443",
+                "HTTPS://rpc.example:443",
+            ],
+        )
+
+
+def test_shipped_loader_defaults_offline_and_accepts_only_its_exact_allowlist() -> None:
+    capabilities = load_process_capability_manifest(
+        MANIFEST_PATH,
+        expected_collector_destinations=(),
+    )
+
+    assert (
+        next(
+            capability for capability in capabilities if capability.role is ProcessRole.COLLECTOR
+        ).network_destinations
+        == ()
+    )
+    with pytest.raises(ManifestValidationError, match="collector network destination matrix"):
+        load_process_capability_manifest(
+            MANIFEST_PATH,
+            expected_collector_destinations=["https://rpc.example:443"],
+        )
 
 
 @pytest.mark.parametrize("role", tuple(ProcessRole))

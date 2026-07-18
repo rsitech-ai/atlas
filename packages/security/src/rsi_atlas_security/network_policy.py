@@ -49,7 +49,15 @@ def _parse_role(role: ProcessRole | str) -> ProcessRole:
 
 
 def _parse_origin(origin: str, *, kind: str) -> SplitResult:
-    if not isinstance(origin, str) or not origin or not origin.isascii():
+    if (
+        not isinstance(origin, str)
+        or not origin
+        or not origin.isascii()
+        or any(
+            character.isspace() or ord(character) < 32 or ord(character) == 127
+            for character in origin
+        )
+    ):
         raise ValueError(f"invalid {kind}")
     parsed = urlsplit(origin)
     if (
