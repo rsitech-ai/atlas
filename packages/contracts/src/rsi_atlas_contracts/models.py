@@ -8,17 +8,17 @@ from rsi_atlas_contracts.system_status import StrictModel
 
 
 class ModelCapability(StrEnum):
-    GENERATE = "generate"
-    EMBED = "embed"
-    RERANK = "rerank"
-    VISION = "vision"
-    AUDIO = "audio"
+    TEXT_GENERATION = "text_generation"
+    STRUCTURED_GENERATION = "structured_generation"
     TOOL_CALLING = "tool_calling"
-    JSON = "json"
-    CLASSIFY = "classify"
-    TRANSLATE = "translate"
-    SUMMARIZE = "summarize"
-    CODE = "code"
+    VISION = "vision"
+    STREAMING = "streaming"
+    LONG_CONTEXT = "long_context"
+    REASONING = "reasoning"
+    EMBEDDINGS = "embeddings"
+    RERANKING = "reranking"
+    MULTILINGUAL = "multilingual"
+    DETERMINISTIC_SAMPLING = "deterministic_sampling"
 
 
 class ModelLifecycle(StrEnum):
@@ -29,7 +29,6 @@ class ModelLifecycle(StrEnum):
     PRODUCTION = "production"
     DEGRADED = "degraded"
     DEPRECATED = "deprecated"
-    VALIDATED = "validated"
     RETIRED = "retired"
     REJECTED = "rejected"
 
@@ -63,9 +62,10 @@ class ModelArtifact(StrictModel):
     tokenizer_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     context_tokens: int = Field(gt=0, le=10_000_000)
     license_id: str = Field(pattern=r"^[A-Za-z0-9.-]{1,96}$")
-    source_manifest_id: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    source_manifest_artifact_id: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     local_path: Path
     capabilities: frozenset[ModelCapability]
+    capability_results: frozenset[str] = Field(default_factory=frozenset)
     approved_tasks: frozenset[str] = Field(default_factory=frozenset)
     lifecycle: ModelLifecycle = ModelLifecycle.IMPORTED
 

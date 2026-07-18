@@ -18,7 +18,6 @@ _TRANSITIONS = {
     ModelLifecycle.PRODUCTION: {ModelLifecycle.DEGRADED, ModelLifecycle.DEPRECATED},
     ModelLifecycle.DEGRADED: {ModelLifecycle.PRODUCTION, ModelLifecycle.DEPRECATED},
     ModelLifecycle.DEPRECATED: {ModelLifecycle.RETIRED},
-    ModelLifecycle.VALIDATED: {ModelLifecycle.RETIRED},
     ModelLifecycle.RETIRED: set(),
     ModelLifecycle.REJECTED: set(),
 }

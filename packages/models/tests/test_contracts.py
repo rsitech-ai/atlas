@@ -18,9 +18,9 @@ def test_model_contract_rejects_coercion_and_unknown_fields(tmp_path: Path) -> N
         tokenizer_sha256="b" * 64,
         context_tokens=1,
         license_id="MIT",
-        source_manifest_id="sha256:" + "c" * 64,
+        source_manifest_artifact_id="sha256:" + "c" * 64,
         local_path=tmp_path / "model",
-        capabilities=frozenset({ModelCapability.GENERATE}),
+        capabilities=frozenset({ModelCapability.TEXT_GENERATION}),
         approved_tasks=frozenset(),
     )
     with pytest.raises(ValidationError):
