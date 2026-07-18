@@ -13,6 +13,9 @@ from uuid import UUID, uuid4
 
 from rsi_atlas_contracts.models import ResourceClass, ThermalState
 
+_MAX_RESOURCE_BYTES = (1 << 63) - 1
+_SAFE_THERMAL_STATES = frozenset({ThermalState.NOMINAL, ThermalState.FAIR})
+
 
 class ResourceRejectionCode(StrEnum):
     INVALID_REQUEST = "invalid_request"
@@ -46,9 +49,17 @@ class ResourceSnapshot:
     captured_at: datetime
 
     def __post_init__(self) -> None:
-        if type(self.free_bytes) is not int or self.free_bytes < 0:
+        if (
+            type(self.free_bytes) is not int
+            or self.free_bytes < 0
+            or self.free_bytes > _MAX_RESOURCE_BYTES
+        ):
             raise ValueError("resource free bytes are invalid")
-        if type(self.swap_bytes) is not int or self.swap_bytes < 0:
+        if (
+            type(self.swap_bytes) is not int
+            or self.swap_bytes < 0
+            or self.swap_bytes > _MAX_RESOURCE_BYTES
+        ):
             raise ValueError("resource swap bytes are invalid")
         if type(self.thermal) is not ThermalState:
             raise ValueError("resource thermal state is invalid")
@@ -67,14 +78,23 @@ class ResourcePolicy:
     max_light_leases: int = 8
 
     def __post_init__(self) -> None:
-        if type(self.min_free_bytes) is not int or self.min_free_bytes < 0:
+        if (
+            type(self.min_free_bytes) is not int
+            or self.min_free_bytes < 0
+            or self.min_free_bytes > _MAX_RESOURCE_BYTES
+        ):
             raise ValueError("minimum free bytes are invalid")
-        if type(self.max_swap_bytes) is not int or self.max_swap_bytes < 0:
+        if (
+            type(self.max_swap_bytes) is not int
+            or self.max_swap_bytes < 0
+            or self.max_swap_bytes > _MAX_RESOURCE_BYTES
+        ):
             raise ValueError("maximum swap bytes are invalid")
         if (
             type(self.allowed_thermal) is not frozenset
             or not self.allowed_thermal
             or any(type(state) is not ThermalState for state in self.allowed_thermal)
+            or not self.allowed_thermal <= _SAFE_THERMAL_STATES
         ):
             raise ValueError("allowed thermal states are invalid")
         if (
@@ -170,6 +190,7 @@ class ResourceArbiter:
     ) -> ResourceLease:
         if (
             type(job_id) is not UUID
+            or job_id.int == 0
             or type(resource_class) is not ResourceClass
             or type(snapshot) is not ResourceSnapshot
         ):

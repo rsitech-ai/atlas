@@ -75,6 +75,7 @@ def test_unsafe_snapshot_rejections_are_exact_and_do_not_consume_capacity(
         lambda: ResourcePolicy(-1, 1, frozenset({ThermalState.NOMINAL}), timedelta(seconds=1)),
         lambda: ResourcePolicy(1, -1, frozenset({ThermalState.NOMINAL}), timedelta(seconds=1)),
         lambda: ResourcePolicy(1, 1, frozenset(), timedelta(seconds=1)),
+        lambda: ResourcePolicy(1, 1, frozenset({ThermalState.CRITICAL}), timedelta(seconds=1)),
         lambda: ResourcePolicy(1, 1, frozenset({ThermalState.NOMINAL}), timedelta(0)),
         lambda: ResourcePolicy(1, 1, frozenset({ThermalState.NOMINAL}), timedelta(hours=2)),
         lambda: ResourcePolicy(1, 1, frozenset({ThermalState.NOMINAL}), timedelta(seconds=1), 0),
@@ -98,6 +99,8 @@ def test_snapshot_and_policy_are_frozen_and_strict() -> None:
         ResourceSnapshot(1, 0, "nominal", NOW)  # type: ignore[arg-type]
     with pytest.raises(ValueError):
         ResourceSnapshot(1, 0, ThermalState.NOMINAL, datetime(2026, 7, 18))
+    with pytest.raises(ValueError):
+        ResourceSnapshot(1 << 63, 0, ThermalState.NOMINAL, NOW)
 
 
 def test_exactly_one_concurrent_heavy_lease_is_admitted() -> None:
@@ -177,4 +180,7 @@ def test_invalid_boundary_input_fails_before_state_mutation() -> None:
     with pytest.raises(ResourceRejectedError) as error:
         resource_arbiter.acquire("job", ResourceClass.HEAVY_MODEL, snapshot())  # type: ignore[arg-type]
     assert error.value.code is ResourceRejectionCode.INVALID_REQUEST
+    with pytest.raises(ResourceRejectedError) as zero_error:
+        resource_arbiter.acquire(UUID(int=0), ResourceClass.HEAVY_MODEL, snapshot())
+    assert zero_error.value.code is ResourceRejectionCode.INVALID_REQUEST
     resource_arbiter.acquire(uuid4(), ResourceClass.HEAVY_MODEL, snapshot()).release()

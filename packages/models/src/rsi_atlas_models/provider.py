@@ -13,12 +13,19 @@ from rsi_atlas_contracts.models import ModelCapability, ProviderHealthState
 
 
 class ProviderErrorCode(StrEnum):
+    INVALID_REQUEST = "invalid_model_request"
     UNAVAILABLE = "provider_unavailable"
 
 
 class ProviderUnavailableError(RuntimeError):
     def __init__(self) -> None:
         self.code = ProviderErrorCode.UNAVAILABLE
+        super().__init__(self.code.value)
+
+
+class InvalidModelRequestError(RuntimeError):
+    def __init__(self) -> None:
+        self.code = ProviderErrorCode.INVALID_REQUEST
         super().__init__(self.code.value)
 
 
@@ -31,7 +38,7 @@ class ModelRequest:
     task_id: str
 
     def __post_init__(self) -> None:
-        if type(self.request_id) is not UUID:
+        if type(self.request_id) is not UUID or self.request_id.int == 0:
             raise ValueError("model request identifier must be a UUID")
         if type(self.task_id) is not str or _TASK_ID.fullmatch(self.task_id) is None:
             raise ValueError("model task identifier is invalid")
@@ -41,6 +48,12 @@ class ModelRequest:
 class ModelResponse:
     request_id: UUID
     provider_state: ProviderHealthState
+
+    def __post_init__(self) -> None:
+        if type(self.request_id) is not UUID or self.request_id.int == 0:
+            raise ValueError("model response identifier must be a UUID")
+        if type(self.provider_state) is not ProviderHealthState:
+            raise ValueError("model response provider state is invalid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,11 +92,13 @@ class UnavailableModelProvider:
         return ProviderHealth(ProviderHealthState.UNAVAILABLE)
 
     def generate(self, request: ModelRequest) -> ModelResponse:
-        del request
+        if type(request) is not ModelRequest:
+            raise InvalidModelRequestError
         raise ProviderUnavailableError
 
     def stream(self, request: ModelRequest) -> Iterator[ModelResponse]:
-        del request
+        if type(request) is not ModelRequest:
+            raise InvalidModelRequestError
         raise ProviderUnavailableError
 
     def unload(self) -> None:
@@ -91,6 +106,7 @@ class UnavailableModelProvider:
 
 
 __all__ = [
+    "InvalidModelRequestError",
     "ModelProvider",
     "ModelRequest",
     "ModelResponse",
