@@ -8,6 +8,7 @@ from enum import StrEnum
 from pathlib import Path
 from uuid import UUID
 
+from pydantic import ValidationError
 from rsi_atlas_contracts.models import ModelArtifact, ModelLifecycle
 
 _HASH_CHUNK_BYTES = 1024 * 1024
@@ -24,7 +25,7 @@ class ModelRegistryErrorCode(StrEnum):
     INVALID_INITIAL_LIFECYCLE = "invalid_initial_lifecycle"
     INVALID_LIFECYCLE = "invalid_lifecycle"
     INVALID_LIFECYCLE_TRANSITION = "invalid_lifecycle_transition"
-    PROMOTION_EVIDENCE_MISSING = "promotion_evidence_missing"
+    PRODUCTION_PROMOTION_UNAVAILABLE = "production_promotion_unavailable"
     DUPLICATE_ARTIFACT_ID = "duplicate_artifact_id"
     DUPLICATE_ARTIFACT_HASH = "duplicate_artifact_hash"
     ARTIFACT_NOT_FOUND = "artifact_not_found"
@@ -84,18 +85,24 @@ class ModelRegistry:
     def register(self, artifact: ModelArtifact) -> ModelArtifact:
         if type(artifact) is not ModelArtifact:
             raise ModelRegistryError(ModelRegistryErrorCode.INVALID_ARTIFACT)
+        try:
+            snapshot = ModelArtifact.model_validate(
+                artifact.model_dump(mode="python", warnings=False)
+            )
+        except (TypeError, ValueError, ValidationError) as error:
+            raise ModelRegistryError(ModelRegistryErrorCode.INVALID_ARTIFACT) from error
         with self._lock:
-            if artifact.artifact_id in self._by_id:
+            if snapshot.artifact_id in self._by_id:
                 raise ModelRegistryError(ModelRegistryErrorCode.DUPLICATE_ARTIFACT_ID)
-            if artifact.sha256 in self._by_hash:
+            if snapshot.sha256 in self._by_hash:
                 raise ModelRegistryError(ModelRegistryErrorCode.DUPLICATE_ARTIFACT_HASH)
-            if artifact.lifecycle is not ModelLifecycle.IMPORTED:
+            if snapshot.lifecycle is not ModelLifecycle.IMPORTED:
                 raise ModelRegistryError(ModelRegistryErrorCode.INVALID_INITIAL_LIFECYCLE)
-            self._validate_file(artifact)
-            self._by_id[artifact.artifact_id] = artifact
-            self._by_hash[artifact.sha256] = artifact.artifact_id
-            self._history[artifact.artifact_id] = (artifact,)
-            return artifact
+            self._validate_file(snapshot)
+            self._by_id[snapshot.artifact_id] = snapshot
+            self._by_hash[snapshot.sha256] = snapshot.artifact_id
+            self._history[snapshot.artifact_id] = (snapshot,)
+            return snapshot
 
     def get(self, artifact_id: UUID) -> ModelArtifact:
         identifier = self._require_artifact_id(artifact_id)
@@ -117,14 +124,10 @@ class ModelRegistry:
             if lifecycle not in _TRANSITIONS[prior.lifecycle]:
                 raise ModelRegistryError(ModelRegistryErrorCode.INVALID_LIFECYCLE_TRANSITION)
             if lifecycle is ModelLifecycle.PRODUCTION:
-                if (
-                    not prior.capabilities
-                    or not prior.capability_results
-                    or not prior.approved_tasks
-                ):
-                    raise ModelRegistryError(ModelRegistryErrorCode.PROMOTION_EVIDENCE_MISSING)
-                self._validate_file(prior)
-            current = prior.model_copy(update={"lifecycle": lifecycle})
+                raise ModelRegistryError(ModelRegistryErrorCode.PRODUCTION_PROMOTION_UNAVAILABLE)
+            current = ModelArtifact.model_validate(
+                {**prior.model_dump(mode="python"), "lifecycle": lifecycle}
+            )
             self._by_id[identifier] = current
             self._history[identifier] = (*self._history[identifier], current)
             return current
@@ -155,6 +158,8 @@ class ModelRegistry:
     def _validate_file(self, artifact: ModelArtifact) -> None:
         parent_fd = -1
         file_fd = -1
+        fresh_parent_fd = -1
+        fresh_file_fd = -1
         try:
             parent_fd, parent_identity = self._open_parent(artifact.local_path.parent)
             try:
@@ -189,8 +194,30 @@ class ModelRegistry:
             if _identity(path_metadata) != _identity(after):
                 raise ModelRegistryError(ModelRegistryErrorCode.ARTIFACT_IDENTITY_CHANGED)
             fresh_parent_fd, fresh_parent_identity = self._open_parent(artifact.local_path.parent)
-            os.close(fresh_parent_fd)
             if fresh_parent_identity != parent_identity:
+                raise ModelRegistryError(ModelRegistryErrorCode.ARTIFACT_IDENTITY_CHANGED)
+            try:
+                fresh_file_fd = os.open(
+                    artifact.local_path.name,
+                    _FILE_FLAGS,
+                    dir_fd=fresh_parent_fd,
+                )
+                fresh_file_metadata = os.fstat(fresh_file_fd)
+                self._require_safe_file(fresh_file_metadata)
+                fresh_path_metadata = os.stat(
+                    artifact.local_path.name,
+                    dir_fd=fresh_parent_fd,
+                    follow_symlinks=False,
+                )
+                self._require_safe_file(fresh_path_metadata)
+            except (FileNotFoundError, OSError) as error:
+                raise ModelRegistryError(
+                    ModelRegistryErrorCode.ARTIFACT_IDENTITY_CHANGED
+                ) from error
+            if (
+                _file_snapshot(fresh_file_metadata) != before_snapshot
+                or _file_snapshot(fresh_path_metadata) != before_snapshot
+            ):
                 raise ModelRegistryError(ModelRegistryErrorCode.ARTIFACT_IDENTITY_CHANGED)
             if digest != artifact.sha256:
                 raise ModelRegistryError(ModelRegistryErrorCode.ARTIFACT_HASH_MISMATCH)
@@ -201,6 +228,10 @@ class ModelRegistry:
         except OSError as error:
             raise ModelRegistryError(ModelRegistryErrorCode.UNSAFE_ARTIFACT_PATH) from error
         finally:
+            if fresh_file_fd >= 0:
+                os.close(fresh_file_fd)
+            if fresh_parent_fd >= 0:
+                os.close(fresh_parent_fd)
             if file_fd >= 0:
                 os.close(file_fd)
             if parent_fd >= 0:

@@ -19,14 +19,11 @@ from rsi_atlas_models.registry import (
 
 MODEL_BYTES = b"atlas-local-model-fixture\n"
 
-ALLOWED_TRANSITIONS = {
+PHASE_ONE_TRANSITIONS = {
     ModelLifecycle.IMPORTED: {ModelLifecycle.QUARANTINED, ModelLifecycle.RETIRED},
     ModelLifecycle.QUARANTINED: {ModelLifecycle.BENCHMARKING, ModelLifecycle.REJECTED},
     ModelLifecycle.BENCHMARKING: {ModelLifecycle.CANDIDATE, ModelLifecycle.REJECTED},
-    ModelLifecycle.CANDIDATE: {ModelLifecycle.PRODUCTION, ModelLifecycle.REJECTED},
-    ModelLifecycle.PRODUCTION: {ModelLifecycle.DEGRADED, ModelLifecycle.DEPRECATED},
-    ModelLifecycle.DEGRADED: {ModelLifecycle.PRODUCTION, ModelLifecycle.DEPRECATED},
-    ModelLifecycle.DEPRECATED: {ModelLifecycle.RETIRED},
+    ModelLifecycle.CANDIDATE: {ModelLifecycle.REJECTED},
     ModelLifecycle.RETIRED: set(),
     ModelLifecycle.REJECTED: set(),
 }
@@ -42,26 +39,6 @@ PATH_TO_STATE = {
         ModelLifecycle.QUARANTINED,
         ModelLifecycle.BENCHMARKING,
         ModelLifecycle.CANDIDATE,
-    ),
-    ModelLifecycle.PRODUCTION: (
-        ModelLifecycle.QUARANTINED,
-        ModelLifecycle.BENCHMARKING,
-        ModelLifecycle.CANDIDATE,
-        ModelLifecycle.PRODUCTION,
-    ),
-    ModelLifecycle.DEGRADED: (
-        ModelLifecycle.QUARANTINED,
-        ModelLifecycle.BENCHMARKING,
-        ModelLifecycle.CANDIDATE,
-        ModelLifecycle.PRODUCTION,
-        ModelLifecycle.DEGRADED,
-    ),
-    ModelLifecycle.DEPRECATED: (
-        ModelLifecycle.QUARANTINED,
-        ModelLifecycle.BENCHMARKING,
-        ModelLifecycle.CANDIDATE,
-        ModelLifecycle.PRODUCTION,
-        ModelLifecycle.DEPRECATED,
     ),
     ModelLifecycle.RETIRED: (ModelLifecycle.RETIRED,),
     ModelLifecycle.REJECTED: (ModelLifecycle.QUARANTINED, ModelLifecycle.REJECTED),
@@ -130,6 +107,7 @@ def test_registers_descriptor_bound_artifact_without_mutating_file(tmp_path: Pat
 
     after = path.stat()
     assert registered == artifact
+    assert registered is not artifact
     assert registry.get(artifact.artifact_id) == artifact
     assert (after.st_dev, after.st_ino, after.st_mode, after.st_size) == (
         before.st_dev,
@@ -159,6 +137,28 @@ def test_registration_rejects_missing_or_hash_mismatched_file(
     registry = ModelRegistry()
 
     _assert_error(code, lambda: registry.register(artifact))
+    assert registry.snapshot() == ()
+
+
+def test_registration_revalidates_copied_contract_and_isolates_collections(
+    tmp_path: Path,
+) -> None:
+    path = _write_model(tmp_path / "model.gguf")
+    artifact = _artifact(path)
+    invalid_slug = artifact.model_copy(update={"provider_family": "bad provider\nprivate"})
+    mutable_results = ["schema_valid_v1"]
+    mutable_collection = artifact.model_copy(update={"capability_results": mutable_results})
+    registry = ModelRegistry()
+
+    _assert_error(
+        ModelRegistryErrorCode.INVALID_ARTIFACT,
+        lambda: registry.register(invalid_slug),
+    )
+    _assert_error(
+        ModelRegistryErrorCode.INVALID_ARTIFACT,
+        lambda: registry.register(mutable_collection),
+    )
+    mutable_results.append("changed_after_rejection")
     assert registry.snapshot() == ()
 
 
@@ -301,6 +301,43 @@ def test_registration_rejects_ancestor_replacement_after_hash(
     )
 
 
+def test_registration_rejects_filename_replacement_after_path_stat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = MODEL_BYTES
+    replacement = b"replacement-model-bytes\n"
+    path = _write_model(tmp_path / "model.gguf", original)
+    moved = tmp_path / "moved.gguf"
+    artifact = _artifact(path, content=original)
+    registry = ModelRegistry()
+    original_stat = registry_module.os.stat
+    replaced = False
+
+    def replace_after_path_stat(
+        target: str | bytes | int | os.PathLike[str] | os.PathLike[bytes],
+        *args: object,
+        **kwargs: object,
+    ) -> os.stat_result:
+        nonlocal replaced
+        metadata = original_stat(target, *args, **kwargs)
+        if target == path.name and kwargs.get("dir_fd") is not None and not replaced:
+            replaced = True
+            path.rename(moved)
+            _write_model(path, replacement)
+        return metadata
+
+    monkeypatch.setattr(registry_module.os, "stat", replace_after_path_stat)
+
+    _assert_error(
+        ModelRegistryErrorCode.ARTIFACT_IDENTITY_CHANGED,
+        lambda: registry.register(artifact),
+    )
+    assert replaced
+    assert hashlib.sha256(path.read_bytes()).hexdigest() != artifact.sha256
+    assert registry.snapshot() == ()
+
+
 def test_duplicate_uuid_and_hash_have_exact_distinct_semantics(tmp_path: Path) -> None:
     first_path = _write_model(tmp_path / "first.gguf", b"first")
     second_path = _write_model(tmp_path / "second.gguf", b"second")
@@ -341,7 +378,7 @@ def test_registry_snapshots_and_history_are_immutable_and_deterministic(tmp_path
 
 @pytest.mark.parametrize(
     ("source", "target"),
-    [(source, target) for source, targets in ALLOWED_TRANSITIONS.items() for target in targets],
+    [(source, target) for source, targets in PHASE_ONE_TRANSITIONS.items() for target in targets],
 )
 def test_every_allowed_lifecycle_edge(
     tmp_path: Path,
@@ -357,9 +394,10 @@ def test_every_allowed_lifecycle_edge(
     ("source", "target"),
     [
         (source, target)
-        for source, targets in ALLOWED_TRANSITIONS.items()
+        for source, targets in PHASE_ONE_TRANSITIONS.items()
         for target in ModelLifecycle
         if target not in targets
+        and not (source is ModelLifecycle.CANDIDATE and target is ModelLifecycle.PRODUCTION)
     ],
 )
 def test_every_forbidden_lifecycle_edge(
@@ -386,32 +424,13 @@ def test_registration_requires_imported_lifecycle(tmp_path: Path) -> None:
     )
 
 
-def test_production_transition_requires_qualification_identifiers(tmp_path: Path) -> None:
-    path = _write_model(tmp_path / "unqualified.gguf")
-    artifact = _artifact(path).model_copy(
-        update={"capability_results": frozenset(), "approved_tasks": frozenset()}
-    )
-    registry = ModelRegistry()
-    registry.register(artifact)
-    registry.transition(artifact.artifact_id, ModelLifecycle.QUARANTINED)
-    registry.transition(artifact.artifact_id, ModelLifecycle.BENCHMARKING)
-    registry.transition(artifact.artifact_id, ModelLifecycle.CANDIDATE)
-
-    _assert_error(
-        ModelRegistryErrorCode.PROMOTION_EVIDENCE_MISSING,
-        lambda: registry.transition(artifact.artifact_id, ModelLifecycle.PRODUCTION),
-    )
-    assert registry.get(artifact.artifact_id).lifecycle is ModelLifecycle.CANDIDATE
-
-
-def test_production_transition_revalidates_model_artifact(tmp_path: Path) -> None:
+def test_phase_one_blocks_production_promotion_even_with_self_asserted_identifiers(
+    tmp_path: Path,
+) -> None:
     registry, artifact_id = _registry_at_state(tmp_path, ModelLifecycle.CANDIDATE)
-    registered_path = registry.get(artifact_id).local_path
-    registered_path.write_bytes(b"changed after candidate qualification")
-    registered_path.chmod(0o600)
 
     _assert_error(
-        ModelRegistryErrorCode.ARTIFACT_HASH_MISMATCH,
+        ModelRegistryErrorCode.PRODUCTION_PROMOTION_UNAVAILABLE,
         lambda: registry.transition(artifact_id, ModelLifecycle.PRODUCTION),
     )
     assert registry.get(artifact_id).lifecycle is ModelLifecycle.CANDIDATE

@@ -39,8 +39,8 @@ members = [
 
 [tool.pytest.ini_options]
 testpaths = [
-    "packages/contracts/tests",
-    "packages/models/tests",
+  "packages/contracts/tests",
+  "packages/models/tests",
   "packages/observability/tests",
   "packages/security/tests",
   "packages/storage/tests",
