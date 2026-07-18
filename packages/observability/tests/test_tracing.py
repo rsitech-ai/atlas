@@ -134,6 +134,7 @@ def test_safe_span_never_records_exception_message_or_stack(tmp_path: Path) -> N
 
     record = json.loads(destination.read_text(encoding="utf-8"))
     assert record["status_code"] == "ERROR"
+    assert record["attributes"]["atlas.error.code"] == "unhandled"
     assert "private exception payload" not in destination.read_text(encoding="utf-8")
     assert "exception" not in record
 

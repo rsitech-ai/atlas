@@ -56,6 +56,7 @@ _COMMAND_NAMES: Final[frozenset[str]] = frozenset(
 )
 _ENUM_VALUES: Final[dict[str, frozenset[str]]] = {
     "atlas.command.name": _COMMAND_NAMES,
+    "atlas.error.code": frozenset({"internal", "invalid_input", "unavailable", "unhandled"}),
     "atlas.outcome": frozenset({"failure", "skipped", "success"}),
     "atlas.phase": frozenset({"prepare", "run", "verify"}),
 }

@@ -126,6 +126,7 @@ class SafeSpan(AbstractContextManager["SafeSpan"]):
         traceback: TracebackType | None,
     ) -> bool | None:
         if self._span is not None and exc_type is not None:
+            self._require_span().set_attribute("atlas.error.code", "unhandled")
             self.set_status_error()
         return self._context_manager.__exit__(exc_type, exc_value, traceback)
 
@@ -135,6 +136,12 @@ class SafeSpan(AbstractContextManager["SafeSpan"]):
 
     def set_status_error(self) -> None:
         self._require_span().set_status(Status(StatusCode.ERROR))
+
+    def set_error_code(self, code: str) -> None:
+        self._require_span().set_attribute(
+            "atlas.error.code", validate_attribute("atlas.error.code", code)
+        )
+        self.set_status_error()
 
     def add_event(self, *args: object, **kwargs: object) -> None:
         del args, kwargs
