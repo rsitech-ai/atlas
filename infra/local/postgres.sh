@@ -29,9 +29,22 @@ if [[ "${1:-}" == "--bound" ]]; then
     echo "Bound PostgreSQL directory identity changed." >&2
     exit 1
   }
+  BOUND_FD="${RSI_ATLAS_BOUND_FD:-}"
+  [[ "$BOUND_FD" =~ ^[0-9]+$ && -d "/dev/fd/$BOUND_FD" ]] || {
+    echo "Bound PostgreSQL directory descriptor is unavailable." >&2
+    exit 1
+  }
+  fd_identity="$(/usr/bin/python3 -c \
+    'import os, sys; value = os.fstat(int(sys.argv[1])); print(f"{value.st_dev}:{value.st_ino}")' \
+    "$BOUND_FD")"
+  [[ "$fd_identity" == "$expected_identity" ]] || {
+    echo "Bound PostgreSQL directory descriptor identity changed." >&2
+    exit 1
+  }
   POSTGRES_ROOT="$(pwd -P)"
   DATA_DIRECTORY="data"
-  SOCKET_DIRECTORY="$POSTGRES_ROOT/socket"
+  EXTERNAL_SOCKET_DIRECTORY="$POSTGRES_ROOT/socket"
+  SERVER_SOCKET_DIRECTORY="../socket"
   LOG_FILE="postgres.log"
 else
   COMMAND="${1:-}"
@@ -79,36 +92,35 @@ validate_cluster() {
 
 server_options() {
   printf -- "-c listen_addresses='' -c unix_socket_directories='%s' -c unix_socket_permissions=0700" \
-    "$SOCKET_DIRECTORY"
+    "$SERVER_SOCKET_DIRECTORY"
 }
 
 is_running() {
   "$PG_CTL" --pgdata="$DATA_DIRECTORY" status >/dev/null 2>&1
 }
 
-run_psql() (
-  unset PGSERVICE PGSERVICEFILE PGHOSTADDR PGHOST PGPORT
-  PGPORT=5432 "$PSQL" "$@"
-)
-
-run_createdb() (
-  unset PGSERVICE PGSERVICEFILE PGHOSTADDR PGHOST PGPORT
-  PGPORT=5432 "$CREATEDB" "$@"
-)
+lifecycle_test_barrier() {
+  if [[ -z "${RSI_ATLAS_TEST_READY_FD:-}" && -z "${RSI_ATLAS_TEST_CONTINUE_FD:-}" ]]; then
+    return
+  fi
+  [[ -n "${RSI_ATLAS_TEST_READY_FD:-}" && -n "${RSI_ATLAS_TEST_CONTINUE_FD:-}" ]] || {
+    echo "Incomplete lifecycle test barrier configuration." >&2
+    exit 1
+  }
+  printf '1' >&"$RSI_ATLAS_TEST_READY_FD"
+  IFS= read -r -n 1 <&"$RSI_ATLAS_TEST_CONTINUE_FD"
+}
 
 start_server() {
   require_toolchain
   initialize_cluster
   validate_cluster
+  lifecycle_test_barrier
   if ! is_running; then
     "$PG_CTL" --pgdata="$DATA_DIRECTORY" --log="$LOG_FILE" \
       --options="$(server_options)" --wait start >/dev/null
   fi
-  if ! run_psql --host="$SOCKET_DIRECTORY" --username="$DATABASE_USER" --dbname=postgres \
-    --tuples-only --no-align --command="SELECT 1 FROM pg_database WHERE datname = '$DATABASE_NAME'" \
-    | grep -qx 1; then
-    run_createdb --host="$SOCKET_DIRECTORY" --username="$DATABASE_USER" "$DATABASE_NAME"
-  fi
+  /usr/bin/python3 "$SECURE_PATH_HELPER" bootstrap "$DATABASE_USER" "$DATABASE_NAME"
 }
 
 stop_server() {
@@ -170,6 +182,6 @@ case "$COMMAND" in
     ;;
   test-url)
     printf "host='%s' user='%s' dbname='%s'\n" \
-      "$SOCKET_DIRECTORY" "$DATABASE_USER" "$DATABASE_NAME"
+      "$EXTERNAL_SOCKET_DIRECTORY" "$DATABASE_USER" "$DATABASE_NAME"
     ;;
 esac

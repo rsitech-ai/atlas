@@ -3,12 +3,17 @@
 
 import errno
 import os
+import re
+import socket
 import stat
+import struct
 import sys
 from pathlib import Path
+from typing import Optional
 
 PRIVATE_MODE = 0o700
 DIRECTORY_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+DATABASE_IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
 class SecurePathError(RuntimeError):
@@ -104,13 +109,112 @@ def execute_bound(data_root: Path, *, create: bool, command: list[str]) -> None:
             "RSI_ATLAS_BOUND_POSTGRES": "1",
             "RSI_ATLAS_BOUND_DEVICE": str(postgres_stat.st_dev),
             "RSI_ATLAS_BOUND_INODE": str(postgres_stat.st_ino),
+            "RSI_ATLAS_BOUND_FD": str(postgres_fd),
         }
+        os.set_inheritable(postgres_fd, True)
         os.execvpe(command[0], command, environment)
     finally:
         os.close(postgres_fd)
 
 
+def _read_exact(connection: socket.socket, size: int) -> bytes:
+    chunks: list[bytes] = []
+    remaining = size
+    while remaining:
+        chunk = connection.recv(remaining)
+        if not chunk:
+            raise SecurePathError("PostgreSQL bootstrap connection closed unexpectedly")
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
+def _read_message(connection: socket.socket) -> tuple[bytes, bytes]:
+    message_type = _read_exact(connection, 1)
+    message_length = struct.unpack("!I", _read_exact(connection, 4))[0]
+    if message_length < 4:
+        raise SecurePathError("PostgreSQL bootstrap returned an invalid message")
+    return message_type, _read_exact(connection, message_length - 4)
+
+
+def _database_error(payload: bytes) -> SecurePathError:
+    fields = payload.rstrip(b"\0").split(b"\0")
+    messages = [field[1:].decode("utf-8", "replace") for field in fields if field[:1] == b"M"]
+    detail = messages[0] if messages else "unknown PostgreSQL error"
+    return SecurePathError(f"PostgreSQL bootstrap failed: {detail}")
+
+
+def _query(
+    connection: socket.socket, query: str
+) -> list[tuple[Optional[str], ...]]:  # noqa: UP045 - macOS system Python 3.9
+    query_payload = query.encode("utf-8") + b"\0"
+    connection.sendall(b"Q" + struct.pack("!I", len(query_payload) + 4) + query_payload)
+    rows: list[tuple[Optional[str], ...]] = []  # noqa: UP045
+    while True:
+        message_type, payload = _read_message(connection)
+        if message_type == b"D":
+            column_count = struct.unpack("!H", payload[:2])[0]
+            offset = 2
+            columns: list[Optional[str]] = []  # noqa: UP045
+            for _ in range(column_count):
+                value_length = struct.unpack("!i", payload[offset : offset + 4])[0]
+                offset += 4
+                if value_length == -1:
+                    columns.append(None)
+                    continue
+                value = payload[offset : offset + value_length]
+                offset += value_length
+                columns.append(value.decode("utf-8"))
+            rows.append(tuple(columns))
+        elif message_type == b"E":
+            raise _database_error(payload)
+        elif message_type == b"Z":
+            return rows
+
+
+def bootstrap_database(user: str, database: str) -> None:
+    if not DATABASE_IDENTIFIER.fullmatch(user) or not DATABASE_IDENTIFIER.fullmatch(database):
+        raise SecurePathError("PostgreSQL bootstrap identifiers are invalid")
+    bound_fd_text = os.environ.get("RSI_ATLAS_BOUND_FD", "")
+    if not bound_fd_text.isdigit():
+        raise SecurePathError("PostgreSQL bootstrap requires a bound directory descriptor")
+    bound_stat = os.fstat(int(bound_fd_text))
+    cwd_stat = os.stat(".", follow_symlinks=False)
+    if (bound_stat.st_dev, bound_stat.st_ino) != (cwd_stat.st_dev, cwd_stat.st_ino):
+        raise SecurePathError("PostgreSQL bootstrap directory identity changed")
+
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+        connection.connect("socket/.s.PGSQL.5432")
+        parameters = (
+            b"user\0" + user.encode("ascii") + b"\0database\0postgres\0client_encoding\0UTF8\0\0"
+        )
+        startup = struct.pack("!I", 196608) + parameters
+        connection.sendall(struct.pack("!I", len(startup) + 4) + startup)
+        while True:
+            message_type, payload = _read_message(connection)
+            if message_type == b"R" and struct.unpack("!I", payload[:4])[0] != 0:
+                raise SecurePathError("PostgreSQL bootstrap requires local trust authentication")
+            if message_type == b"E":
+                raise _database_error(payload)
+            if message_type == b"Z":
+                break
+        rows = _query(
+            connection,
+            f"SELECT 1 FROM pg_database WHERE datname = '{database}'",
+        )
+        if not rows:
+            _query(connection, f'CREATE DATABASE "{database}"')
+        connection.sendall(b"X" + struct.pack("!I", 4))
+
+
 def main() -> int:
+    if len(sys.argv) == 4 and sys.argv[1] == "bootstrap":
+        try:
+            bootstrap_database(sys.argv[2], sys.argv[3])
+        except (OSError, SecurePathError) as error:
+            print(f"Secure PostgreSQL bootstrap failed: {error}", file=sys.stderr)
+            return 1
+        return 0
     if (
         len(sys.argv) < 6
         or sys.argv[1] != "exec"

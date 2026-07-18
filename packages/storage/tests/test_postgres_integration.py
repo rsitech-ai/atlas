@@ -1,4 +1,5 @@
 import os
+import select
 import shutil
 import stat
 import subprocess
@@ -256,10 +257,11 @@ def test_database_is_socket_only_and_owner_private(
 
     assert postgres_database.fetch_value("SHOW listen_addresses") == ""
     assert postgres_database.fetch_value("SHOW data_checksums") == "on"
-    assert postgres_database.fetch_value("SHOW unix_socket_directories") == str(socket_directory)
+    server_socket_setting = Path(postgres_database.fetch_value("SHOW unix_socket_directories"))
     assert stat.S_IMODE(socket_directory.stat().st_mode) == 0o700
     data_directory = socket_directory.parent / "data"
     assert data_directory.is_absolute()
+    assert (data_directory / server_socket_setting).resolve() == socket_directory.resolve()
     assert stat.S_IMODE(data_directory.stat().st_mode) == 0o700
 
 
@@ -563,6 +565,84 @@ os.execve(script, [script, "--bound", command], os.environ)
             )
             assert (status.returncode == 0) is expected_running
         finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait()
+            subprocess.run(
+                [
+                    "/opt/homebrew/opt/postgresql@17/bin/pg_ctl",
+                    f"--pgdata={bound_root / 'data'}",
+                    "--mode=fast",
+                    "--wait",
+                    "stop",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+
+def test_postgres_socket_stays_bound_after_second_ancestor_swap() -> None:
+    with tempfile.TemporaryDirectory(prefix="atlas-socket-bind-", dir="/private/tmp") as root:
+        data_root = Path(root) / "root"
+        postgres_root = data_root / "postgres"
+        bound_root = data_root / "postgres-bound-second"
+        outside = Path(root) / "outside"
+        outside.mkdir(mode=0o700)
+        outside_socket = outside / "socket"
+        outside_socket.mkdir(mode=0o700)
+        ready_read, ready_write = os.pipe()
+        continue_read, continue_write = os.pipe()
+        environment = {
+            **os.environ,
+            "RSI_ATLAS_DATA_ROOT": str(data_root),
+            "RSI_ATLAS_TEST_READY_FD": str(ready_write),
+            "RSI_ATLAS_TEST_CONTINUE_FD": str(continue_read),
+        }
+        process = subprocess.Popen(
+            ["./infra/local/postgres.sh", "start"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=environment,
+            pass_fds=(ready_write, continue_read),
+        )
+        os.close(ready_write)
+        os.close(continue_read)
+        try:
+            readable, _, _ = select.select([ready_read], [], [], 15)
+            assert readable, process.communicate(timeout=1)
+            assert os.read(ready_read, 1) == b"1"
+            assert (postgres_root / "data" / "PG_VERSION").is_file()
+
+            postgres_root.rename(bound_root)
+            postgres_root.symlink_to(outside, target_is_directory=True)
+            os.write(continue_write, b"1")
+            stdout, stderr = process.communicate(timeout=20)
+
+            assert process.returncode == 0, (stdout, stderr)
+            assert tuple(outside_socket.iterdir()) == ()
+            socket_entries = {path.name for path in (bound_root / "socket").iterdir()}
+            assert ".s.PGSQL.5432" in socket_entries
+            assert ".s.PGSQL.5432.lock" in socket_entries
+            assert (
+                subprocess.run(
+                    [
+                        "/opt/homebrew/opt/postgresql@17/bin/psql",
+                        f"host={bound_root / 'socket'} user=atlas dbname=atlas",
+                        "--tuples-only",
+                        "--no-align",
+                        "--command=SELECT 1",
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip()
+                == "1"
+            )
+        finally:
+            os.close(ready_read)
+            os.close(continue_write)
             if process.poll() is None:
                 process.kill()
                 process.wait()
