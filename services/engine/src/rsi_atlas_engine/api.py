@@ -3,12 +3,13 @@ from collections.abc import Callable
 from fastapi import FastAPI
 from rsi_atlas_contracts import SystemStatus
 
-from rsi_atlas_engine.diagnostics import build_system_status
+from rsi_atlas_engine.runtime import RuntimeServices
 
 
 def create_app(
-    status_factory: Callable[[], SystemStatus] = build_system_status,
+    status_factory: Callable[[], SystemStatus] | None = None,
 ) -> FastAPI:
+    factory = status_factory or RuntimeServices.from_environment().status
     application = FastAPI(
         title="RSI Atlas Engine",
         version="0.1.0",
@@ -19,7 +20,7 @@ def create_app(
 
     @application.get("/v1/system/status", response_model=SystemStatus)
     def system_status() -> SystemStatus:
-        return status_factory()
+        return factory()
 
     return application
 

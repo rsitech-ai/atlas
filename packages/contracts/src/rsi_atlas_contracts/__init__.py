@@ -13,6 +13,7 @@ from rsi_atlas_contracts.models import (
     ThermalState,
 )
 from rsi_atlas_contracts.system_status import (
+    ComponentGroup,
     ComponentStatus,
     HealthState,
     RuntimeProfile,
@@ -24,6 +25,7 @@ __all__ = [
     "ArtifactDescriptor",
     "ArtifactID",
     "ArtifactIntegrityError",
+    "ComponentGroup",
     "ComponentStatus",
     "HealthState",
     "ModelArtifact",

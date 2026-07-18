@@ -21,6 +21,8 @@ case "$MODE" in
 esac
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RSI_ATLAS_DATA_ROOT="${RSI_ATLAS_DATA_ROOT:-$ROOT_DIR/.local}"
+export RSI_ATLAS_DATA_ROOT
 DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DIST_DIR/$APP_PROCESS.app"
 APP_CONTENTS="$APP_BUNDLE/Contents"
@@ -90,6 +92,36 @@ wait_for_engine() {
   echo "RSI Atlas Engine did not become ready at $ENGINE_STATUS_URL." >&2
   tail -n 30 "$ENGINE_LOG" >&2 || true
   exit 1
+}
+
+verify_engine_contract() {
+  curl --fail --silent --show-error "$ENGINE_STATUS_URL" \
+    | "$ROOT_DIR/.venv/bin/python" -c '
+import json
+import sys
+
+expected = (
+    ("engine_runtime", "engine", "healthy"),
+    ("database", "storage", "healthy"),
+    ("artifact_store", "storage", "healthy"),
+    ("offline_policy", "privacy", "healthy"),
+    ("trace_store", "observability", "healthy"),
+    ("resource_policy", "resources", "healthy"),
+    ("model_registry", "resources", "degraded"),
+    ("contract_api", "engine", "healthy"),
+)
+payload = json.load(sys.stdin)
+actual = tuple(
+    (item.get("component_id"), item.get("group"), item.get("state"))
+    for item in payload.get("components", ())
+)
+if payload.get("schema_version") != "1.1.0":
+    raise SystemExit("unexpected runtime schema")
+if payload.get("profile") != "offline" or payload.get("state") != "degraded":
+    raise SystemExit("runtime baseline is not degraded-only-model")
+if actual != expected or len({item[0] for item in actual}) != len(expected):
+    raise SystemExit("runtime components do not match the Phase 1 contract")
+'
 }
 
 wait_for_app() {
@@ -185,9 +217,9 @@ case "$MODE" in
   --verify|verify)
     open_app
     wait_for_app
-    curl --fail --silent --show-error "$ENGINE_STATUS_URL" >/dev/null
+    verify_engine_contract
     launchctl print "$ENGINE_SERVICE_DOMAIN/$ENGINE_SERVICE_LABEL" >/dev/null
-    echo "Verified $APP_DISPLAY_NAME and RSI Atlas Engine."
+    echo "Verified $APP_DISPLAY_NAME and the degraded-only-model RSI Atlas Engine contract."
     ;;
   *)
     echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2

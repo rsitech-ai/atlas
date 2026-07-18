@@ -242,7 +242,7 @@ def _parse_data_row(payload: bytes) -> tuple[Optional[str], ...]:  # noqa: UP045
 def _validate_row_description(payload: bytes) -> int:
     if len(payload) < 2:
         raise SecurePathError("PostgreSQL bootstrap RowDescription is truncated")
-    field_count = struct.unpack("!H", payload[:2])[0]
+    field_count = int(struct.unpack("!H", payload[:2])[0])
     if field_count > MAX_COLUMNS:
         raise SecurePathError("PostgreSQL bootstrap RowDescription has too many fields")
     offset = 2

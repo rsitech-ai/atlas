@@ -5,7 +5,7 @@ from typing import NoReturn, TextIO
 
 from rsi_atlas_contracts import HealthState, SystemStatus
 
-from rsi_atlas_engine.diagnostics import build_system_status
+from rsi_atlas_engine.runtime import RuntimeServices
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -20,10 +20,10 @@ def main(
     argv: Sequence[str] | None = None,
     *,
     stdout: TextIO = sys.stdout,
-    status_factory: Callable[[], SystemStatus] = build_system_status,
+    status_factory: Callable[[], SystemStatus] | None = None,
 ) -> int:
     args = build_parser().parse_args(argv)
-    status = status_factory()
+    status = (status_factory or RuntimeServices.from_environment().status)()
 
     if args.json:
         print(status.model_dump_json(indent=2), file=stdout)
@@ -34,8 +34,10 @@ def main(
                 f"- {component.title}: {component.state.value} — {component.summary}",
                 file=stdout,
             )
+            if component.remediation is not None:
+                print(f"  Remediation: {component.remediation}", file=stdout)
 
-    return 0 if status.state is HealthState.HEALTHY else 1
+    return 0 if status.state in {HealthState.HEALTHY, HealthState.DEGRADED} else 1
 
 
 def entrypoint() -> NoReturn:

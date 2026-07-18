@@ -58,9 +58,11 @@ select = ["B", "E", "F", "I", "RUF", "SIM", "UP"]
 python_version = "3.11"
 strict = true
 warn_unreachable = true
+exclude = "(^|/)tests/"
 mypy_path = [
   "packages/contracts/src",
   "packages/models/src",
+  "packages/observability/src",
   "packages/security/src",
   "packages/storage/src",
   "services/engine/src",

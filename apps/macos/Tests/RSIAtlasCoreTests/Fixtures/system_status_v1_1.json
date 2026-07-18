@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.1.0",
+  "product": "RSI Atlas Engine",
+  "profile": "offline",
+  "state": "degraded",
+  "checked_at": "2026-07-18T12:00:00.123456Z",
+  "components": [
+    {
+      "component_id": "engine_runtime",
+      "title": "Engine Runtime",
+      "group": "engine",
+      "state": "healthy",
+      "summary": "The local engine can evaluate runtime diagnostics.",
+      "remediation": null
+    },
+    {
+      "component_id": "database",
+      "title": "Database",
+      "group": "storage",
+      "state": "healthy",
+      "summary": "PostgreSQL and pgvector are ready on the project-owned Unix socket.",
+      "remediation": null
+    },
+    {
+      "component_id": "artifact_store",
+      "title": "Artifact Store",
+      "group": "storage",
+      "state": "healthy",
+      "summary": "The immutable runtime integrity sentinel verifies successfully.",
+      "remediation": null
+    },
+    {
+      "component_id": "offline_policy",
+      "title": "Offline Policy",
+      "group": "privacy",
+      "state": "healthy",
+      "summary": "Remote network access is denied and local boundaries are exact.",
+      "remediation": null
+    },
+    {
+      "component_id": "trace_store",
+      "title": "Trace Store",
+      "group": "observability",
+      "state": "healthy",
+      "summary": "Metadata-only traces use owner-private local storage.",
+      "remediation": null
+    },
+    {
+      "component_id": "resource_policy",
+      "title": "Resource Policy",
+      "group": "resources",
+      "state": "healthy",
+      "summary": "Current memory, swap, and thermal state admit bounded local work.",
+      "remediation": null
+    },
+    {
+      "component_id": "model_registry",
+      "title": "Model Registry",
+      "group": "resources",
+      "state": "degraded",
+      "summary": "No qualified local model or provider is available in Phase 1.",
+      "remediation": "Model execution remains disabled until evaluation and approval are implemented."
+    },
+    {
+      "component_id": "contract_api",
+      "title": "Contract API",
+      "group": "engine",
+      "state": "healthy",
+      "summary": "The versioned local status contract is available.",
+      "remediation": null
+    }
+  ]
+}

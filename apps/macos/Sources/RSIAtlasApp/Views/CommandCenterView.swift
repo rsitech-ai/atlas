@@ -23,8 +23,9 @@ struct CommandCenterView: View {
                     Label("Refresh Runtime Status", systemImage: "arrow.clockwise")
                 }
                 .keyboardShortcut("r", modifiers: .command)
-                .disabled(store.state == .loading)
+                .disabled(isRefreshing)
                 .help("Refresh local runtime status (⌘R)")
+                .accessibilityIdentifier("runtime.refresh")
             }
         }
     }
@@ -35,13 +36,21 @@ struct CommandCenterView: View {
                 Text("Command Center")
                     .font(.largeTitle.weight(.semibold))
                 Spacer()
-                Label("Strict Offline", systemImage: "network.slash")
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(.secondary)
+                if let status = currentStatus {
+                    Label(status.profile.displayName, systemImage: status.profile.systemImage)
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("runtime.profile")
+                } else {
+                    Label("Local Runtime", systemImage: "desktopcomputer")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("runtime.profile")
+                }
             }
-            Text("Local runtime readiness and policy enforcement for the RSI Atlas foundation.")
+            Text("Live readiness, integrity, privacy, and resource evidence for the local runtime.")
                 .foregroundStyle(.secondary)
-            Text("Persistence, collectors, document intelligence, and model services are not enabled in this slice.")
+            Text("Model execution remains disabled until a provider is evaluated and approved.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
@@ -52,44 +61,97 @@ struct CommandCenterView: View {
     private var statusContent: some View {
         switch store.state {
         case .idle, .loading:
-            VStack(spacing: 12) {
-                ProgressView()
-                Text("Checking local runtime…")
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ProgressView("Checking local runtime…")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityIdentifier("runtime.loading")
 
-        case let .loaded(status):
+        case let .loaded(status, isRefreshing, refreshFailure):
             List {
-                Section {
-                    ForEach(status.components) { component in
-                        ComponentStatusRow(component: component)
+                if let refreshFailure {
+                    Section {
+                        Label {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Showing the last successful check")
+                                    .font(.body.weight(.medium))
+                                Text(refreshFailure.message)
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: "clock.badge.exclamationmark")
+                                .foregroundStyle(.orange)
+                        }
+                        .accessibilityIdentifier("runtime.stale_status")
+
+                        Button("Retry Status Check") {
+                            Task { await store.reload() }
+                        }
+                        .accessibilityIdentifier("runtime.retry")
                     }
-                } header: {
-                    HStack {
+                }
+
+                Section {
+                    HStack(alignment: .firstTextBaseline) {
                         Label(status.state.displayName, systemImage: status.state.systemImage)
                             .foregroundStyle(status.state.tint)
+                            .accessibilityIdentifier("runtime.overall_state")
                         Spacer()
-                        Text("Checked \(status.checkedAt.formatted(date: .abbreviated, time: .standard))")
-                            .foregroundStyle(.secondary)
+                        if isRefreshing {
+                            ProgressView()
+                                .controlSize(.small)
+                                .accessibilityLabel("Refreshing runtime status")
+                        }
+                        Text(
+                            "Checked \(status.checkedAt.formatted(date: .abbreviated, time: .standard))"
+                        )
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("runtime.checked_at")
                     }
-                    .textCase(nil)
+                }
+
+                ForEach(status.sections) { section in
+                    Section {
+                        ForEach(section.components) { component in
+                            ComponentStatusRow(component: component)
+                        }
+                    } header: {
+                        Text(section.title)
+                            .textCase(nil)
+                            .accessibilityIdentifier("runtime.group.\(section.group.rawValue)")
+                    }
                 }
             }
             .listStyle(.inset)
 
-        case let .failed(message):
+        case let .failed(failure):
             ContentUnavailableView {
-                Label("Engine unavailable", systemImage: "exclamationmark.triangle")
+                Label(failure.title, systemImage: "exclamationmark.triangle")
             } description: {
-                Text(message)
-                Text("Start the local engine, then retry. No remote fallback will be used.")
+                Text(failure.message)
+                Text("Retry after restoring the local engine. No remote fallback will be used.")
             } actions: {
                 Button("Retry") {
                     Task { await store.reload() }
                 }
                 .keyboardShortcut(.defaultAction)
+                .accessibilityIdentifier("runtime.retry")
             }
+        }
+    }
+
+    private var currentStatus: SystemStatus? {
+        guard case let .loaded(status, _, _) = store.state else { return nil }
+        return status
+    }
+
+    private var isRefreshing: Bool {
+        switch store.state {
+        case .loading:
+            true
+        case let .loaded(_, isRefreshing, _):
+            isRefreshing
+        case .idle, .failed:
+            false
         }
     }
 }

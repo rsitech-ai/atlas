@@ -1,6 +1,6 @@
 import Foundation
 
-public enum HealthState: String, Codable, Sendable, Equatable {
+public enum HealthState: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case healthy
     case degraded
     case blocked
@@ -8,40 +8,114 @@ public enum HealthState: String, Codable, Sendable, Equatable {
     case repairable
 }
 
-public enum RuntimeProfile: String, Codable, Sendable, Equatable {
+public enum RuntimeProfile: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case offline
     case monitored
+}
+
+public enum ComponentGroup: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
+    case storage
+    case privacy
+    case observability
+    case resources
+    case engine
+
+    public var displayName: String {
+        switch self {
+        case .storage: "Storage"
+        case .privacy: "Privacy"
+        case .observability: "Observability"
+        case .resources: "Resources"
+        case .engine: "Engine"
+        }
+    }
+}
+
+public struct ComponentSection: Identifiable, Sendable, Equatable {
+    public let group: ComponentGroup
+    public let components: [ComponentStatus]
+
+    public var id: ComponentGroup { group }
+    public var title: String { group.displayName }
 }
 
 public struct ComponentStatus: Codable, Identifiable, Sendable, Equatable {
     public let componentID: String
     public let title: String
+    public let group: ComponentGroup
     public let state: HealthState
     public let summary: String
+    public let remediation: String?
 
     public var id: String { componentID }
 
-    public init(componentID: String, title: String, state: HealthState, summary: String) {
+    public init(
+        componentID: String,
+        title: String,
+        group: ComponentGroup,
+        state: HealthState,
+        summary: String,
+        remediation: String? = nil
+    ) throws {
+        guard componentID.range(
+            of: "^[a-z][a-z0-9_]{0,63}$",
+            options: .regularExpression
+        ) != nil else {
+            throw StatusContractError.invalidComponentID
+        }
+        try Self.validateDisplayText(title, maximumLength: 80)
+        try Self.validateDisplayText(summary, maximumLength: 240)
+        if let remediation {
+            try Self.validateDisplayText(remediation, maximumLength: 240)
+        }
         self.componentID = componentID
         self.title = title
+        self.group = group
         self.state = state
         self.summary = summary
+        self.remediation = remediation
     }
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case componentID = "component_id"
         case title
+        case group
         case state
         case summary
+        case remediation
     }
 
     public init(from decoder: Decoder) throws {
         try decoder.rejectUnknownKeys(allowed: CodingKeys.self)
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        componentID = try container.decode(String.self, forKey: .componentID)
-        title = try container.decode(String.self, forKey: .title)
-        state = try container.decode(HealthState.self, forKey: .state)
-        summary = try container.decode(String.self, forKey: .summary)
+        do {
+            try self.init(
+                componentID: container.decode(String.self, forKey: .componentID),
+                title: container.decode(String.self, forKey: .title),
+                group: container.decode(ComponentGroup.self, forKey: .group),
+                state: container.decode(HealthState.self, forKey: .state),
+                summary: container.decode(String.self, forKey: .summary),
+                remediation: container.decodeIfPresent(String.self, forKey: .remediation)
+            )
+        } catch let error as StatusContractError {
+            throw DecodingError.dataCorrupted(
+                .init(codingPath: decoder.codingPath, debugDescription: String(describing: error))
+            )
+        }
+    }
+
+    private static func validateDisplayText(
+        _ value: String,
+        maximumLength: Int
+    ) throws {
+        guard
+            !value.isEmpty,
+            value == value.trimmingCharacters(in: .whitespacesAndNewlines),
+            value.count <= maximumLength,
+            !value.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 })
+        else {
+            throw StatusContractError.invalidDisplayText
+        }
     }
 }
 
@@ -53,6 +127,13 @@ public struct SystemStatus: Codable, Sendable, Equatable {
     public let checkedAt: Date
     public let components: [ComponentStatus]
 
+    public var sections: [ComponentSection] {
+        ComponentGroup.allCases.compactMap { group in
+            let matching = components.filter { $0.group == group }
+            return matching.isEmpty ? nil : ComponentSection(group: group, components: matching)
+        }
+    }
+
     public init(
         schemaVersion: String,
         product: String,
@@ -60,7 +141,25 @@ public struct SystemStatus: Codable, Sendable, Equatable {
         state: HealthState,
         checkedAt: Date,
         components: [ComponentStatus]
-    ) {
+    ) throws {
+        guard schemaVersion == "1.1.0" else {
+            throw StatusContractError.unsupportedSchema
+        }
+        guard product == "RSI Atlas Engine" else {
+            throw StatusContractError.unexpectedProduct
+        }
+        guard !components.isEmpty else {
+            throw StatusContractError.emptyComponents
+        }
+        guard Set(components.map(\.componentID)).count == components.count else {
+            throw StatusContractError.duplicateComponent
+        }
+        let expectedState = components.max {
+            $0.state.severity < $1.state.severity
+        }?.state
+        guard state == expectedState else {
+            throw StatusContractError.inconsistentState
+        }
         self.schemaVersion = schemaVersion
         self.product = product
         self.profile = profile
@@ -81,25 +180,18 @@ public struct SystemStatus: Codable, Sendable, Equatable {
     public init(from decoder: Decoder) throws {
         try decoder.rejectUnknownKeys(allowed: CodingKeys.self)
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        schemaVersion = try container.decode(String.self, forKey: .schemaVersion)
-        product = try container.decode(String.self, forKey: .product)
-        profile = try container.decode(RuntimeProfile.self, forKey: .profile)
-        state = try container.decode(HealthState.self, forKey: .state)
-        checkedAt = try container.decode(Date.self, forKey: .checkedAt)
-        components = try container.decode([ComponentStatus].self, forKey: .components)
-
-        guard schemaVersion == "1.0.0" else {
-            throw DecodingError.dataCorruptedError(
-                forKey: .schemaVersion,
-                in: container,
-                debugDescription: "Unsupported RSI Atlas status schema: \(schemaVersion)"
+        do {
+            try self.init(
+                schemaVersion: container.decode(String.self, forKey: .schemaVersion),
+                product: container.decode(String.self, forKey: .product),
+                profile: container.decode(RuntimeProfile.self, forKey: .profile),
+                state: container.decode(HealthState.self, forKey: .state),
+                checkedAt: container.decode(Date.self, forKey: .checkedAt),
+                components: container.decode([ComponentStatus].self, forKey: .components)
             )
-        }
-        guard product == "RSI Atlas Engine" else {
-            throw DecodingError.dataCorruptedError(
-                forKey: .product,
-                in: container,
-                debugDescription: "Unexpected status product: \(product)"
+        } catch let error as StatusContractError {
+            throw DecodingError.dataCorrupted(
+                .init(codingPath: decoder.codingPath, debugDescription: String(describing: error))
             )
         }
     }
@@ -136,6 +228,28 @@ public struct SystemStatus: Codable, Sendable, Equatable {
             try container.encode(formatter.string(from: date))
         }
         return encoder
+    }
+}
+
+private enum StatusContractError: Error {
+    case invalidComponentID
+    case invalidDisplayText
+    case unsupportedSchema
+    case unexpectedProduct
+    case emptyComponents
+    case duplicateComponent
+    case inconsistentState
+}
+
+private extension HealthState {
+    var severity: Int {
+        switch self {
+        case .healthy: 0
+        case .degraded: 1
+        case .repairable: 2
+        case .blocked: 3
+        case .unsafe: 4
+        }
     }
 }
 

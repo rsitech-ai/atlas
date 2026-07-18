@@ -1,7 +1,7 @@
 from enum import StrEnum
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class StrictModel(BaseModel):
@@ -21,17 +21,55 @@ class RuntimeProfile(StrEnum):
     MONITORED = "monitored"
 
 
+class ComponentGroup(StrEnum):
+    STORAGE = "storage"
+    PRIVACY = "privacy"
+    OBSERVABILITY = "observability"
+    RESOURCES = "resources"
+    ENGINE = "engine"
+
+
 class ComponentStatus(StrictModel):
-    component_id: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
-    title: str = Field(min_length=1)
+    component_id: str = Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")
+    title: str = Field(min_length=1, max_length=80)
+    group: ComponentGroup
     state: HealthState
-    summary: str = Field(min_length=1)
+    summary: str = Field(min_length=1, max_length=240)
+    remediation: str | None = Field(default=None, min_length=1, max_length=240)
+
+    @field_validator("title", "summary", "remediation")
+    @classmethod
+    def bounded_display_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if value != value.strip() or any(
+            ord(character) < 32 or ord(character) == 127 for character in value
+        ):
+            raise ValueError("component display text is invalid")
+        return value
 
 
 class SystemStatus(StrictModel):
-    schema_version: Literal["1.0.0"]
+    schema_version: Literal["1.1.0"]
     product: Literal["RSI Atlas Engine"]
     profile: RuntimeProfile
     state: HealthState
     checked_at: AwareDatetime
     components: tuple[ComponentStatus, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def consistent_components(self) -> Self:
+        identifiers = tuple(component.component_id for component in self.components)
+        if len(set(identifiers)) != len(identifiers):
+            raise ValueError("system status contains a duplicate component identifier")
+        priority = {
+            HealthState.HEALTHY: 0,
+            HealthState.DEGRADED: 1,
+            HealthState.REPAIRABLE: 2,
+            HealthState.BLOCKED: 3,
+            HealthState.UNSAFE: 4,
+        }
+        expected = max(self.components, key=lambda component: priority[component.state]).state
+        if self.state is not expected:
+            raise ValueError("system state must equal the highest component severity")
+        return self

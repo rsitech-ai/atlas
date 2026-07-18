@@ -4,11 +4,11 @@ import SwiftUI
 extension HealthState {
     var displayName: String {
         switch self {
-        case .healthy: "Foundation healthy"
-        case .degraded: "Foundation degraded"
-        case .blocked: "Foundation blocked"
-        case .unsafe: "Foundation unsafe"
-        case .repairable: "Repair available"
+        case .healthy: "Runtime healthy"
+        case .degraded: "Runtime degraded"
+        case .blocked: "Runtime blocked"
+        case .unsafe: "Runtime unsafe"
+        case .repairable: "Runtime repairable"
         }
     }
 
@@ -27,7 +27,23 @@ extension HealthState {
         case .healthy: .green
         case .degraded: .orange
         case .blocked, .unsafe: .red
-        case .repairable: .blue
+        case .repairable: .orange
+        }
+    }
+}
+
+extension RuntimeProfile {
+    var displayName: String {
+        switch self {
+        case .offline: "Strict Offline"
+        case .monitored: "Monitored"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .offline: "network.slash"
+        case .monitored: "network"
         }
     }
 }
