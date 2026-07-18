@@ -158,7 +158,7 @@ Generate the task review package from the pre-task base to the task head. Do not
 - `ArtifactRepository.register()` commits metadata only after `ContentAddressedArtifactStore.verify()` succeeds.
 - Development PostgreSQL is initialized under the injected `RSI_ATLAS_DATA_ROOT`; release data placement remains outside the app bundle and is a later packaging gate.
 
-- [ ] **Step 1: Write failing policy and integration tests**
+- [x] **Step 1: Write failing policy and integration tests**
 
 ```python
 def test_database_settings_reject_tcp_host() -> None:
@@ -186,7 +186,7 @@ def test_artifact_metadata_requires_verified_bytes(
     assert repository.find(descriptor.artifact_id) is None
 ```
 
-- [ ] **Step 2: Run RED against the real local PostgreSQL fixture**
+- [x] **Step 2: Run RED against the real local PostgreSQL fixture**
 
 Run:
 
@@ -197,7 +197,7 @@ RSI_ATLAS_TEST_DATABASE_URL="$(./infra/local/postgres.sh test-url)" uv run pytes
 
 Expected: tests fail because the database modules, migration, and integration helper do not exist.
 
-- [ ] **Step 3: Implement socket-only settings, migration ledger, and repository**
+- [x] **Step 3: Implement socket-only settings, migration ledger, and repository**
 
 `0001_foundation.sql` creates `vector`, `atlas_meta.schema_migrations`, immutable workspace/actor identities, and artifact metadata with SHA-256 uniqueness and explicit workspace/actor provenance. `MigrationRunner` computes and stores each migration hash, applies each migration once in a transaction, and fails if a previously applied version has different bytes.
 
@@ -218,7 +218,7 @@ class DatabaseSettings:
 
 All values use Psycopg parameters; identifiers in migration bookkeeping are fixed internal names. Long-lived probes use autocommit so a health `SELECT` cannot leave an idle transaction.
 
-- [ ] **Step 4: Verify migration, transaction, restart, and socket ownership behavior**
+- [x] **Step 4: Verify migration, transaction, restart, and socket ownership behavior**
 
 Run:
 
@@ -232,7 +232,7 @@ uv run mypy packages/storage/src
 
 Expected: migrations are idempotent, changed migration bytes fail, failed registration leaves no row, metadata survives restart, the server listens only on its owner-only Unix socket, and no TCP listener is configured.
 
-- [ ] **Step 5: Commit and review Task 2**
+- [x] **Step 5: Commit and review Task 2**
 
 ```bash
 git add README.md infra migrations packages/storage pyproject.toml script/build_and_run.sh uv.lock
