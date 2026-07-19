@@ -6,6 +6,9 @@ struct ContentView: View {
     @State private var store = CommandCenterStore(loader: EngineClient())
     @State private var documentImportStore: DocumentImportStore
     @State private var documentProcessingStore: DocumentProcessingStore
+    @State private var researchStore: ResearchCanvasStore
+    @State private var comparisonStore: ComparisonTimelineStore
+    @State private var chunkStore: ChunkInspectorStore
 
     init() {
         let identity = LocalWorkspaceIdentity.loadOrCreate()
@@ -14,6 +17,15 @@ struct ContentView: View {
         )
         documentProcessingStore = DocumentProcessingStore(
             client: DocumentProcessingClient(identity: identity)
+        )
+        researchStore = ResearchCanvasStore(
+            client: ResearchWorkflowClient(identity: identity)
+        )
+        comparisonStore = ComparisonTimelineStore(
+            client: ComparisonClient(identity: identity)
+        )
+        chunkStore = ChunkInspectorStore(
+            client: ChunkInspectClient(identity: identity)
         )
     }
 
@@ -31,11 +43,11 @@ struct ContentView: View {
                     processingStore: documentProcessingStore
                 )
             case .research:
-                ResearchCanvasView()
+                ResearchCanvasView(store: researchStore)
             case .comparison:
-                ComparisonTimelineView()
+                ComparisonTimelineView(store: comparisonStore)
             case .chunks:
-                ChunkInspectorView()
+                ChunkInspectorView(store: chunkStore)
             case nil:
                 ContentUnavailableView(
                     "Choose a workspace",
