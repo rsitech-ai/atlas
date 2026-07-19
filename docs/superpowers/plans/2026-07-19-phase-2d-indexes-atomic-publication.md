@@ -79,7 +79,7 @@ raw SQL migration `0008`, existing CAS artifact store, pytest + real test DB.
 - [x] **Step 1: Write RED contract tests**
 - [x] **Step 2: Run RED**
 - [x] **Step 3: Implement smallest strict models**
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 uv run pytest packages/contracts/tests/test_publication.py packages/contracts/tests/test_chunking.py -q
@@ -105,9 +105,9 @@ git commit -m "feat: define retrieval index publication contracts"
 - Identical text hash → identical vector; content-hash cache keyed by (policy, text_hash)
 - Reject empty text / zero-norm / wrong dimension
 
-- [ ] **Step 1: RED tests**
-- [ ] **Step 2: Implement**
-- [ ] **Step 3: Commit**
+- [x] **Step 1: RED tests**
+- [x] **Step 2: Implement**
+- [x] **Step 3: Commit**
 
 ```bash
 git commit -m "feat: add deterministic development embeddings"
@@ -146,9 +146,9 @@ git commit -m "feat: add deterministic development embeddings"
 5. Persist embedding-set + index-version manifests at lifecycle `index_validated`
 6. Do **not** flip active pointer
 
-- [ ] **Step 1: RED persistence/staging tests**
-- [ ] **Step 2: Migration + repository + IndexService**
-- [ ] **Step 3: Commit**
+- [x] **Step 1: RED persistence/staging tests**
+- [x] **Step 2: Migration + repository + IndexService**
+- [x] **Step 3: Commit**
 
 ```bash
 git commit -m "feat: stage dense and lexical retrieval indexes"
@@ -182,9 +182,9 @@ without becoming searchable. Re-running identical inputs is idempotent on conten
 
 Search helper used only in tests: `search_lexical(active_only=True)` must miss staging rows.
 
-- [ ] **Step 1: RED atomicity tests (incl. simulated mid-txn failure)**
-- [ ] **Step 2: Implement**
-- [ ] **Step 3: Commit**
+- [x] **Step 1: RED atomicity tests (incl. simulated mid-txn failure)**
+- [x] **Step 2: Implement**
+- [x] **Step 3: Commit**
 
 ```bash
 git commit -m "feat: atomically publish retrieval index versions"
@@ -207,9 +207,9 @@ Endpoints (loopback development):
 
 Keep wording honest: development-only; not production-promoted embedding policy.
 
-- [ ] **Step 1: RED API tests**
-- [ ] **Step 2: Implement**
-- [ ] **Step 3: Commit**
+- [x] **Step 1: RED API tests**
+- [x] **Step 2: Implement**
+- [x] **Step 3: Commit**
 
 ```bash
 git commit -m "feat: inspect and activate development retrieval indexes"
@@ -265,3 +265,5 @@ git commit -m "docs: close dense/lexical index publication slice"
 - Intelligence extractors (§15)
 - Human interrupt/resume workflow UI (criterion 20) unless already present
 - Claiming full closure of acceptance criteria 10–24
+
+Proven at closure: `uv lock --check`, ruff check/format, mypy, full pytest **989** passed, Swift **44** passed. Tip through `88df534`; Docling blocked; fixture embeddings only; criterion 15 unclaimed; Phase 3 not started.

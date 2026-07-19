@@ -8,7 +8,8 @@ The approved product and system design is in [`docs/superpowers/specs/2026-07-18
 
 The repository completes the reviewed Phase 1 durable local-runtime seam, Phase 2A secure
 document-admission checkpoint, Phase 2B development-qualified Tier-0 canonical PDF evidence,
-and Phase 2C development five-chunker slice:
+Phase 2C development five-chunker slice, and Phase 2D development dense/lexical index
+publication:
 
 - strict, versioned Python runtime-status contracts;
 - an immutable, content-addressed artifact store with integrity verification;
@@ -39,14 +40,20 @@ and Phase 2C development five-chunker slice:
   loopback processing APIs plus the native Evidence inspector;
 - five implemented chunking families (`fixed_token`, `recursive`, `page_based`, `parent_child`,
   `table_aware`) with frozen intrinsic goldens, CAS-first chunk-set persistence, and loopback
-  chunk inspect APIs (`chunking:start`, list, get) marked non-searchable.
+  chunk inspect APIs (`chunking:start`, list, get);
+- development fixture embeddings (stdlib hash→vector; production embedding models blocked),
+  migration `0008` staging dense pgvector + PostgreSQL FTS lexical + exact-identifier rows,
+  atomic publication activate/rollback via an active pointer, and loopback
+  `indexing:start` / index-version list / `publication:activate` APIs. Staging stays
+  non-searchable until activation.
 
-OCR/scanned fallback, Docling/Tier-1 promotion, embeddings/indexes/publication, retrieval, qualified
-model execution, collectors, LangGraph workflows, XPC, signing, and release qualification are not
-implemented yet. Canonical pages and chunk sets are inspectable development evidence only: they are
-not searchable, published, or production-promoted. Parent-child/table-aware are implemented and
-benchmarked for development only—not production-ready. The development database is project-owned;
-release data placement remains a later packaging gate.
+OCR/scanned fallback, Docling/Tier-1 promotion, production embedding-model promotion, Tantivy,
+hybrid retrieval/fusion/rerank, qualified model execution, collectors, LangGraph workflows, XPC,
+signing, and release qualification are not implemented yet. Canonical pages, chunk sets, and
+fixture indexes are development evidence: searchable only after explicit publication activation,
+and not production-promoted. Parent-child/table-aware are implemented and benchmarked for
+development only—not production-ready. The development database is project-owned; release data
+placement remains a later packaging gate.
 
 ## Requirements
 

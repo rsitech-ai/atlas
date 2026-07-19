@@ -9,22 +9,24 @@ RSI Atlas is complete only when all 134 normative acceptance criteria in Section
 ## Current evidence boundary
 
 The reviewed Phase 1 chain through `647c25b`, Phase 2A chain through `113110c`, Phase 2B
-development chain through `6383861` (re-review approve-with-nits), and Phase 2C development chain
-through `a51545d` prove the native-to-engine seam, immutable local artifacts,
-Unix-socket PostgreSQL/pgvector persistence, exact runtime capability policy, isolated metadata-only
-OpenTelemetry, strict model/resource boundaries, eight real bounded diagnostics, raw fail-closed PDF
-admission with exact-duplicate and hard-kill recovery, development-qualified Tier-0 parse plus
-inspectable canonical pages under Seatbelt (Docling blocked; not production-promoted), and five
-implemented chunking families with frozen intrinsic benchmarks plus non-searchable chunk-set
-persistence/inspect APIs. This does not complete document intelligence or a full
-release criterion: no production-promoted parser, OCR/scanned path, embeddings/indexes, or workflow
-runs; observability is not end-to-end Swift-to-publication; loopback HTTP remains development-only;
-and the artifact is unsigned.
+development chain through `6383861` (re-review approve-with-nits), Phase 2C development chain
+through `a51545d`, and Phase 2D development chain through `88df534` prove the native-to-engine
+seam, immutable local artifacts, Unix-socket PostgreSQL/pgvector persistence, exact runtime
+capability policy, isolated metadata-only OpenTelemetry, strict model/resource boundaries, eight
+real bounded diagnostics, raw fail-closed PDF admission with exact-duplicate and hard-kill
+recovery, development-qualified Tier-0 parse plus inspectable canonical pages under Seatbelt
+(Docling blocked; not production-promoted), five implemented chunking families with frozen
+intrinsic benchmarks plus chunk-set persistence/inspect APIs, and development dense/lexical
+staging indexes with atomic publication activation under fixture embeddings. This does not
+complete document intelligence or a full release criterion: no production-promoted parser or
+embedding model, OCR/scanned path, hybrid retrieval/workflow runs; observability is not
+end-to-end Swift-to-publication; loopback HTTP remains development-only; and the artifact is
+unsigned.
 
 | Phase | Specification scope | Acceptance criteria | Current status | Phase demonstration |
 | --- | --- | --- | --- | --- |
 | 1. Foundation and local runtime | §§8–11, 25, 27, 29–32 foundation portions | 1–3, 17, 85–93, 99–102, 112–126, 127–134 foundations | Complete (development evidence) | Native Command Center controls and diagnoses a durable, enforced-offline, observable local runtime with immutable artifacts, PostgreSQL/pgvector, resource/model policy, recovery, and no hard-coded health. |
-| 2. Document intelligence | §§12–15 | 10–24 plus Evidence Inspector portion of 6 | Phase 2A–2C complete (dev); 2D missing | Native PDF import reaches immutable raw evidence, durable fail-closed admission, development-qualified Tier-0 parse, inspectable canonical pages, and five development chunkers with intrinsic goldens. Completion still requires production promotion/OCR, dense/lexical indexes, interrupt/resume, atomic publication, and complete offline proof. |
+| 2. Document intelligence | §§12–15 | 10–24 plus Evidence Inspector portion of 6 | Phase 2A–2D complete (dev); production promotion/OCR/interrupt still open | Native PDF import reaches immutable raw evidence, durable fail-closed admission, development-qualified Tier-0 parse, inspectable canonical pages, five development chunkers, fixture dense/lexical indexes, and atomic publication activation. Completion still requires production promotion/OCR, interrupt/resume, and complete offline proof. |
 | 3. Retrieval and research | §§16–18 | 4–8, 25–60 | Missing | A frozen material question produces an inspectable plan, hybrid evidence packet, bounded specialist findings, deterministic calculations, exact citations, review, and an editable versioned report. |
 | 4. Multi-chain and quantitative data | §§19–23 | 43–44 and 61–81 | Missing | Bitcoin, EVM, Solana, market, governance, and GitHub fixtures become bitemporal observations/features and support reproducible dossiers and comparison inputs. |
 | 5. Monitoring and comparison | §24 and cross-surface UX | 45, 61, 82–84 plus comparison/timeline UX | Missing | A deterministic material change invalidates affected research, deduplicates an alert, launches targeted research, and appears on the cross-chain timeline/comparison matrix. |
