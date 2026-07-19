@@ -1,0 +1,78 @@
+{
+  "candidate": {
+    "build_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "configuration_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "name": "pdfminer.six",
+    "parser_id": "pdfminer_tier0",
+    "schema_version": "1.0.0",
+    "tier": 0,
+    "version": "20260107"
+  },
+  "canonicalization_id": "canonicalization:a24b25a2ba011b73fd718978449b8ade91d0476e2006eca1b24b30bfe7d9dc68",
+  "normalizer_configuration_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+  "normalizer_version": "nfc-1",
+  "pages": [
+    {
+      "canonicalization_id": "canonicalization:a24b25a2ba011b73fd718978449b8ade91d0476e2006eca1b24b30bfe7d9dc68",
+      "elements": [
+        {
+          "bounding_box": {
+            "bottom": "0.200000",
+            "coordinate_system": "normalized_top_left",
+            "left": "0.100000",
+            "right": "0.900000",
+            "top": "0.100000"
+          },
+          "canonicalization_id": "canonicalization:a24b25a2ba011b73fd718978449b8ade91d0476e2006eca1b24b30bfe7d9dc68",
+          "element_id": "element:3adee744c260aa63554b931959b2ae6d25859ee5e70bcc447b3bdc47e5a35d49",
+          "kind": "text",
+          "language": "unknown",
+          "normalized_text": "Bitcoin settles every ten minutes.",
+          "normalized_text_hash": "2a48dd3644cb8acaf23a330b6494c6d99b55e454a101ef5a103b8e1bbc7353d1",
+          "ocr_confidence": null,
+          "page_number": 1,
+          "parent_section_id": null,
+          "parser_confidence": 1.0,
+          "raw_bounding_box": {
+            "bottom": "700.000000",
+            "coordinate_system": "pdf_bottom_left_points",
+            "left": "72.000000",
+            "right": "360.000000",
+            "top": "720.000000"
+          },
+          "raw_text": "Bitcoin settles every ten minutes.",
+          "raw_text_hash": "2a48dd3644cb8acaf23a330b6494c6d99b55e454a101ef5a103b8e1bbc7353d1",
+          "reading_order": 0,
+          "role": "paragraph",
+          "source_hash": "e7ebc48fa39cb70e876fb3cca588b921a2a313bf815b87b6c3dfbfa721c510e3",
+          "source_output_artifact_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "source_span_hash": "e7ebc48fa39cb70e876fb3cca588b921a2a313bf815b87b6c3dfbfa721c510e3",
+          "source_span_id": "span_0001"
+        }
+      ],
+      "geometry": {
+        "crop_box": {
+          "bottom": "0.000000",
+          "coordinate_system": "pdf_bottom_left_points",
+          "left": "0.000000",
+          "right": "612.000000",
+          "top": "792.000000"
+        },
+        "media_box": {
+          "bottom": "0.000000",
+          "coordinate_system": "pdf_bottom_left_points",
+          "left": "0.000000",
+          "right": "612.000000",
+          "top": "792.000000"
+        },
+        "page_number": 1,
+        "rotation_degrees": 0
+      },
+      "page_number": 1,
+      "schema_version": "1.0.0",
+      "source_artifact_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "schema_version": "1.0.0",
+  "source_artifact_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

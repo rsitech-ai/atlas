@@ -1,0 +1,59 @@
+{
+  "acquisition_id": "00000000-0000-4000-8000-000000000005",
+  "active_actions": "pass",
+  "artifact": {
+    "algorithm": "sha256",
+    "artifact_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "media_type": "application/pdf",
+    "schema_version": "1.0.0",
+    "size_bytes": 4096
+  },
+  "character_count": 128,
+  "context": {
+    "actor_id": "00000000-0000-4000-8000-000000000003",
+    "tenant_id": "00000000-0000-4000-8000-000000000001",
+    "trace_id": "00000000-0000-4000-8000-000000000004",
+    "workspace_id": "00000000-0000-4000-8000-000000000002"
+  },
+  "decoded_stream_bytes": 1024,
+  "decompression_ratio": "pass",
+  "embedded_files": "pass",
+  "encryption_password_state": "pass",
+  "image_only_page_count": 0,
+  "malformed_structure": "pass",
+  "page_count": 1,
+  "pages": [
+    {
+      "crop_box": {
+        "bottom": "0.000000",
+        "coordinate_system": "pdf_bottom_left_points",
+        "left": "0.000000",
+        "right": "612.000000",
+        "top": "792.000000"
+      },
+      "media_box": {
+        "bottom": "0.000000",
+        "coordinate_system": "pdf_bottom_left_points",
+        "left": "0.000000",
+        "right": "612.000000",
+        "top": "792.000000"
+      },
+      "page_number": 1,
+      "rotation_degrees": 0
+    }
+  ],
+  "preflight_run_id": "00000000-0000-4000-8000-000000000006",
+  "profiled_at": "2026-07-19T08:00:00Z",
+  "profiler": {
+    "build_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "configuration_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "name": "pypdf-preflight",
+    "profiler_id": "pypdf_preflight",
+    "schema_version": "1.0.0",
+    "version": "6.14.2"
+  },
+  "schema_version": "1.0.0",
+  "suspicious_references": "pass",
+  "warnings": []
+}
