@@ -90,21 +90,21 @@ Docling, or claim production promotion. Phase 2D owns dense/lexical indexes and 
 - `Chunk`, `ChunkRelationship`, `ChunkSetQuality`, `ChunkSet`, `ChunkSetManifest`
 - Helpers: `chunk_identifier`, `chunk_set_identifier`, `build_chunk_set`
 
-- [ ] **Step 1: Write RED contract tests**
+- [x] **Step 1: Write RED contract tests**
 
 Unknown fields forbidden; schema `1.0.0`; UTC timestamps; deterministic IDs; source element
 non-empty ordered uniqueness; text/hash binding; family/config binding; no searchable lifecycle;
 unimplemented-family rejection at manifest builder when requested.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 uv run pytest packages/contracts/tests/test_chunking.py -q
 ```
 
-- [ ] **Step 3: Implement smallest strict models**
+- [x] **Step 3: Implement smallest strict models**
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 uv run pytest packages/contracts/tests/test_chunking.py packages/contracts/tests/test_document_parsing.py -q
@@ -145,14 +145,14 @@ git commit -m "feat: define chunk set contracts"
   back to page-based packing for that family set.
 - Registry: only the five families above are callable; others raise `ChunkStrategyNotImplemented`.
 
-- [ ] **Step 1: RED tests for each family**
+- [x] **Step 1: RED tests for each family**
 
 Determinism, lineage, token bounds (soft development thresholds), empty-page rejection, crypto
 token/numeric preservation, parent-child edges, table split behavior.
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 3: Verify and commit**
 
 ```bash
 uv run pytest packages/ingestion/tests/test_chunkers.py -q
@@ -180,9 +180,9 @@ headings, paragraphs, tables, and crypto identifiers. Freeze expected chunk coun
 intrinsic quality floors (token distribution, broken-sentence rate, table-split rate, section-path
 completeness where applicable) per family.
 
-- [ ] **Step 1: RED corpus integrity tests**
-- [ ] **Step 2: Freeze goldens**
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 1: RED corpus integrity tests**
+- [x] **Step 2: Freeze goldens**
+- [x] **Step 3: Verify and commit**
 
 ```bash
 uv run pytest packages/ingestion/tests/test_chunk_benchmark.py -q
@@ -205,9 +205,9 @@ git commit -m "test: freeze chunker intrinsic benchmarks"
 `(tenant, workspace, document_version_id, strategy_id, configuration_hash)`. Lifecycle event
 `ChunkSetRecorded`. No index writes.
 
-- [ ] **Step 1: RED persistence/idempotency/corruption tests**
-- [ ] **Step 2: Migration + service**
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 1: RED persistence/idempotency/corruption tests**
+- [x] **Step 2: Migration + service**
+- [x] **Step 3: Verify and commit**
 
 ```bash
 RSI_ATLAS_TEST_DATABASE_URL="$(./infra/local/postgres.sh test-url)" \
@@ -228,9 +228,9 @@ git commit -m "feat: persist versioned chunk sets"
 Expose list/get for chunk sets bound to a canonical document version. Keep non-searchable wording
 in responses. Skip native UI if time-bound; API + Python contract tests are the minimum.
 
-- [ ] **Step 1: RED API tests**
-- [ ] **Step 2: Implement**
-- [ ] **Step 3: Commit**
+- [x] **Step 1: RED API tests**
+- [x] **Step 2: Implement**
+- [x] **Step 3: Commit**
 
 ```bash
 git commit -m "feat: inspect development chunk sets"

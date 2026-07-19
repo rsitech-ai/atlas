@@ -7,8 +7,8 @@ The approved product and system design is in [`docs/superpowers/specs/2026-07-18
 ## Current slice
 
 The repository completes the reviewed Phase 1 durable local-runtime seam, Phase 2A secure
-document-admission checkpoint, and Phase 2B development-qualified Tier-0 canonical PDF evidence
-slice:
+document-admission checkpoint, Phase 2B development-qualified Tier-0 canonical PDF evidence,
+and Phase 2C development five-chunker slice:
 
 - strict, versioned Python runtime-status contracts;
 - an immutable, content-addressed artifact store with integrity verification;
@@ -36,13 +36,17 @@ slice:
 - preflight assessment before parse, with Process PDF / `processing:start` gated off
   encrypted, rejected, duplicate, and embedded-file paths;
 - append-only parser-attempt journals, CAS-first canonical JSON, and canonical page inspection via
-  loopback processing APIs plus the native Evidence inspector.
+  loopback processing APIs plus the native Evidence inspector;
+- five implemented chunking families (`fixed_token`, `recursive`, `page_based`, `parent_child`,
+  `table_aware`) with frozen intrinsic goldens, CAS-first chunk-set persistence, and loopback
+  chunk inspect APIs (`chunking:start`, list, get) marked non-searchable.
 
-OCR/scanned fallback, Docling/Tier-1 promotion, chunking, indexes, retrieval, qualified model
-execution, collectors, LangGraph workflows, XPC, signing, and release qualification are not
-implemented yet. Canonical pages are inspectable development evidence only: they are not searchable,
-published, or production-promoted. The development database is project-owned; release data placement
-remains a later packaging gate.
+OCR/scanned fallback, Docling/Tier-1 promotion, embeddings/indexes/publication, retrieval, qualified
+model execution, collectors, LangGraph workflows, XPC, signing, and release qualification are not
+implemented yet. Canonical pages and chunk sets are inspectable development evidence only: they are
+not searchable, published, or production-promoted. Parent-child/table-aware are implemented and
+benchmarked for development only—not production-ready. The development database is project-owned;
+release data placement remains a later packaging gate.
 
 ## Requirements
 
