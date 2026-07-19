@@ -9,6 +9,15 @@ from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
 
+def _box(values: list[float]) -> dict[str, float]:
+    return {
+        "left": float(values[0]),
+        "bottom": float(values[1]),
+        "right": float(values[2]),
+        "top": float(values[3]),
+    }
+
+
 class PyPdfParserCandidate:
     name = "pypdf"
     version = "6.14.2"
@@ -43,20 +52,23 @@ class PyPdfParserCandidate:
                 text = ""
                 warnings.append(f"page_{index}_extract_failed")
             mediabox = [float(value) for value in page.mediabox]
+            cropbox = [float(value) for value in (page.cropbox or page.mediabox)]
+            rotation = int(page.get("/Rotate", 0) or 0) % 360
+            if rotation not in {0, 90, 180, 270}:
+                warnings.append(f"page_{index}_unsupported_rotation")
+                rotation = 0
             pages.append(
                 {
                     "page_number": index,
                     "width": mediabox[2] - mediabox[0],
                     "height": mediabox[3] - mediabox[1],
+                    "media_box": _box(mediabox),
+                    "crop_box": _box(cropbox),
+                    "rotation_degrees": rotation,
                     "spans": [
                         {
                             "text": text,
-                            "source_box": {
-                                "left": mediabox[0],
-                                "bottom": mediabox[1],
-                                "right": mediabox[2],
-                                "top": mediabox[3],
-                            },
+                            "source_box": _box(cropbox),
                         }
                     ]
                     if text

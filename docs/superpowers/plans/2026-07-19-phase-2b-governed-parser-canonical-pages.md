@@ -466,7 +466,7 @@ git commit -m "feat: benchmark local PDF parser candidates"
 - Extend: `packages/storage/src/rsi_atlas_storage/document_processing_repository.py`
 - Extend: `packages/storage/tests/test_document_processing_repository.py`
 
-- [ ] **Step 1: Write canonicalization RED tests**
+- [x] **Step 1: Write canonicalization RED tests**
 
 Cover stable IDs, page/order preservation, coordinate conversion for rotations/crop boxes, heading
 tree bounds, repeated header/footer marking, paragraph reconstruction, conservative hyphen repair,
@@ -474,26 +474,26 @@ NFC, raw text retention, table/figure/caption relationships where candidate evid
 language/family `unknown`, crypto/numeric preservation, byte-deterministic reruns, and fail-closed
 quality thresholds.
 
-- [ ] **Step 2: Implement pure canonicalization**
+- [x] **Step 2: Implement pure canonicalization**
 
 Keep candidate adapters and persistence out of the pure transform. Never infer missing text or
 coordinates. Generated metadata is labelled separately. Unsupported structures remain warnings or
 review requirements.
 
-- [ ] **Step 3: Publish canonical JSON to CAS then commit one manifest**
+- [x] **Step 3: Publish canonical JSON to CAS then commit one manifest**
 
 Persist canonical bytes as a new media type, verify them from CAS, then atomically record the
 canonical version, reference to an already-retained accepted parser attempt, quality report,
 lifecycle event, and outbox event. Failure before
 manifest commit leaves reusable immutable bytes but no visible canonical version.
 
-- [ ] **Step 4: Prove idempotency, history, corruption, and restart**
+- [x] **Step 4: Prove idempotency, history, corruption, and restart**
 
 Exact replay returns the same canonical version. Parser/config change creates a new version and
 never overwrites the old. Corrupt/missing canonical bytes fail retrieval. Restart preserves every
 raw/candidate/quality/canonical hash and relationship.
 
-- [ ] **Step 5: Verify and commit Task 7**
+- [x] **Step 5: Verify and commit Task 7**
 
 ```bash
 RSI_ATLAS_TEST_DATABASE_URL="$(./infra/local/postgres.sh test-url)" uv run pytest packages/ingestion/tests/test_canonicalization.py packages/storage/tests/test_document_processing_repository.py -q

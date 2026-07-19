@@ -12,6 +12,7 @@ from uuid import UUID, uuid4
 from psycopg.types.json import Jsonb
 from pydantic import Field
 from rsi_atlas_contracts import ArtifactCommandContext
+from rsi_atlas_contracts.document_parsing import CanonicalDocumentManifest
 from rsi_atlas_contracts.system_status import StrictModel
 
 from rsi_atlas_storage.database import PostgresDatabase, Row
@@ -364,6 +365,132 @@ class DocumentProcessingRepository:
                 ),
             )
             connection.commit()
+
+    def commit_canonical_manifest(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        manifest: CanonicalDocumentManifest,
+        parse_attempt_id: UUID,
+        qualification_record: dict[str, Any],
+    ) -> None:
+        command = ArtifactCommandContext.model_validate(context)
+        payload = manifest.model_dump(mode="json")
+        # Authority field is exclude=True; dump is draft-shaped and validates on read.
+        with self._database.connect() as connection:
+            existing = connection.execute(
+                """
+                SELECT manifest FROM atlas_ingestion.canonical_document_versions
+                WHERE tenant_id = %s AND workspace_id = %s AND document_version_id = %s
+                """,
+                (command.tenant_id, command.workspace_id, manifest.document_version_id),
+            ).fetchone()
+            if existing is not None:
+                prior = dict(existing[0])
+                if prior.get("canonical_content_hash") == manifest.canonical_content_hash:
+                    return
+                raise DocumentProcessingConflictError("canonical version identity conflict")
+            connection.execute(
+                """
+                INSERT INTO atlas_ingestion.canonical_document_versions (
+                    tenant_id, workspace_id, document_version_id, manifest_id,
+                    acquisition_id, parse_attempt_id, artifact_id, canonical_artifact_id,
+                    canonical_content_hash, parser_configuration_hash,
+                    manifest, qualification, recorded_at
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                )
+                """,
+                (
+                    command.tenant_id,
+                    command.workspace_id,
+                    manifest.document_version_id,
+                    manifest.manifest_id,
+                    manifest.acquisition_id,
+                    parse_attempt_id,
+                    str(manifest.artifact.artifact_id),
+                    str(manifest.canonical_artifact.artifact_id),
+                    manifest.canonical_content_hash,
+                    manifest.canonical_document.candidate.configuration_hash,
+                    Jsonb(payload),
+                    Jsonb(qualification_record),
+                    manifest.recorded_at,
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO atlas_ingestion.canonical_lifecycle_events (
+                    tenant_id, workspace_id, event_id, acquisition_id,
+                    document_version_id, event_type, payload, recorded_at
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s
+                )
+                """,
+                (
+                    command.tenant_id,
+                    command.workspace_id,
+                    uuid4(),
+                    manifest.acquisition_id,
+                    manifest.document_version_id,
+                    "CanonicalDocumentRecorded",
+                    Jsonb(
+                        {
+                            "document_version_id": manifest.document_version_id,
+                            "canonical_content_hash": manifest.canonical_content_hash,
+                            "parse_attempt_id": str(parse_attempt_id),
+                        }
+                    ),
+                    manifest.recorded_at,
+                ),
+            )
+            connection.commit()
+
+    def get_canonical_manifest(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        document_version_id: str,
+    ) -> dict[str, Any] | None:
+        command = ArtifactCommandContext.model_validate(context)
+        row = self._database.fetch_one(
+            """
+            SELECT manifest FROM atlas_ingestion.canonical_document_versions
+            WHERE tenant_id = %s AND workspace_id = %s AND document_version_id = %s
+            """,
+            (command.tenant_id, command.workspace_id, document_version_id),
+        )
+        if row is None:
+            return None
+        return dict(row[0])
+
+    def list_canonical_versions(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        acquisition_id: UUID,
+    ) -> list[dict[str, Any]]:
+        command = ArtifactCommandContext.model_validate(context)
+        with self._database.connect(autocommit=True) as connection:
+            rows = connection.execute(
+                """
+                SELECT document_version_id, canonical_content_hash, parser_configuration_hash,
+                       recorded_at, manifest
+                FROM atlas_ingestion.canonical_document_versions
+                WHERE tenant_id = %s AND workspace_id = %s AND acquisition_id = %s
+                ORDER BY recorded_at ASC
+                """,
+                (command.tenant_id, command.workspace_id, acquisition_id),
+            ).fetchall()
+        return [
+            {
+                "document_version_id": row[0],
+                "canonical_content_hash": row[1],
+                "parser_configuration_hash": row[2],
+                "recorded_at": row[3],
+                "manifest": dict(row[4]),
+            }
+            for row in rows
+        ]
 
 
 def _row_to_attempt(row: Row) -> DocumentParserAttempt:
