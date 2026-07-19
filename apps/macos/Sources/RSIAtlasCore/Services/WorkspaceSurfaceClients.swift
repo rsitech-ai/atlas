@@ -5,6 +5,8 @@ public enum LoopbackClientError: Error, Equatable, LocalizedError, Sendable {
     case httpStatus(Int)
     case incompatibleContract
     case transportUnavailable
+    case authenticationFailed
+    case authenticationRequired
 
     public var errorDescription: String? {
         switch self {
@@ -16,6 +18,27 @@ public enum LoopbackClientError: Error, Equatable, LocalizedError, Sendable {
             "The local engine returned incompatible evidence."
         case .transportUnavailable:
             "The local engine could not be reached. No remote fallback was used."
+        case .authenticationFailed:
+            "Local engine IPC authentication failed."
+        case .authenticationRequired:
+            "Local engine IPC token is missing for Unix-domain transport."
+        }
+    }
+
+    public static func from(_ error: LocalEngineHTTPError) -> LoopbackClientError {
+        switch error {
+        case .invalidResponse:
+            .invalidResponse
+        case let .httpStatus(code):
+            .httpStatus(code)
+        case .responseTooLarge:
+            .invalidResponse
+        case .transportUnavailable:
+            .transportUnavailable
+        case .authenticationFailed:
+            .authenticationFailed
+        case .authenticationRequired:
+            .authenticationRequired
         }
     }
 }
@@ -56,17 +79,22 @@ public protocol ResearchWorkflowing: Sendable {
 
 public struct ResearchWorkflowClient: ResearchWorkflowing {
     public static let maximumResponseBytes = 2_097_152
-    private static let engineBaseURL = URL(string: "http://127.0.0.1:8765")!
+    private let configuration: LocalEngineConfiguration
     private let identity: LocalWorkspaceIdentity
-    private let session: URLSession
+    private let http: LocalEngineHTTP
 
-    public init(identity: LocalWorkspaceIdentity, session: URLSession = .shared) {
+    public init(
+        identity: LocalWorkspaceIdentity,
+        configuration: LocalEngineConfiguration = .resolve(),
+        session: URLSession = .shared
+    ) {
         self.identity = identity
-        self.session = session
+        self.configuration = configuration
+        http = LocalEngineHTTP(configuration: configuration, urlSession: session)
     }
 
     public func startWorkflow(_ request: ResearchStartRequest) async throws -> ResearchWorkflowResponse {
-        let url = Self.engineBaseURL
+        let url = configuration.httpBaseURL
             .appending(path: "v1/workspaces/\(identity.workspaceID.uuidString.lowercased())/research/workflows:start")
         var httpRequest = URLRequest(url: url)
         httpRequest.httpMethod = "POST"
@@ -84,7 +112,7 @@ public struct ResearchWorkflowClient: ResearchWorkflowing {
         rationale: String,
         reportID: String
     ) async throws -> ResearchWorkflowResponse {
-        let url = Self.engineBaseURL
+        let url = configuration.httpBaseURL
             .appending(
                 path: "v1/workspaces/\(identity.workspaceID.uuidString.lowercased())/research/workflows/\(workflowID.uuidString.lowercased()):resume"
             )
@@ -115,7 +143,7 @@ public struct ResearchWorkflowClient: ResearchWorkflowing {
     }
 
     public func listWorkflows() async throws -> [ResearchWorkflowAttempt] {
-        let url = Self.engineBaseURL
+        let url = configuration.httpBaseURL
             .appending(path: "v1/workspaces/\(identity.workspaceID.uuidString.lowercased())/research/workflows")
         let response: ResearchWorkflowListResponse = try await send(URLRequest(url: url, method: "GET"))
         return response.workflows
@@ -125,7 +153,7 @@ public struct ResearchWorkflowClient: ResearchWorkflowing {
         try await LoopbackJSON.send(
             request,
             identity: identity,
-            session: session,
+            http: http,
             maximumResponseBytes: Self.maximumResponseBytes
         )
     }
@@ -164,18 +192,23 @@ public protocol ComparisonSurfacing: Sendable {
 
 public struct ComparisonClient: ComparisonSurfacing {
     public static let maximumResponseBytes = 2_097_152
-    private static let engineBaseURL = URL(string: "http://127.0.0.1:8765")!
+    private let configuration: LocalEngineConfiguration
     private let identity: LocalWorkspaceIdentity
-    private let session: URLSession
+    private let http: LocalEngineHTTP
 
-    public init(identity: LocalWorkspaceIdentity, session: URLSession = .shared) {
+    public init(
+        identity: LocalWorkspaceIdentity,
+        configuration: LocalEngineConfiguration = .resolve(),
+        session: URLSession = .shared
+    ) {
         self.identity = identity
-        self.session = session
+        self.configuration = configuration
+        http = LocalEngineHTTP(configuration: configuration, urlSession: session)
     }
 
     public func listObservationJSON(limit: Int = 50) async throws -> [[String: Any]] {
         var components = URLComponents(
-            url: Self.engineBaseURL
+            url: configuration.httpBaseURL
                 .appending(path: "v1/workspaces/\(identity.workspaceID.uuidString.lowercased())/observations"),
             resolvingAgainstBaseURL: false
         )!
@@ -188,7 +221,7 @@ public struct ComparisonClient: ComparisonSurfacing {
         let data = try await LoopbackJSON.data(
             URLRequest(url: components.url!, method: "GET"),
             identity: identity,
-            session: session,
+            http: http,
             maximumResponseBytes: Self.maximumResponseBytes
         )
         guard
@@ -201,7 +234,7 @@ public struct ComparisonClient: ComparisonSurfacing {
     }
 
     public func timeline(observationJSON: [[String: Any]]) async throws -> TimelinePayloadDTO {
-        let url = Self.engineBaseURL
+        let url = configuration.httpBaseURL
             .appending(path: "v1/workspaces/\(identity.workspaceID.uuidString.lowercased())/monitoring:timeline")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -214,7 +247,7 @@ public struct ComparisonClient: ComparisonSurfacing {
         let response: TimelineResponseDTO = try await LoopbackJSON.send(
             request,
             identity: identity,
-            session: session,
+            http: http,
             maximumResponseBytes: Self.maximumResponseBytes
         )
         return response.timeline
@@ -228,40 +261,45 @@ public protocol ChunkInspecting: Sendable {
 
 public struct ChunkInspectClient: ChunkInspecting {
     public static let maximumResponseBytes = 2_097_152
-    private static let engineBaseURL = URL(string: "http://127.0.0.1:8765")!
+    private let configuration: LocalEngineConfiguration
     private let identity: LocalWorkspaceIdentity
-    private let session: URLSession
+    private let http: LocalEngineHTTP
 
-    public init(identity: LocalWorkspaceIdentity, session: URLSession = .shared) {
+    public init(
+        identity: LocalWorkspaceIdentity,
+        configuration: LocalEngineConfiguration = .resolve(),
+        session: URLSession = .shared
+    ) {
         self.identity = identity
-        self.session = session
+        self.configuration = configuration
+        http = LocalEngineHTTP(configuration: configuration, urlSession: session)
     }
 
     public func listChunkSets(documentVersionID: String) async throws -> [ChunkSetSummaryDTO] {
         let encoded = documentVersionID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
             ?? documentVersionID
-        let url = Self.engineBaseURL
+        let url = configuration.httpBaseURL
             .appending(
                 path: "v1/workspaces/\(identity.workspaceID.uuidString.lowercased())/canonical/\(encoded)/chunk-sets"
             )
         return try await LoopbackJSON.send(
             URLRequest(url: url, method: "GET"),
             identity: identity,
-            session: session,
+            http: http,
             maximumResponseBytes: Self.maximumResponseBytes
         )
     }
 
     public func chunkSet(chunkSetID: String) async throws -> ChunkSetEvidenceDTO {
         let encoded = chunkSetID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? chunkSetID
-        let url = Self.engineBaseURL
+        let url = configuration.httpBaseURL
             .appending(
                 path: "v1/workspaces/\(identity.workspaceID.uuidString.lowercased())/chunk-sets/\(encoded)"
             )
         return try await LoopbackJSON.send(
             URLRequest(url: url, method: "GET"),
             identity: identity,
-            session: session,
+            http: http,
             maximumResponseBytes: Self.maximumResponseBytes
         )
     }
@@ -271,13 +309,13 @@ enum LoopbackJSON {
     static func send<T: Decodable>(
         _ request: URLRequest,
         identity: LocalWorkspaceIdentity,
-        session: URLSession,
+        http: LocalEngineHTTP,
         maximumResponseBytes: Int
     ) async throws -> T {
         let data = try await data(
             request,
             identity: identity,
-            session: session,
+            http: http,
             maximumResponseBytes: maximumResponseBytes
         )
         do {
@@ -290,7 +328,7 @@ enum LoopbackJSON {
     static func data(
         _ request: URLRequest,
         identity: LocalWorkspaceIdentity,
-        session: URLSession,
+        http: LocalEngineHTTP,
         maximumResponseBytes: Int
     ) async throws -> Data {
         var request = request
@@ -302,17 +340,10 @@ enum LoopbackJSON {
             request.setValue("application/json", forHTTPHeaderField: "content-type")
         }
         do {
-            let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse else {
-                throw LoopbackClientError.invalidResponse
-            }
-            guard (200 ..< 300).contains(http.statusCode) else {
-                throw LoopbackClientError.httpStatus(http.statusCode)
-            }
-            guard data.count <= maximumResponseBytes else {
-                throw LoopbackClientError.invalidResponse
-            }
+            let (data, _) = try await http.perform(request, maximumResponseBytes: maximumResponseBytes)
             return data
+        } catch let error as LocalEngineHTTPError {
+            throw LoopbackClientError.from(error)
         } catch let error as LoopbackClientError {
             throw error
         } catch {

@@ -174,7 +174,12 @@ PLIST
 }
 
 open_app() {
-  /usr/bin/open -n "$APP_BUNDLE"
+  # Propagate IPC policy into the GUI process (open does not inherit shell env).
+  /usr/bin/open -n "$APP_BUNDLE" \
+    --env "RSI_ATLAS_DATA_ROOT=$RSI_ATLAS_DATA_ROOT" \
+    --env "RSI_ATLAS_ALLOW_LOOPBACK_TCP=${RSI_ATLAS_ALLOW_LOOPBACK_TCP:-1}" \
+    --env "RSI_ATLAS_ENGINE_HOST=$ENGINE_HOST" \
+    --env "RSI_ATLAS_ENGINE_PORT=$ENGINE_PORT"
 }
 
 mkdir -p "$DIST_DIR"

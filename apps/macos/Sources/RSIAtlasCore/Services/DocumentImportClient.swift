@@ -57,6 +57,8 @@ public enum DocumentImportClientError: Error, Equatable, LocalizedError, Sendabl
     case responseTooLarge
     case incompatibleContract
     case transportUnavailable
+    case authenticationFailed
+    case authenticationRequired
 
     public var errorDescription: String? {
         switch self {
@@ -80,6 +82,27 @@ public enum DocumentImportClientError: Error, Equatable, LocalizedError, Sendabl
             "The local engine returned incompatible admission evidence."
         case .transportUnavailable:
             "The local engine could not be reached. No remote fallback was used."
+        case .authenticationFailed:
+            "Local engine IPC authentication failed."
+        case .authenticationRequired:
+            "Local engine IPC token is missing for Unix-domain transport."
+        }
+    }
+
+    public static func from(_ error: LocalEngineHTTPError) -> DocumentImportClientError {
+        switch error {
+        case .invalidResponse:
+            .invalidResponse
+        case let .httpStatus(code):
+            .httpStatus(code)
+        case .responseTooLarge:
+            .responseTooLarge
+        case .transportUnavailable:
+            .transportUnavailable
+        case .authenticationFailed:
+            .authenticationFailed
+        case .authenticationRequired:
+            .authenticationRequired
         }
     }
 }
@@ -89,18 +112,21 @@ public struct DocumentImportClient: DocumentImporting {
 
     public static let maximumPDFBytes: Int64 = 33_554_432
     public static let maximumResponseBytes = 1_048_576
-    private static let engineBaseURL = URL(string: "http://127.0.0.1:8765")!
+    private let configuration: LocalEngineConfiguration
     private let identity: LocalWorkspaceIdentity
     private let uploader: FileUploader
 
     public init(
         identity: LocalWorkspaceIdentity,
+        configuration: LocalEngineConfiguration = .resolve(),
         uploader: FileUploader? = nil
     ) {
         self.identity = identity
+        self.configuration = configuration
+        let http = LocalEngineHTTP(configuration: configuration)
         self.uploader = uploader ?? { request, fileURL in
-            try await BoundedFileUploader.upload(
-                request: request,
+            try await http.uploadFile(
+                request,
                 fileURL: fileURL,
                 maximumResponseBytes: DocumentImportClient.maximumResponseBytes
             )
@@ -150,7 +176,7 @@ public struct DocumentImportClient: DocumentImporting {
         let acquisitionID = importRequest.acquisitionID
         let traceID = importRequest.traceID
         var components = URLComponents(
-            url: Self.engineBaseURL,
+            url: configuration.httpBaseURL,
             resolvingAgainstBaseURL: false
         )!
         components.path = "/v1/workspaces/\(identity.workspaceID.uuidString.lowercased())/documents:admit"
@@ -204,6 +230,8 @@ public struct DocumentImportClient: DocumentImporting {
             throw CancellationError()
         } catch let error as DocumentImportClientError {
             throw error
+        } catch let error as LocalEngineHTTPError {
+            throw DocumentImportClientError.from(error)
         } catch {
             throw DocumentImportClientError.transportUnavailable
         }

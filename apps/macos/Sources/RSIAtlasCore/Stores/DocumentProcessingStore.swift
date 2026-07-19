@@ -98,7 +98,7 @@ public final class DocumentProcessingStore {
             return .unavailable
         }
         switch clientError {
-        case .transportUnavailable, .invalidResponse:
+        case .transportUnavailable, .invalidResponse, .authenticationFailed, .authenticationRequired:
             return .unavailable
         case let .httpStatus(code):
             return .httpStatus(code)

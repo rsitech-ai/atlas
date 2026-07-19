@@ -109,6 +109,8 @@ public final class CommandCenterStore {
             return .responseTooLarge
         case .incompatibleContract:
             return .incompatibleContract
+        case .authenticationFailed, .authenticationRequired, .transportUnavailable:
+            return .unavailable
         }
     }
 }

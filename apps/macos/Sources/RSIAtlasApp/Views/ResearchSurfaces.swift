@@ -30,7 +30,7 @@ struct ResearchCanvasView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Research Canvas")
                 .font(.largeTitle.weight(.semibold))
-            Text("Start a durable multi-specialist workflow over loopback research APIs. Interrupt waits for human review. Report Studio panel shows the draft id when present.")
+                Text("Start a durable multi-specialist workflow over authenticated local IPC (Unix domain by default). Interrupt waits for human review. Report Studio panel shows the draft id when present.")
                 .foregroundStyle(.secondary)
         }
         .padding(24)
@@ -209,7 +209,7 @@ struct ChunkInspectorView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Chunk Inspector")
                     .font(.largeTitle.weight(.semibold))
-                Text("List and inspect chunk sets for a canonical document version over loopback APIs.")
+                Text("List and inspect chunk sets for a canonical document version over authenticated local IPC.")
                     .foregroundStyle(.secondary)
             }
             .padding(24)

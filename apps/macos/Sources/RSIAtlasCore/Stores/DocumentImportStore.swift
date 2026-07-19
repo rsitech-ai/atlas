@@ -130,7 +130,7 @@ public final class DocumentImportStore {
             return .responseTooLarge
         case .incompatibleContract:
             return .incompatibleContract
-        case .transportUnavailable:
+        case .transportUnavailable, .authenticationFailed, .authenticationRequired:
             return .unavailable
         }
     }
