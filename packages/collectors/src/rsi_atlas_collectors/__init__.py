@@ -26,8 +26,9 @@ from rsi_atlas_collectors.pipeline import (
     import_fixture,
     load_fixture_bytes,
 )
-from rsi_atlas_collectors.reorg import mark_orphaned
+from rsi_atlas_collectors.reorg import ReorgEvent, apply_reorg, mark_orphaned
 from rsi_atlas_collectors.signals import detect_fee_regime_signal
+from rsi_atlas_collectors.websocket import refuse_websocket_stream
 
 __all__ = [
     "BTC_FEE_FEATURE",
@@ -41,7 +42,9 @@ __all__ = [
     "LiveCollectorBlocked",
     "MarketSequenceError",
     "QualityQuarantine",
+    "ReorgEvent",
     "analytics_gates",
+    "apply_reorg",
     "collect_live_json",
     "collector_definition_for",
     "compute_btc_fee_regime",
@@ -52,6 +55,7 @@ __all__ = [
     "load_fixture_bytes",
     "mark_orphaned",
     "refuse_live_collect",
+    "refuse_websocket_stream",
     "require_contiguous_sequence",
     "require_offline_mode",
     "require_postgres_only",

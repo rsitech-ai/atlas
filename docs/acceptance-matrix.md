@@ -6,40 +6,51 @@ This is the live completion ledger for the normative criteria in Section 33 and 
 
 | Criteria | Area | Current status | Current evidence | Closing evidence |
 | --- | --- | --- | --- | --- |
-| 1–9 | Product and UX | Not proven | Phase 1 Command Center plus Evidence; OSS slice binds Research / Comparison / Chunks to loopback workflow, timeline, and chunk-inspect clients (usable, not polished). Release-artifact accessibility incomplete. | Presets; complete workspaces/canvas/inspector/report/labs; release-artifact accessibility acceptance. |
-| 10–24 | Ingestion | Not proven | Phase 2A–2D development evidence unchanged for admission/parse/chunk/index. System Tesseract OCR is fail-closed when absent; Docling remains blocked. No sealed scanned holdout or production parser promotion. | New-version handling; born-digital/scanned production parsing; measured fallback; production-promoted canonical provenance; production-ready parent-child/table; production embedding promotion; human interrupt/resume; citations; sealed holdout; retrieval benchmarks; full lineage/reprocessing; complete offline ingestion. |
-| 25–40 | Retrieval | Not proven | Hybrid dense/lexical/exact, intent-weighted RRF, stdlib lexical post-RRF rerank, coverage/abstention. Offline `oss_token_hash_v1` candidate + MiniLM ONNX path (WordPiece+mean-pool) when owner artifact+vocab+`onnxruntime` present; `--download` pins URL+sha256 (opt-in egress). Still not sealed-holdout `PRODUCTION`. Fixture default for tests. No neural cross-encoder, expansion, multi-hop, or injection suite. | All required planes, identity/as-of, intent, expansion, fusion/rerank, coverage/contradiction/repair/abstention, injection containment, degradation, replay, and promotion gates. |
-| 41–60 | Research, agents, and reports | Not proven | Document Evidence specialist, plan validation, assertion/citation/report draft, immutable review; linear interrupt/resume with Postgres-durable attempts (`0012`) + artifact rehydration; loopback workflow start/resume/list/get; native Research Canvas bound. Remaining specialists, LangGraph, calibrated judges, Report Studio remain open. | Typed validated plans/specialists/tools, three ecosystems, comparison, monitoring trigger, assertions-first, exact multi-plane citations, numerical validation, calibrated judges, immutable review, edit validation, complete lineage. |
-| 61–84 | Structured data and monitoring | Not proven | Fixture collectors + optional monitored live HTTPS with user allowlists (deny-by-default); optional DuckDB/Parquet when enabled; monitoring detectors/alerts/comparison payloads; native Comparison timeline bound to observations+timeline APIs. WebSocket streams, calibrated semantic triage, full matrix client remain open. | Shared raw envelope, scheduler controls, three chain families, market reconciliation/precision, governance/GitHub, bitemporal quality/replay, Parquet/DuckDB, leakage-safe features, non-trading signals, deterministic monitoring, alert/evidence navigation. |
-| 85–102 | Models, evaluation, and observability | Not proven | Phase 1 metadata-only OTel + Phase 6 offline eval harness with fail-closed uncalibrated judges. OSS candidate embedders are not sealed-holdout production models. No calibrated judges, statistical CIs, or Swift-to-publication trace. | Interchangeable qualified providers, Apple fallback, isolated services, load/unload/arbiter/recovery, immutable artifacts, six dataset splits, evaluator ordering/calibration/statistics, regression mining, distributed local traces/privacy/retention and disabled exporters. |
-| 103–111 | Codex | Not proven | Phase 6 product-plane sanitize/approval/gate/authority denial + loopback API. Not a qualified live Codex App Server suite. | Qualified local provider/app-server contracts, inspectable streams, isolated sanitized worktree, credential/private-data/network denial, approvals, no automatic authority, complete patch gate. |
-| 112–134 | Security, packaging, and recovery | Not proven | Owner-private roots/sockets; SBOM; entitlement-matrix draft; fail-closed unsigned release checks; filesystem backup/Safe Mode; owner file-key AES-GCM backup (0600). No Developer ID signing, notarization, stapling, Gatekeeper clean-user, Keychain wrap, or embedded signed Python. | Signed/notarized exact artifact, capability/entitlement matrix, no TCP release API, exact release zero egress/allowlists, Keychain/worker containment, supply-chain/SBOM, embedded runtime, install/update/rollback/backup/restore/Safe Mode/rebuild/scrub/doctor/uninstall/incident proof. |
+| 1–9 | Product and UX | Not proven | Command Center + Evidence; Research Canvas with Report Studio panel; Comparison timeline + matrix shell; Chunk Inspector bound to loopback. Release-artifact accessibility incomplete. | Presets; polished Report Studio; labs; release accessibility acceptance. |
+| 10–24 | Ingestion | Not proven | Phase 2A–2D unchanged. Tesseract OCR fail-closed when absent; Docling blocked. Sealed-holdout **promotion machinery** exists (`script/run_sealed_promotion.py`) but synthetic fixtures do **not** authorize Proven PRODUCTION parser/embedding. | Owner-sealed holdout corpus; born-digital/scanned production parsing; Docling if offline+license. |
+| 25–40 | Retrieval | Not proven | Hybrid RRF + lexical rerank; OSS token-hash + MiniLM ONNX candidate; sealed promotion gates fail-closed without owner evidence; injection suite self-check (`run_injection_suite`). No neural cross-encoder PRODUCTION. | Sealed holdout PRODUCTION; neural rerank if governable; full injection containment under live retrieve. |
+| 41–60 | Research, agents, and reports | Not proven | Multi-specialist extractive orchestration (document/tokenomics/market/on_chain/governance/treasury/security/contradiction); Postgres-durable linear interrupt/resume; Report Studio minimal native panel. LangGraph deferred (ponytail). Calibrated judges remain open. | LangGraph or equivalent if license OK; calibrated judges; full Report Studio. |
+| 61–84 | Structured data and monitoring | Not proven | Live HTTPS allowlist collectors; reorg `apply_reorg`; WebSocket fail-closed; DuckDB optional; heuristic triage with frozen calibration fixture (`run_heuristic_triage`); comparison matrix shell. | Live WebSocket under egress policy; human-labelled triage calibration Proven; full matrix cells UI. |
+| 85–102 | Models, evaluation, and observability | Not proven | Sealed promotion machinery; local model load/unload/OOM recovery; Apple Foundation Models honest unavailable; offline eval harness; Swift→publication local JSONL bridge (`record_swift_to_publication_trace`) — not full native Swift join. | Owner-sealed PRODUCTION models; calibrated judges/CIs; Swift process OTel join. |
+| 103–111 | Codex | Not proven | Product-plane sanitize/gate + `qualify_codex_app_server` fail-closed without binary / deny-network. Live App Server suite not executed. | Live Codex App Server under isolated worktree + deny-network proof. |
+| 112–134 | Security, packaging, and recovery | Not proven | Authenticated Unix-domain release IPC (`script/run_engine.py --release-ipc`); loopback TCP only behind explicit flag; SBOM; entitlement matrix with UDS policy; fail-closed signing/notarization scripts; file-key backup + recovery harness. No Developer ID/notarization/Gatekeeper/Keychain wrap Proven. | Apple secrets + nested sign/staple/Gatekeeper clean-user; Keychain wrap; embedded signed Python. |
 
 ## Appendix D
 
 | Capability | Current status | Required completion artifact |
 | --- | --- | --- |
 | Immutable evidence | Not proven | Phase 2A raw PDF publication + append-only admission evidence. Full scrub/supersession remain. |
-| Durable workflow | Not proven | Parser-attempt journals + linear research workflow interrupt/resume with Postgres attempts (`0012`) and artifact rehydration; in-memory retained for unit tests. LangGraph and sealed criterion proof remain. |
-| PDF intelligence | Not proven | Tier-0 `pypdf`; Docling blocked; system Tesseract OCR fail-closed when absent; sealed scanned holdout remains. |
-| Chunking | Not proven | Five families with intrinsic goldens; parent-child/table production-ready policy remain. |
-| Retrieval | Not proven | Hybrid RRF + lexical rerank; fixture + OSS token-hash candidate; MiniLM ONNX usable with artifact+vocab+ort (else fail-closed); no sealed PRODUCTION promotion. |
-| Multi-agent research | Not proven | Document Evidence + linear interrupt/resume (Postgres-durable); LangGraph deferred; native Research Canvas bound to workflow APIs. |
+| Durable workflow | Not proven | Linear research workflow interrupt/resume with Postgres attempts (`0012`); multi-specialist extractive; LangGraph deferred. |
+| PDF intelligence | Not proven | Tier-0 `pypdf`; Docling blocked; Tesseract fail-closed; sealed scanned holdout remains. |
+| Chunking | Not proven | Five families with intrinsic goldens; sealed chunk-policy promotion machinery only. |
+| Retrieval | Not proven | Hybrid RRF + lexical rerank; injection suite; sealed PRODUCTION still owner-corpus gated. |
+| Multi-agent research | Not proven | Multi-specialist extractive (no LangGraph); Report Studio minimal panel. |
 | Numerical integrity | Not proven | Calculation manifests, report revalidation, units/as-of tests. |
-| Citation integrity | Not proven | Phase 3 direct_support citations with excerpt hashes; entailment judges remain. |
-| Multi-chain | Not proven | Fixtures + optional monitored live HTTPS allowlist; WebSocket remain fail-closed. |
-| Market data | Not proven | Fixture tick decimals + sequence-gap resnapshot; live streams remain. |
-| Monitoring | Not proven | Deterministic monitoring + comparison payloads; native Comparison timeline bound; calibrated triage blocked. |
-| Local models | Not proven | Candidate OSS embedders; MiniLM ONNX+vocab pinned and wired (candidate); sealed PRODUCTION qualification remain. |
-| Evaluation | Not proven | Offline harness + fail-closed uncalibrated judges; calibration/statistics/promotion remain. |
-| Observability | Not proven | Metadata-only local spans; Swift-to-publication trace remain. |
-| Native application | Not proven | Command Center + Evidence + Research/Comparison/Chunks loopback-backed screens; release proof remain. |
-| Zero egress | Not proven | Deny-by-default + optional collector allowlist; signed release-artifact proof remain. |
-| Codex | Not proven | Product-plane sanitize/gate; live App Server qualification remain. |
-| Security | Not proven | Signed peers, sandbox/entitlements, redaction, malicious containment. |
-| Release | Not proven | SBOM + entitlement-matrix draft + fail-closed unsigned release check; notarization blocked on secrets. |
-| Recovery | Not proven | Filesystem backup + optional file-key AES-GCM; Keychain wrap blocked. |
+| Citation integrity | Not proven | Phase 3 direct_support citations; entailment judges remain. |
+| Multi-chain | Not proven | Fixtures + live HTTPS allowlist; reorg apply; WebSocket fail-closed. |
+| Market data | Not proven | Fixture ticks + sequence-gap; live streams remain. |
+| Monitoring | Not proven | Deterministic detectors + calibrated heuristic triage (synthetic calibration); matrix shell. |
+| Local models | Not proven | Candidate OSS embedders + load/unload/OOM; AFM unavailable honesty; sealed PRODUCTION remain. |
+| Evaluation | Not proven | Offline harness + sealed promotion gates; synthetic promote path is machinery-only. |
+| Observability | Not proven | Metadata-only local spans + Swift→publication JSONL bridge (not native Swift join). |
+| Native application | Not proven | Command Center + Evidence + Research/Report Studio panel + Comparison matrix shell + Chunks. |
+| Zero egress | Not proven | Deny-by-default + optional collector allowlist; signed release proof remain. |
+| Codex | Not proven | Product-plane + qualification probe; live App Server remain. |
+| Security | Not proven | UDS release IPC + token auth; signed peers/notarization remain. |
+| Release | Not proven | SBOM + entitlement matrix + fail-closed unsigned/notarization scripts. |
+| Recovery | Not proven | Filesystem backup/restore/Safe Mode + file-key AES-GCM + recovery harness; Keychain wrap blocked. |
 
 ## Update rule
 
 Every reviewed vertical slice updates the relevant row with exact commands, fixture names, commit, and runtime artifact. The final audit expands each grouped Section 33 range into individual criterion evidence and rejects any row supported only by source presence or a narrower smoke.
+
+## Commands for newly added machinery (still Not proven for PRODUCTION claims)
+
+```bash
+uv run python script/run_sealed_promotion.py --component all
+uv run python script/run_engine.py --release-ipc   # UDS; do not combine with ALLOW_LOOPBACK_TCP
+uv run python script/release_check.py --require-release
+./script/package_release.sh
+# ./script/sign_and_notarize.sh   # requires Apple secrets
+uv run pytest packages/evaluation/tests/test_sealed_promotion.py packages/security/tests/test_ipc.py packages/monitoring/tests/test_triage.py packages/retrieval/tests/test_injection_suite.py -q
+```

@@ -18,7 +18,7 @@ from rsi_atlas_contracts import (
     sealed_evidence_id,
 )
 
-from rsi_atlas_evaluation.errors import DatasetLoadError, EvaluationError
+from rsi_atlas_evaluation.errors import EvaluationError
 from rsi_atlas_evaluation.harness import dataset_content_hash, load_dataset, run_offline_evaluation
 from rsi_atlas_evaluation.promotion import decide_promotion
 
@@ -38,10 +38,7 @@ class SealedPromotionBlocked(EvaluationError):
 def default_sealed_fixture_path() -> Path:
     """Synthetic sealed-holdout fixture (machinery proof only; not owner-sealed corpus)."""
     return (
-        Path(__file__).resolve().parents[4]
-        / "fixtures"
-        / "evaluation"
-        / "sealed_holdout_v1.json"
+        Path(__file__).resolve().parents[4] / "fixtures" / "evaluation" / "sealed_holdout_v1.json"
     )
 
 

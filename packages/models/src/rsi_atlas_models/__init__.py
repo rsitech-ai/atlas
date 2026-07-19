@@ -1,3 +1,10 @@
+from rsi_atlas_models.local_runtime import (
+    LocalModelBackend,
+    LocalModelError,
+    LocalModelHandle,
+    LocalModelRuntime,
+    default_local_runtime,
+)
 from rsi_atlas_models.provider import (
     InvalidModelRequestError,
     ModelProvider,
@@ -22,6 +29,10 @@ from rsi_atlas_models.resource_arbiter import (
 __all__ = [
     "InvalidModelRequestError",
     "InvalidResourceLeaseError",
+    "LocalModelBackend",
+    "LocalModelError",
+    "LocalModelHandle",
+    "LocalModelRuntime",
     "ModelProvider",
     "ModelRegistry",
     "ModelRegistryError",
@@ -38,4 +49,5 @@ __all__ = [
     "ResourceRejectionCode",
     "ResourceSnapshot",
     "UnavailableModelProvider",
+    "default_local_runtime",
 ]
