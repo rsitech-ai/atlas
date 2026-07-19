@@ -1,0 +1,34 @@
+{
+  "bounding_region_semantics": {
+    "coordinate_system": "pdf_bottom_left_points",
+    "relation": "observed_glyph_box_must_be_contained",
+    "tolerance_points": "1.000000"
+  },
+  "expected_bounding_regions": [
+    {
+      "bottom": "712.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "312.000000",
+      "text": "Malformed trailer fixture",
+      "top": "740.000000"
+    }
+  ],
+  "expected_page_count": 1,
+  "expected_preflight_route": "reject",
+  "expected_raw_strings": [
+    "Malformed trailer fixture"
+  ],
+  "expected_tokens": {
+    "bitcoin_identifiers": [],
+    "currencies": [],
+    "dates": [],
+    "evm_addresses": [],
+    "finding_ids": [],
+    "percentages": [],
+    "solana_addresses": [],
+    "symbols": []
+  },
+  "fixture": "malformed_trailer.pdf",
+  "schema_version": "1.0.0"
+}

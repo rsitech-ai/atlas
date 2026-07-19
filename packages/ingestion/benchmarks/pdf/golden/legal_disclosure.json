@@ -1,0 +1,54 @@
+{
+  "bounding_region_semantics": {
+    "coordinate_system": "pdf_bottom_left_points",
+    "relation": "observed_glyph_box_must_be_contained",
+    "tolerance_points": "1.000000"
+  },
+  "expected_bounding_regions": [
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "432.000000",
+      "text": "DIGITAL ASSET RISK DISCLOSURE",
+      "top": "764.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "342.000000",
+      "text": "Loss of principal is possible",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "642.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "322.000000",
+      "text": "Effective date 2026-07-19",
+      "top": "670.000000"
+    }
+  ],
+  "expected_page_count": 1,
+  "expected_preflight_route": "accept",
+  "expected_raw_strings": [
+    "DIGITAL ASSET RISK DISCLOSURE",
+    "Effective date 2026-07-19",
+    "Loss of principal is possible"
+  ],
+  "expected_tokens": {
+    "bitcoin_identifiers": [],
+    "currencies": [],
+    "dates": [
+      "2026-07-19"
+    ],
+    "evm_addresses": [],
+    "finding_ids": [],
+    "percentages": [],
+    "solana_addresses": [],
+    "symbols": []
+  },
+  "fixture": "legal_disclosure.pdf",
+  "schema_version": "1.0.0"
+}

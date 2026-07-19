@@ -1,0 +1,52 @@
+{
+  "bounding_region_semantics": {
+    "coordinate_system": "pdf_bottom_left_points",
+    "relation": "observed_glyph_box_must_be_contained",
+    "tolerance_points": "1.000000"
+  },
+  "expected_bounding_regions": [
+    {
+      "bottom": "692.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "262.000000",
+      "text": "LEFT ORDER A",
+      "top": "720.000000"
+    },
+    {
+      "bottom": "692.000000",
+      "left": "318.000000",
+      "page": 1,
+      "right": "522.000000",
+      "text": "RIGHT ORDER B",
+      "top": "720.000000"
+    },
+    {
+      "bottom": "692.000000",
+      "left": "198.000000",
+      "page": 1,
+      "right": "412.000000",
+      "text": "OVERLAP ORDER C",
+      "top": "720.000000"
+    }
+  ],
+  "expected_page_count": 1,
+  "expected_preflight_route": "review",
+  "expected_raw_strings": [
+    "LEFT ORDER A",
+    "OVERLAP ORDER C",
+    "RIGHT ORDER B"
+  ],
+  "expected_tokens": {
+    "bitcoin_identifiers": [],
+    "currencies": [],
+    "dates": [],
+    "evm_addresses": [],
+    "finding_ids": [],
+    "percentages": [],
+    "solana_addresses": [],
+    "symbols": []
+  },
+  "fixture": "parser_disagreement.pdf",
+  "schema_version": "1.0.0"
+}

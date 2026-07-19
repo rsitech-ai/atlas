@@ -1,0 +1,80 @@
+%PDF-1.7
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 3 /Kids [7 0 R 9 0 R 11 0 R] >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman >>
+endobj
+6 0 obj
+<< /Length 382 >>
+stream
+BT /F3 18 Tf 54 740 Td (RSI Atlas Protocol Technical Paper) Tj ET
+BT /F2 8 Tf 54 690 Td (EVM address 0x1111111111111111111111111111111111111111) Tj ET
+BT /F2 8 Tf 320 690 Td (Solana address 11111111111111111111111111111111) Tj ET
+BT /F2 8 Tf 54 650 Td (Bitcoin txid aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) Tj ET
+BT /F1 8 Tf 260 30 Td (Footer page 1) Tj ET
+
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /CropBox [0 0 612 792] /Rotate 0 /Contents 6 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> >>
+endobj
+8 0 obj
+<< /Length 398 >>
+stream
+0 G 0.5 w 54 610 390 110 re S 54 642 m 444 642 l S 54 678 m 444 678 l S 250 610 m 250 720 l S
+BT /F3 16 Tf 54 740 Td (Token Allocation) Tj ET
+BT /F1 11 Tf 54 690 Td (Community 45 percent) Tj ET
+BT /F1 11 Tf 260 690 Td (Treasury 25 percent) Tj ET
+BT /F1 11 Tf 54 650 Td (Contributors 20 percent) Tj ET
+BT /F1 11 Tf 260 650 Td (Liquidity 10 percent) Tj ET
+BT /F1 8 Tf 260 30 Td (Footer page 2) Tj ET
+
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /CropBox [0 0 612 792] /Rotate 0 /Contents 8 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> >>
+endobj
+10 0 obj
+<< /Length 255 >>
+stream
+BT /F3 16 Tf 54 740 Td (Vesting and Audit) Tj ET
+BT /F1 11 Tf 54 690 Td (Vesting starts 2026-09-01) Tj ET
+BT /F2 10 Tf 320 690 Td (Finding RSI-ATLAS-001) Tj ET
+BT /F1 11 Tf 54 650 Td (Symbol RSI USD 1.25) Tj ET
+BT /F1 8 Tf 260 30 Td (Footer page 3) Tj ET
+
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /CropBox [0 0 612 792] /Rotate 0 /Contents 10 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> >>
+endobj
+xref
+0 12
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000134 00000 n 
+0000000204 00000 n 
+0000000272 00000 n 
+0000000344 00000 n 
+0000000777 00000 n 
+0000000956 00000 n 
+0000001405 00000 n 
+0000001584 00000 n 
+0000001891 00000 n 
+trailer
+<< /Size 12 /Root 1 0 R >>
+startxref
+2072
+%%EOF

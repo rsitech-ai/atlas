@@ -1,0 +1,54 @@
+{
+  "bounding_region_semantics": {
+    "coordinate_system": "pdf_bottom_left_points",
+    "relation": "observed_glyph_box_must_be_contained",
+    "tolerance_points": "1.000000"
+  },
+  "expected_bounding_regions": [
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "342.000000",
+      "text": "SECURITY AUDIT REPORT",
+      "top": "764.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "332.000000",
+      "text": "Finding AUD-2026-004 High",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "642.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "392.000000",
+      "text": "Recommendation apply access control",
+      "top": "670.000000"
+    }
+  ],
+  "expected_page_count": 1,
+  "expected_preflight_route": "accept",
+  "expected_raw_strings": [
+    "Finding AUD-2026-004 High",
+    "Recommendation apply access control",
+    "SECURITY AUDIT REPORT"
+  ],
+  "expected_tokens": {
+    "bitcoin_identifiers": [],
+    "currencies": [],
+    "dates": [],
+    "evm_addresses": [],
+    "finding_ids": [
+      "AUD-2026-004"
+    ],
+    "percentages": [],
+    "solana_addresses": [],
+    "symbols": []
+  },
+  "fixture": "audit_mixed_font.pdf",
+  "schema_version": "1.0.0"
+}

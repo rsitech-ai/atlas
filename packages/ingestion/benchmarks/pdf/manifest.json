@@ -1,0 +1,532 @@
+{
+  "candidates": [
+    {
+      "configuration_hash": null,
+      "name": "docling",
+      "qualification": "unqualified",
+      "status": "unavailable",
+      "tier": 1,
+      "version": "2.113.0"
+    },
+    {
+      "configuration_hash": null,
+      "name": "pdfminer.six",
+      "qualification": "unqualified",
+      "status": "unavailable",
+      "tier": 0,
+      "version": "20260107"
+    },
+    {
+      "configuration_hash": null,
+      "name": "pypdf",
+      "qualification": "unqualified",
+      "status": "unavailable",
+      "tier": 0,
+      "version": "6.14.2"
+    }
+  ],
+  "fixtures": [
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [
+        {
+          "kind": "action",
+          "target": "inline:test-fixture",
+          "type": "JavaScript"
+        }
+      ],
+      "document_family": "unknown",
+      "expected_page_count": 1,
+      "expected_preflight_route": "reject",
+      "features": [
+        "active_javascript"
+      ],
+      "fixture": "active_javascript.pdf",
+      "golden": "active_javascript.json",
+      "golden_sha256": "db37b82c462e9faf7749f27be14f7d87ac07cfda46be2d6d7b38a2be0fe1b540",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "adversarial",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "e9b691496533b051a1e89c1ea1b7e44bb9bdd5ffa9bd01b3b455de8e5fc93855",
+      "size_bytes": 937
+    },
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [],
+      "document_family": "audit",
+      "expected_page_count": 1,
+      "expected_preflight_route": "accept",
+      "features": [
+        "mixed_font",
+        "single_column"
+      ],
+      "fixture": "audit_mixed_font.pdf",
+      "golden": "audit_mixed_font.json",
+      "golden_sha256": "78c0dc960e52aca6be369fe06ee8907ae062617fb7797372c46e2c387dfe7092",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "calibration",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "6d205536a09c1d27db9bc7d3edab4c128ac497e0c21aed15c25647c6b5a0859b",
+      "size_bytes": 961
+    },
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [],
+      "document_family": "technical_paper",
+      "expected_page_count": 3,
+      "expected_preflight_route": "accept",
+      "features": [
+        "mixed_font",
+        "multi_column",
+        "table"
+      ],
+      "fixture": "crypto_technical_three_page.pdf",
+      "golden": "crypto_technical_three_page.json",
+      "golden_sha256": "125a27abc80a3ee6670ba047892edf3c6694c62eaf06234634f3cd353eee8ea1",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "development",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "b769526f12d1a75cb0eaf26c534facd905eda0147337f647bbdc9f085d998822",
+      "size_bytes": 2378
+    },
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [],
+      "document_family": "unknown",
+      "expected_page_count": 1,
+      "expected_preflight_route": "reject",
+      "features": [
+        "decompression_boundary"
+      ],
+      "fixture": "decompression_boundary.pdf",
+      "golden": "decompression_boundary.json",
+      "golden_sha256": "a295ab8c90650dfb3639cd7eb5f7a74f592da8fb1887a285952c0626e16286ae",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "adversarial",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [
+        {
+          "accounting_scope": "referenced_form_xobject_decoded_stream",
+          "compressed_bytes": 3905,
+          "compression_ratio": "1024.328809",
+          "decoded_bytes": 4000004,
+          "expected_outcome": "reject",
+          "limit_bytes": 1000000,
+          "limit_name": "decoded_stream_bytes"
+        }
+      ],
+      "sha256": "1240cb2839abf5850c9cffe7aef189b8df6d26e4d520077371df8e3c4870ea65",
+      "size_bytes": 4930
+    },
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [
+        {
+          "kind": "embedded_file",
+          "target": "fixture.txt",
+          "type": "Filespec"
+        }
+      ],
+      "document_family": "unknown",
+      "expected_page_count": 1,
+      "expected_preflight_route": "reject",
+      "features": [
+        "attachment"
+      ],
+      "fixture": "embedded_attachment.pdf",
+      "golden": "embedded_attachment.json",
+      "golden_sha256": "69c9286ec010775dfbd6360f90b66b0a82692246ffaad30879876ee9ec185667",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "adversarial",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "1ac8d146f5074767b2d410ada70f2301e3cbc71a038bd24fb6e6d87db8c6b27d",
+      "size_bytes": 1143
+    },
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [],
+      "document_family": "unknown",
+      "expected_page_count": 1,
+      "expected_preflight_route": "awaiting_password",
+      "features": [
+        "encrypted"
+      ],
+      "fixture": "encrypted_password.pdf",
+      "golden": "encrypted_password.json",
+      "golden_sha256": "d35ae3b3fd78a09a395c31966edd1dcff7a578e8088243e85cafe358a98f1dfe",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "adversarial",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "59ee90536a4f90e3ebfeed217e20fd2853ca6f9713b2bc65bca52614369c2d73",
+      "size_bytes": 915
+    },
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [],
+      "document_family": "governance",
+      "expected_page_count": 1,
+      "expected_preflight_route": "accept",
+      "features": [
+        "multi_column"
+      ],
+      "fixture": "governance_multicolumn.pdf",
+      "golden": "governance_multicolumn.json",
+      "golden_sha256": "d97984af1a547dca3cde1cae69d3dd3d23d59ad2dcba4668c5555ac5c3d69853",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "calibration",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "e56238fb7ad8991a7353c45f916853a6293b2d9e9756d4db5b52e824339e500f",
+      "size_bytes": 950
+    },
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [],
+      "document_family": "unknown",
+      "expected_page_count": 1,
+      "expected_preflight_route": "review",
+      "features": [
+        "image_only"
+      ],
+      "fixture": "image_only.pdf",
+      "golden": "image_only.json",
+      "golden_sha256": "83f1bf538b8f9599f097b6ddc0a569c224877b3da8d07508d85d6cf37bf00bc1",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "adversarial",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "ba3eaeb768665e5b8288b078310aeac5d98037fa2541229335d5f31b71469162",
+      "size_bytes": 1018
+    },
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [],
+      "document_family": "legal_regulatory",
+      "expected_page_count": 1,
+      "expected_preflight_route": "accept",
+      "features": [
+        "single_column"
+      ],
+      "fixture": "legal_disclosure.pdf",
+      "golden": "legal_disclosure.json",
+      "golden_sha256": "8f1fbe013fab5e0ebc87670f1f758978a5b2598064dfe7e8a5a2cdc090b726b9",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "validation",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "caab3f8570a0998711f44bb2f4d479841790a02218ec4c48060677e8464ce870",
+      "size_bytes": 963
+    },
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [],
+      "document_family": "whitepaper",
+      "expected_page_count": 120,
+      "expected_preflight_route": "accept",
+      "features": [
+        "long_document",
+        "single_column"
+      ],
+      "fixture": "long_whitepaper_120_pages.pdf",
+      "golden": "long_whitepaper_120_pages.json",
+      "golden_sha256": "a22bae8c08d907a5b55cbde274cc59e99855bf256dfecebc9f0665c00fcae5a1",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "calibration",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "fa25e0b63ae0b32c634e5e135034ac42cece04ed16eee2fc3784c8455c2a8693",
+      "size_bytes": 48224
+    },
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [],
+      "document_family": "unknown",
+      "expected_page_count": 1,
+      "expected_preflight_route": "reject",
+      "features": [
+        "malformed_trailer"
+      ],
+      "fixture": "malformed_trailer.pdf",
+      "golden": "malformed_trailer.json",
+      "golden_sha256": "fb8dedabda8cf5cc5d8c213968cedc53a11c413b4fd9fa4bffceeeb0a2d92448",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "adversarial",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "dd87b71cb1ec78e58dd9dfaeee552cd6842c91929032b0d874eec0ad0505928d",
+      "size_bytes": 844
+    },
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [],
+      "document_family": "market_report",
+      "expected_page_count": 12,
+      "expected_preflight_route": "accept",
+      "features": [
+        "figure_caption",
+        "long_document"
+      ],
+      "fixture": "market_report_figure.pdf",
+      "golden": "market_report_figure.json",
+      "golden_sha256": "147aa58a713de4a1ff702d0880d80f6d19a729cd795a7ef8df7edcab9897252c",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "calibration",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "92856afa56e5b0b4f58fec8ce38f69afd8ce6b2f95358fddf2a6291b57263364",
+      "size_bytes": 7515
+    },
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [],
+      "document_family": "unknown",
+      "expected_page_count": 2001,
+      "expected_preflight_route": "reject",
+      "features": [
+        "long_document",
+        "over_page_limit"
+      ],
+      "fixture": "over_page_limit.pdf",
+      "golden": "over_page_limit.json",
+      "golden_sha256": "97ac78111e3d83db5513c12733cf0c625b1c7a00805417017b10b68fcf7067bc",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "adversarial",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "2bc9b35a55895be1708ec3470bcdca5779eb3ae1f05217e67ae49f2195779d8c",
+      "size_bytes": 314433
+    },
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [],
+      "document_family": "unknown",
+      "expected_page_count": 1,
+      "expected_preflight_route": "review",
+      "features": [
+        "multi_column",
+        "parser_disagreement"
+      ],
+      "fixture": "parser_disagreement.pdf",
+      "golden": "parser_disagreement.json",
+      "golden_sha256": "ea406ae8988d6e9231b4c43c2f67da306cf1a2af57ffdb67698f0c990b6ed43c",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "adversarial",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "b5d1bb8c751069364762c35e19d4f683811a03692d4673f7831fe7aee6ff2342",
+      "size_bytes": 922
+    },
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [],
+      "document_family": "technical_paper",
+      "expected_page_count": 1,
+      "expected_preflight_route": "accept",
+      "features": [
+        "rotated_crop_box"
+      ],
+      "fixture": "rotated_crop_box.pdf",
+      "golden": "rotated_crop_box.json",
+      "golden_sha256": "79d95706668b7a87b137c22000f4e723e14cf88e0c3f2c2845195a95bb41cc3c",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "development",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "6e544b42cc4fa00a0931085f27e82231197e7e790ed20b4e8e3d31dd475cece7",
+      "size_bytes": 845
+    },
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [],
+      "document_family": "tokenomics",
+      "expected_page_count": 1,
+      "expected_preflight_route": "accept",
+      "features": [
+        "single_column",
+        "table"
+      ],
+      "fixture": "tokenomics_table.pdf",
+      "golden": "tokenomics_table.json",
+      "golden_sha256": "6bafad15f5e2aaedac4142c41c6c7f406aed881afa6bd969ff6cee842af5343e",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "development",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "4987562b04f539ea951a060f96e593b3b48851550af58ef44ca86ebc1a552f3a",
+      "size_bytes": 1103
+    },
+    {
+      "declared_external_resources": [
+        {
+          "kind": "uri",
+          "locator": "https://example.invalid/governance"
+        }
+      ],
+      "declared_pdf_capabilities": [
+        {
+          "kind": "action",
+          "target": "https://example.invalid/governance",
+          "type": "URI"
+        }
+      ],
+      "document_family": "unknown",
+      "expected_page_count": 1,
+      "expected_preflight_route": "reject",
+      "features": [
+        "uri_action"
+      ],
+      "fixture": "uri_action.pdf",
+      "golden": "uri_action.json",
+      "golden_sha256": "8313362af58af002e5a3c664454677c55538482727f2ff6270c2545f97a95258",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "adversarial",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "6a72375c6b0aca142b7fc040dae3c2cacd77cb634d5c9f2b6546357313992d7d",
+      "size_bytes": 1011
+    },
+    {
+      "declared_external_resources": [],
+      "declared_pdf_capabilities": [],
+      "document_family": "whitepaper",
+      "expected_page_count": 1,
+      "expected_preflight_route": "accept",
+      "features": [
+        "single_column"
+      ],
+      "fixture": "whitepaper_single_column.pdf",
+      "golden": "whitepaper_single_column.json",
+      "golden_sha256": "ee188fdcf08cfccf1fe1605cc76c5a04f8cd4ae74d19eddc248db21fd0f5dcf4",
+      "license": "CC0-1.0",
+      "maximum_fixture_bytes": 8388608,
+      "partition": "development",
+      "provenance": "deterministic-local-generator:rsi-atlas-pdf-corpus-1",
+      "resource_limits": [],
+      "sha256": "2663d869a416099dfbcaed41e22267d3c14e4d7443e9c29c0b7d3f04479fc9b2",
+      "size_bytes": 957
+    }
+  ],
+  "performance_protocol": {
+    "cold_process": {
+      "filesystem_cache": "not_flushed_record_observed_state",
+      "measured_runs_per_fixture": 30,
+      "semantics": "new_interpreter_and_parser_instance_per_run",
+      "warmup_iterations": 0
+    },
+    "metrics": [
+      "failure_count",
+      "p50_ms",
+      "p95_ms",
+      "peak_rss_bytes",
+      "timeout_count"
+    ],
+    "pass_fail_rules": {
+      "all_class_ceilings_required": true,
+      "allowed_failure_count": 0,
+      "allowed_timeout_count": 0
+    },
+    "reference_environment": {
+      "hardware": "MacBook Pro Mac15,10; Apple M3 Max 14-core; 36 GB unified memory",
+      "operating_system": "macOS 27.0",
+      "runtime": "CPython 3.12.13 arm64"
+    },
+    "result_record_schema": {
+      "required_fields": [
+        "benchmark_schema_version",
+        "candidate_configuration_hash",
+        "candidate_name",
+        "candidate_version",
+        "execution_mode",
+        "failure_count",
+        "filesystem_cache_state",
+        "fixture",
+        "hardware",
+        "measured_runs",
+        "operating_system",
+        "p50_ms",
+        "p95_ms",
+        "peak_rss_bytes",
+        "runtime",
+        "size_class",
+        "timeout_count",
+        "warmup_iterations"
+      ],
+      "schema_version": "1.0.0"
+    },
+    "size_classes": [
+      {
+        "fixtures": [
+          "crypto_technical_three_page.pdf",
+          "tokenomics_table.pdf",
+          "whitepaper_single_column.pdf"
+        ],
+        "maximum_bytes": 65536,
+        "maximum_pages": 3,
+        "minimum_bytes": 1,
+        "minimum_pages": 1,
+        "name": "small",
+        "p95_ceiling_ms": 750,
+        "peak_rss_ceiling_bytes": 268435456
+      },
+      {
+        "fixtures": [
+          "market_report_figure.pdf"
+        ],
+        "maximum_bytes": 1048576,
+        "maximum_pages": 50,
+        "minimum_bytes": 1,
+        "minimum_pages": 4,
+        "name": "medium",
+        "p95_ceiling_ms": 2000,
+        "peak_rss_ceiling_bytes": 536870912
+      },
+      {
+        "fixtures": [
+          "long_whitepaper_120_pages.pdf"
+        ],
+        "maximum_bytes": 8388608,
+        "maximum_pages": 2000,
+        "minimum_bytes": 1,
+        "minimum_pages": 51,
+        "name": "long",
+        "p95_ceiling_ms": 10000,
+        "peak_rss_ceiling_bytes": 1073741824
+      }
+    ],
+    "timeout_seconds_per_run": 30,
+    "warm_process": {
+      "filesystem_cache": "shared_and_recorded",
+      "measured_runs_per_fixture": 30,
+      "semantics": "one_interpreter_one_parser_instance_no_result_cache",
+      "warmup_iterations": 3
+    }
+  },
+  "qualification": {
+    "production": "blocked_sealed_holdout_missing",
+    "tier0_development": "unqualified",
+    "tier1_development": "unqualified"
+  },
+  "schema_version": "1.0.0"
+}

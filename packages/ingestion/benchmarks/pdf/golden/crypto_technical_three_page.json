@@ -1,0 +1,188 @@
+{
+  "bounding_region_semantics": {
+    "coordinate_system": "pdf_bottom_left_points",
+    "relation": "observed_glyph_box_must_be_contained",
+    "tolerance_points": "1.000000"
+  },
+  "expected_bounding_regions": [
+    {
+      "bottom": "732.000000",
+      "left": "52.000000",
+      "page": 1,
+      "right": "515.000000",
+      "text": "RSI Atlas Protocol Technical Paper",
+      "top": "766.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "52.000000",
+      "page": 1,
+      "right": "380.000000",
+      "text": "EVM address 0x1111111111111111111111111111111111111111",
+      "top": "708.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "318.000000",
+      "page": 1,
+      "right": "604.000000",
+      "text": "Solana address 11111111111111111111111111111111",
+      "top": "708.000000"
+    },
+    {
+      "bottom": "642.000000",
+      "left": "52.000000",
+      "page": 1,
+      "right": "560.000000",
+      "text": "Bitcoin txid aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "top": "668.000000"
+    },
+    {
+      "bottom": "22.000000",
+      "left": "258.000000",
+      "page": 1,
+      "right": "352.000000",
+      "text": "Footer page 1",
+      "top": "46.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "52.000000",
+      "page": 2,
+      "right": "248.000000",
+      "text": "Token Allocation",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "52.000000",
+      "page": 2,
+      "right": "252.000000",
+      "text": "Community 45 percent",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "258.000000",
+      "page": 2,
+      "right": "442.000000",
+      "text": "Treasury 25 percent",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "642.000000",
+      "left": "52.000000",
+      "page": 2,
+      "right": "252.000000",
+      "text": "Contributors 20 percent",
+      "top": "670.000000"
+    },
+    {
+      "bottom": "642.000000",
+      "left": "258.000000",
+      "page": 2,
+      "right": "442.000000",
+      "text": "Liquidity 10 percent",
+      "top": "670.000000"
+    },
+    {
+      "bottom": "22.000000",
+      "left": "258.000000",
+      "page": 2,
+      "right": "352.000000",
+      "text": "Footer page 2",
+      "top": "46.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "52.000000",
+      "page": 3,
+      "right": "262.000000",
+      "text": "Vesting and Audit",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "52.000000",
+      "page": 3,
+      "right": "262.250000",
+      "text": "Vesting starts 2026-09-01",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "318.000000",
+      "page": 3,
+      "right": "522.000000",
+      "text": "Finding RSI-ATLAS-001",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "642.000000",
+      "left": "52.000000",
+      "page": 3,
+      "right": "242.000000",
+      "text": "Symbol RSI USD 1.25",
+      "top": "670.000000"
+    },
+    {
+      "bottom": "22.000000",
+      "left": "258.000000",
+      "page": 3,
+      "right": "352.000000",
+      "text": "Footer page 3",
+      "top": "46.000000"
+    }
+  ],
+  "expected_page_count": 3,
+  "expected_preflight_route": "accept",
+  "expected_raw_strings": [
+    "Bitcoin txid aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "Community 45 percent",
+    "Contributors 20 percent",
+    "EVM address 0x1111111111111111111111111111111111111111",
+    "Finding RSI-ATLAS-001",
+    "Footer page 1",
+    "Footer page 2",
+    "Footer page 3",
+    "Liquidity 10 percent",
+    "RSI Atlas Protocol Technical Paper",
+    "Solana address 11111111111111111111111111111111",
+    "Symbol RSI USD 1.25",
+    "Token Allocation",
+    "Treasury 25 percent",
+    "Vesting and Audit",
+    "Vesting starts 2026-09-01"
+  ],
+  "expected_tokens": {
+    "bitcoin_identifiers": [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ],
+    "currencies": [
+      "USD"
+    ],
+    "dates": [
+      "2026-09-01"
+    ],
+    "evm_addresses": [
+      "0x1111111111111111111111111111111111111111"
+    ],
+    "finding_ids": [
+      "RSI-ATLAS-001"
+    ],
+    "percentages": [
+      "10 percent",
+      "20 percent",
+      "25 percent",
+      "45 percent"
+    ],
+    "solana_addresses": [
+      "11111111111111111111111111111111"
+    ],
+    "symbols": [
+      "RSI"
+    ]
+  },
+  "fixture": "crypto_technical_three_page.pdf",
+  "schema_version": "1.0.0"
+}

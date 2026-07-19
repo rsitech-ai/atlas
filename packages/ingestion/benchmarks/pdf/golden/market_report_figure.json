@@ -1,0 +1,338 @@
+{
+  "bounding_region_semantics": {
+    "coordinate_system": "pdf_bottom_left_points",
+    "relation": "observed_glyph_box_must_be_contained",
+    "tolerance_points": "1.000000"
+  },
+  "expected_bounding_regions": [
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "302.000000",
+      "text": "Market Report page 1",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "302.000000",
+      "text": "BTC volume index 1001",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "112.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "302.000000",
+      "text": "Figure 1 weekly liquidity",
+      "top": "140.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 2,
+      "right": "302.000000",
+      "text": "Market Report page 2",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 2,
+      "right": "302.000000",
+      "text": "BTC volume index 1002",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "112.000000",
+      "left": "70.000000",
+      "page": 2,
+      "right": "302.000000",
+      "text": "Figure 1 weekly liquidity",
+      "top": "140.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 3,
+      "right": "302.000000",
+      "text": "Market Report page 3",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 3,
+      "right": "302.000000",
+      "text": "BTC volume index 1003",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "112.000000",
+      "left": "70.000000",
+      "page": 3,
+      "right": "302.000000",
+      "text": "Figure 1 weekly liquidity",
+      "top": "140.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 4,
+      "right": "302.000000",
+      "text": "Market Report page 4",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 4,
+      "right": "302.000000",
+      "text": "BTC volume index 1004",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "112.000000",
+      "left": "70.000000",
+      "page": 4,
+      "right": "302.000000",
+      "text": "Figure 1 weekly liquidity",
+      "top": "140.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 5,
+      "right": "302.000000",
+      "text": "Market Report page 5",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 5,
+      "right": "302.000000",
+      "text": "BTC volume index 1005",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "112.000000",
+      "left": "70.000000",
+      "page": 5,
+      "right": "302.000000",
+      "text": "Figure 1 weekly liquidity",
+      "top": "140.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 6,
+      "right": "302.000000",
+      "text": "Market Report page 6",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 6,
+      "right": "302.000000",
+      "text": "BTC volume index 1006",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "112.000000",
+      "left": "70.000000",
+      "page": 6,
+      "right": "302.000000",
+      "text": "Figure 1 weekly liquidity",
+      "top": "140.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 7,
+      "right": "302.000000",
+      "text": "Market Report page 7",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 7,
+      "right": "302.000000",
+      "text": "BTC volume index 1007",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "112.000000",
+      "left": "70.000000",
+      "page": 7,
+      "right": "302.000000",
+      "text": "Figure 1 weekly liquidity",
+      "top": "140.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 8,
+      "right": "302.000000",
+      "text": "Market Report page 8",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 8,
+      "right": "302.000000",
+      "text": "BTC volume index 1008",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "112.000000",
+      "left": "70.000000",
+      "page": 8,
+      "right": "302.000000",
+      "text": "Figure 1 weekly liquidity",
+      "top": "140.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 9,
+      "right": "302.000000",
+      "text": "Market Report page 9",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 9,
+      "right": "302.000000",
+      "text": "BTC volume index 1009",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "112.000000",
+      "left": "70.000000",
+      "page": 9,
+      "right": "302.000000",
+      "text": "Figure 1 weekly liquidity",
+      "top": "140.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 10,
+      "right": "310.250000",
+      "text": "Market Report page 10",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 10,
+      "right": "302.000000",
+      "text": "BTC volume index 1010",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "112.000000",
+      "left": "70.000000",
+      "page": 10,
+      "right": "302.000000",
+      "text": "Figure 1 weekly liquidity",
+      "top": "140.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 11,
+      "right": "310.250000",
+      "text": "Market Report page 11",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 11,
+      "right": "302.000000",
+      "text": "BTC volume index 1011",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "112.000000",
+      "left": "70.000000",
+      "page": 11,
+      "right": "302.000000",
+      "text": "Figure 1 weekly liquidity",
+      "top": "140.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 12,
+      "right": "310.250000",
+      "text": "Market Report page 12",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 12,
+      "right": "302.000000",
+      "text": "BTC volume index 1012",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "112.000000",
+      "left": "70.000000",
+      "page": 12,
+      "right": "302.000000",
+      "text": "Figure 1 weekly liquidity",
+      "top": "140.000000"
+    }
+  ],
+  "expected_page_count": 12,
+  "expected_preflight_route": "accept",
+  "expected_raw_strings": [
+    "BTC volume index 1001",
+    "BTC volume index 1002",
+    "BTC volume index 1003",
+    "BTC volume index 1004",
+    "BTC volume index 1005",
+    "BTC volume index 1006",
+    "BTC volume index 1007",
+    "BTC volume index 1008",
+    "BTC volume index 1009",
+    "BTC volume index 1010",
+    "BTC volume index 1011",
+    "BTC volume index 1012",
+    "Figure 1 weekly liquidity",
+    "Market Report page 1",
+    "Market Report page 10",
+    "Market Report page 11",
+    "Market Report page 12",
+    "Market Report page 2",
+    "Market Report page 3",
+    "Market Report page 4",
+    "Market Report page 5",
+    "Market Report page 6",
+    "Market Report page 7",
+    "Market Report page 8",
+    "Market Report page 9"
+  ],
+  "expected_tokens": {
+    "bitcoin_identifiers": [],
+    "currencies": [],
+    "dates": [],
+    "evm_addresses": [],
+    "finding_ids": [],
+    "percentages": [],
+    "solana_addresses": [],
+    "symbols": []
+  },
+  "fixture": "market_report_figure.pdf",
+  "schema_version": "1.0.0"
+}

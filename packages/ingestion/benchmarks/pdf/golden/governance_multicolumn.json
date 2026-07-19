@@ -1,0 +1,54 @@
+{
+  "bounding_region_semantics": {
+    "coordinate_system": "pdf_bottom_left_points",
+    "relation": "observed_glyph_box_must_be_contained",
+    "tolerance_points": "1.000000"
+  },
+  "expected_bounding_regions": [
+    {
+      "bottom": "732.000000",
+      "left": "52.000000",
+      "page": 1,
+      "right": "320.000000",
+      "text": "Governance Proposal 42",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "52.000000",
+      "page": 1,
+      "right": "282.000000",
+      "text": "FOR quorum 1200000 RSI",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "318.000000",
+      "page": 1,
+      "right": "562.000000",
+      "text": "AGAINST quorum 300000 RSI",
+      "top": "710.000000"
+    }
+  ],
+  "expected_page_count": 1,
+  "expected_preflight_route": "accept",
+  "expected_raw_strings": [
+    "AGAINST quorum 300000 RSI",
+    "FOR quorum 1200000 RSI",
+    "Governance Proposal 42"
+  ],
+  "expected_tokens": {
+    "bitcoin_identifiers": [],
+    "currencies": [],
+    "dates": [],
+    "evm_addresses": [],
+    "finding_ids": [],
+    "percentages": [],
+    "solana_addresses": [],
+    "symbols": [
+      "RSI"
+    ]
+  },
+  "fixture": "governance_multicolumn.pdf",
+  "schema_version": "1.0.0"
+}

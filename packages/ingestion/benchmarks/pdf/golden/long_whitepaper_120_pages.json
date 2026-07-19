@@ -1,0 +1,2185 @@
+{
+  "bounding_region_semantics": {
+    "coordinate_system": "pdf_bottom_left_points",
+    "relation": "observed_glyph_box_must_be_contained",
+    "tolerance_points": "1.000000"
+  },
+  "expected_bounding_regions": [
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 1",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "362.000000",
+      "text": "Protocol evidence section 1",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 2,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 2",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 2,
+      "right": "362.000000",
+      "text": "Protocol evidence section 2",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 3,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 3",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 3,
+      "right": "362.000000",
+      "text": "Protocol evidence section 3",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 4,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 4",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 4,
+      "right": "362.000000",
+      "text": "Protocol evidence section 4",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 5,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 5",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 5,
+      "right": "362.000000",
+      "text": "Protocol evidence section 5",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 6,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 6",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 6,
+      "right": "362.000000",
+      "text": "Protocol evidence section 6",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 7,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 7",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 7,
+      "right": "362.000000",
+      "text": "Protocol evidence section 7",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 8,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 8",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 8,
+      "right": "362.000000",
+      "text": "Protocol evidence section 8",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 9,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 9",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 9,
+      "right": "362.000000",
+      "text": "Protocol evidence section 9",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 10,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 10",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 10,
+      "right": "362.000000",
+      "text": "Protocol evidence section 10",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 11,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 11",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 11,
+      "right": "362.000000",
+      "text": "Protocol evidence section 11",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 12,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 12",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 12,
+      "right": "362.000000",
+      "text": "Protocol evidence section 12",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 13,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 13",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 13,
+      "right": "362.000000",
+      "text": "Protocol evidence section 13",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 14,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 14",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 14,
+      "right": "362.000000",
+      "text": "Protocol evidence section 14",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 15,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 15",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 15,
+      "right": "362.000000",
+      "text": "Protocol evidence section 15",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 16,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 16",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 16,
+      "right": "362.000000",
+      "text": "Protocol evidence section 16",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 17,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 17",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 17,
+      "right": "362.000000",
+      "text": "Protocol evidence section 17",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 18,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 18",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 18,
+      "right": "362.000000",
+      "text": "Protocol evidence section 18",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 19,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 19",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 19,
+      "right": "362.000000",
+      "text": "Protocol evidence section 19",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 20,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 20",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 20,
+      "right": "362.000000",
+      "text": "Protocol evidence section 20",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 21,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 21",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 21,
+      "right": "362.000000",
+      "text": "Protocol evidence section 21",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 22,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 22",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 22,
+      "right": "362.000000",
+      "text": "Protocol evidence section 22",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 23,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 23",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 23,
+      "right": "362.000000",
+      "text": "Protocol evidence section 23",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 24,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 24",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 24,
+      "right": "362.000000",
+      "text": "Protocol evidence section 24",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 25,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 25",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 25,
+      "right": "362.000000",
+      "text": "Protocol evidence section 25",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 26,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 26",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 26,
+      "right": "362.000000",
+      "text": "Protocol evidence section 26",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 27,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 27",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 27,
+      "right": "362.000000",
+      "text": "Protocol evidence section 27",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 28,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 28",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 28,
+      "right": "362.000000",
+      "text": "Protocol evidence section 28",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 29,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 29",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 29,
+      "right": "362.000000",
+      "text": "Protocol evidence section 29",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 30,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 30",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 30,
+      "right": "362.000000",
+      "text": "Protocol evidence section 30",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 31,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 31",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 31,
+      "right": "362.000000",
+      "text": "Protocol evidence section 31",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 32,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 32",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 32,
+      "right": "362.000000",
+      "text": "Protocol evidence section 32",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 33,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 33",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 33,
+      "right": "362.000000",
+      "text": "Protocol evidence section 33",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 34,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 34",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 34,
+      "right": "362.000000",
+      "text": "Protocol evidence section 34",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 35,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 35",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 35,
+      "right": "362.000000",
+      "text": "Protocol evidence section 35",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 36,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 36",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 36,
+      "right": "362.000000",
+      "text": "Protocol evidence section 36",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 37,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 37",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 37,
+      "right": "362.000000",
+      "text": "Protocol evidence section 37",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 38,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 38",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 38,
+      "right": "362.000000",
+      "text": "Protocol evidence section 38",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 39,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 39",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 39,
+      "right": "362.000000",
+      "text": "Protocol evidence section 39",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 40,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 40",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 40,
+      "right": "362.000000",
+      "text": "Protocol evidence section 40",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 41,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 41",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 41,
+      "right": "362.000000",
+      "text": "Protocol evidence section 41",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 42,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 42",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 42,
+      "right": "362.000000",
+      "text": "Protocol evidence section 42",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 43,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 43",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 43,
+      "right": "362.000000",
+      "text": "Protocol evidence section 43",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 44,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 44",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 44,
+      "right": "362.000000",
+      "text": "Protocol evidence section 44",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 45,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 45",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 45,
+      "right": "362.000000",
+      "text": "Protocol evidence section 45",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 46,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 46",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 46,
+      "right": "362.000000",
+      "text": "Protocol evidence section 46",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 47,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 47",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 47,
+      "right": "362.000000",
+      "text": "Protocol evidence section 47",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 48,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 48",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 48,
+      "right": "362.000000",
+      "text": "Protocol evidence section 48",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 49,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 49",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 49,
+      "right": "362.000000",
+      "text": "Protocol evidence section 49",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 50,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 50",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 50,
+      "right": "362.000000",
+      "text": "Protocol evidence section 50",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 51,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 51",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 51,
+      "right": "362.000000",
+      "text": "Protocol evidence section 51",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 52,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 52",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 52,
+      "right": "362.000000",
+      "text": "Protocol evidence section 52",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 53,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 53",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 53,
+      "right": "362.000000",
+      "text": "Protocol evidence section 53",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 54,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 54",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 54,
+      "right": "362.000000",
+      "text": "Protocol evidence section 54",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 55,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 55",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 55,
+      "right": "362.000000",
+      "text": "Protocol evidence section 55",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 56,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 56",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 56,
+      "right": "362.000000",
+      "text": "Protocol evidence section 56",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 57,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 57",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 57,
+      "right": "362.000000",
+      "text": "Protocol evidence section 57",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 58,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 58",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 58,
+      "right": "362.000000",
+      "text": "Protocol evidence section 58",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 59,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 59",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 59,
+      "right": "362.000000",
+      "text": "Protocol evidence section 59",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 60,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 60",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 60,
+      "right": "362.000000",
+      "text": "Protocol evidence section 60",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 61,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 61",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 61,
+      "right": "362.000000",
+      "text": "Protocol evidence section 61",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 62,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 62",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 62,
+      "right": "362.000000",
+      "text": "Protocol evidence section 62",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 63,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 63",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 63,
+      "right": "362.000000",
+      "text": "Protocol evidence section 63",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 64,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 64",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 64,
+      "right": "362.000000",
+      "text": "Protocol evidence section 64",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 65,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 65",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 65,
+      "right": "362.000000",
+      "text": "Protocol evidence section 65",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 66,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 66",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 66,
+      "right": "362.000000",
+      "text": "Protocol evidence section 66",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 67,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 67",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 67,
+      "right": "362.000000",
+      "text": "Protocol evidence section 67",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 68,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 68",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 68,
+      "right": "362.000000",
+      "text": "Protocol evidence section 68",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 69,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 69",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 69,
+      "right": "362.000000",
+      "text": "Protocol evidence section 69",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 70,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 70",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 70,
+      "right": "362.000000",
+      "text": "Protocol evidence section 70",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 71,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 71",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 71,
+      "right": "362.000000",
+      "text": "Protocol evidence section 71",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 72,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 72",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 72,
+      "right": "362.000000",
+      "text": "Protocol evidence section 72",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 73,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 73",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 73,
+      "right": "362.000000",
+      "text": "Protocol evidence section 73",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 74,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 74",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 74,
+      "right": "362.000000",
+      "text": "Protocol evidence section 74",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 75,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 75",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 75,
+      "right": "362.000000",
+      "text": "Protocol evidence section 75",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 76,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 76",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 76,
+      "right": "362.000000",
+      "text": "Protocol evidence section 76",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 77,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 77",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 77,
+      "right": "362.000000",
+      "text": "Protocol evidence section 77",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 78,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 78",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 78,
+      "right": "362.000000",
+      "text": "Protocol evidence section 78",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 79,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 79",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 79,
+      "right": "362.000000",
+      "text": "Protocol evidence section 79",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 80,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 80",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 80,
+      "right": "362.000000",
+      "text": "Protocol evidence section 80",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 81,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 81",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 81,
+      "right": "362.000000",
+      "text": "Protocol evidence section 81",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 82,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 82",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 82,
+      "right": "362.000000",
+      "text": "Protocol evidence section 82",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 83,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 83",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 83,
+      "right": "362.000000",
+      "text": "Protocol evidence section 83",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 84,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 84",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 84,
+      "right": "362.000000",
+      "text": "Protocol evidence section 84",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 85,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 85",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 85,
+      "right": "362.000000",
+      "text": "Protocol evidence section 85",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 86,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 86",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 86,
+      "right": "362.000000",
+      "text": "Protocol evidence section 86",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 87,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 87",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 87,
+      "right": "362.000000",
+      "text": "Protocol evidence section 87",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 88,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 88",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 88,
+      "right": "362.000000",
+      "text": "Protocol evidence section 88",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 89,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 89",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 89,
+      "right": "362.000000",
+      "text": "Protocol evidence section 89",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 90,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 90",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 90,
+      "right": "362.000000",
+      "text": "Protocol evidence section 90",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 91,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 91",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 91,
+      "right": "362.000000",
+      "text": "Protocol evidence section 91",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 92,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 92",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 92,
+      "right": "362.000000",
+      "text": "Protocol evidence section 92",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 93,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 93",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 93,
+      "right": "362.000000",
+      "text": "Protocol evidence section 93",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 94,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 94",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 94,
+      "right": "362.000000",
+      "text": "Protocol evidence section 94",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 95,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 95",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 95,
+      "right": "362.000000",
+      "text": "Protocol evidence section 95",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 96,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 96",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 96,
+      "right": "362.000000",
+      "text": "Protocol evidence section 96",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 97,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 97",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 97,
+      "right": "362.000000",
+      "text": "Protocol evidence section 97",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 98,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 98",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 98,
+      "right": "362.000000",
+      "text": "Protocol evidence section 98",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 99,
+      "right": "342.000000",
+      "text": "Long Whitepaper page 99",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 99,
+      "right": "362.000000",
+      "text": "Protocol evidence section 99",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 100,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 100",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 100,
+      "right": "362.000000",
+      "text": "Protocol evidence section 100",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 101,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 101",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 101,
+      "right": "362.000000",
+      "text": "Protocol evidence section 101",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 102,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 102",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 102,
+      "right": "362.000000",
+      "text": "Protocol evidence section 102",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 103,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 103",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 103,
+      "right": "362.000000",
+      "text": "Protocol evidence section 103",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 104,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 104",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 104,
+      "right": "362.000000",
+      "text": "Protocol evidence section 104",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 105,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 105",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 105,
+      "right": "362.000000",
+      "text": "Protocol evidence section 105",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 106,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 106",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 106,
+      "right": "362.000000",
+      "text": "Protocol evidence section 106",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 107,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 107",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 107,
+      "right": "362.000000",
+      "text": "Protocol evidence section 107",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 108,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 108",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 108,
+      "right": "362.000000",
+      "text": "Protocol evidence section 108",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 109,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 109",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 109,
+      "right": "362.000000",
+      "text": "Protocol evidence section 109",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 110,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 110",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 110,
+      "right": "362.000000",
+      "text": "Protocol evidence section 110",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 111,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 111",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 111,
+      "right": "362.000000",
+      "text": "Protocol evidence section 111",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 112,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 112",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 112,
+      "right": "362.000000",
+      "text": "Protocol evidence section 112",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 113,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 113",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 113,
+      "right": "362.000000",
+      "text": "Protocol evidence section 113",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 114,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 114",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 114,
+      "right": "362.000000",
+      "text": "Protocol evidence section 114",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 115,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 115",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 115,
+      "right": "362.000000",
+      "text": "Protocol evidence section 115",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 116,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 116",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 116,
+      "right": "362.000000",
+      "text": "Protocol evidence section 116",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 117,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 117",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 117,
+      "right": "362.000000",
+      "text": "Protocol evidence section 117",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 118,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 118",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 118,
+      "right": "362.000000",
+      "text": "Protocol evidence section 118",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 119,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 119",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 119,
+      "right": "362.000000",
+      "text": "Protocol evidence section 119",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 120,
+      "right": "344.000000",
+      "text": "Long Whitepaper page 120",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 120,
+      "right": "362.000000",
+      "text": "Protocol evidence section 120",
+      "top": "710.000000"
+    }
+  ],
+  "expected_page_count": 120,
+  "expected_preflight_route": "accept",
+  "expected_raw_strings": [
+    "Long Whitepaper page 1",
+    "Long Whitepaper page 10",
+    "Long Whitepaper page 100",
+    "Long Whitepaper page 101",
+    "Long Whitepaper page 102",
+    "Long Whitepaper page 103",
+    "Long Whitepaper page 104",
+    "Long Whitepaper page 105",
+    "Long Whitepaper page 106",
+    "Long Whitepaper page 107",
+    "Long Whitepaper page 108",
+    "Long Whitepaper page 109",
+    "Long Whitepaper page 11",
+    "Long Whitepaper page 110",
+    "Long Whitepaper page 111",
+    "Long Whitepaper page 112",
+    "Long Whitepaper page 113",
+    "Long Whitepaper page 114",
+    "Long Whitepaper page 115",
+    "Long Whitepaper page 116",
+    "Long Whitepaper page 117",
+    "Long Whitepaper page 118",
+    "Long Whitepaper page 119",
+    "Long Whitepaper page 12",
+    "Long Whitepaper page 120",
+    "Long Whitepaper page 13",
+    "Long Whitepaper page 14",
+    "Long Whitepaper page 15",
+    "Long Whitepaper page 16",
+    "Long Whitepaper page 17",
+    "Long Whitepaper page 18",
+    "Long Whitepaper page 19",
+    "Long Whitepaper page 2",
+    "Long Whitepaper page 20",
+    "Long Whitepaper page 21",
+    "Long Whitepaper page 22",
+    "Long Whitepaper page 23",
+    "Long Whitepaper page 24",
+    "Long Whitepaper page 25",
+    "Long Whitepaper page 26",
+    "Long Whitepaper page 27",
+    "Long Whitepaper page 28",
+    "Long Whitepaper page 29",
+    "Long Whitepaper page 3",
+    "Long Whitepaper page 30",
+    "Long Whitepaper page 31",
+    "Long Whitepaper page 32",
+    "Long Whitepaper page 33",
+    "Long Whitepaper page 34",
+    "Long Whitepaper page 35",
+    "Long Whitepaper page 36",
+    "Long Whitepaper page 37",
+    "Long Whitepaper page 38",
+    "Long Whitepaper page 39",
+    "Long Whitepaper page 4",
+    "Long Whitepaper page 40",
+    "Long Whitepaper page 41",
+    "Long Whitepaper page 42",
+    "Long Whitepaper page 43",
+    "Long Whitepaper page 44",
+    "Long Whitepaper page 45",
+    "Long Whitepaper page 46",
+    "Long Whitepaper page 47",
+    "Long Whitepaper page 48",
+    "Long Whitepaper page 49",
+    "Long Whitepaper page 5",
+    "Long Whitepaper page 50",
+    "Long Whitepaper page 51",
+    "Long Whitepaper page 52",
+    "Long Whitepaper page 53",
+    "Long Whitepaper page 54",
+    "Long Whitepaper page 55",
+    "Long Whitepaper page 56",
+    "Long Whitepaper page 57",
+    "Long Whitepaper page 58",
+    "Long Whitepaper page 59",
+    "Long Whitepaper page 6",
+    "Long Whitepaper page 60",
+    "Long Whitepaper page 61",
+    "Long Whitepaper page 62",
+    "Long Whitepaper page 63",
+    "Long Whitepaper page 64",
+    "Long Whitepaper page 65",
+    "Long Whitepaper page 66",
+    "Long Whitepaper page 67",
+    "Long Whitepaper page 68",
+    "Long Whitepaper page 69",
+    "Long Whitepaper page 7",
+    "Long Whitepaper page 70",
+    "Long Whitepaper page 71",
+    "Long Whitepaper page 72",
+    "Long Whitepaper page 73",
+    "Long Whitepaper page 74",
+    "Long Whitepaper page 75",
+    "Long Whitepaper page 76",
+    "Long Whitepaper page 77",
+    "Long Whitepaper page 78",
+    "Long Whitepaper page 79",
+    "Long Whitepaper page 8",
+    "Long Whitepaper page 80",
+    "Long Whitepaper page 81",
+    "Long Whitepaper page 82",
+    "Long Whitepaper page 83",
+    "Long Whitepaper page 84",
+    "Long Whitepaper page 85",
+    "Long Whitepaper page 86",
+    "Long Whitepaper page 87",
+    "Long Whitepaper page 88",
+    "Long Whitepaper page 89",
+    "Long Whitepaper page 9",
+    "Long Whitepaper page 90",
+    "Long Whitepaper page 91",
+    "Long Whitepaper page 92",
+    "Long Whitepaper page 93",
+    "Long Whitepaper page 94",
+    "Long Whitepaper page 95",
+    "Long Whitepaper page 96",
+    "Long Whitepaper page 97",
+    "Long Whitepaper page 98",
+    "Long Whitepaper page 99",
+    "Protocol evidence section 1",
+    "Protocol evidence section 10",
+    "Protocol evidence section 100",
+    "Protocol evidence section 101",
+    "Protocol evidence section 102",
+    "Protocol evidence section 103",
+    "Protocol evidence section 104",
+    "Protocol evidence section 105",
+    "Protocol evidence section 106",
+    "Protocol evidence section 107",
+    "Protocol evidence section 108",
+    "Protocol evidence section 109",
+    "Protocol evidence section 11",
+    "Protocol evidence section 110",
+    "Protocol evidence section 111",
+    "Protocol evidence section 112",
+    "Protocol evidence section 113",
+    "Protocol evidence section 114",
+    "Protocol evidence section 115",
+    "Protocol evidence section 116",
+    "Protocol evidence section 117",
+    "Protocol evidence section 118",
+    "Protocol evidence section 119",
+    "Protocol evidence section 12",
+    "Protocol evidence section 120",
+    "Protocol evidence section 13",
+    "Protocol evidence section 14",
+    "Protocol evidence section 15",
+    "Protocol evidence section 16",
+    "Protocol evidence section 17",
+    "Protocol evidence section 18",
+    "Protocol evidence section 19",
+    "Protocol evidence section 2",
+    "Protocol evidence section 20",
+    "Protocol evidence section 21",
+    "Protocol evidence section 22",
+    "Protocol evidence section 23",
+    "Protocol evidence section 24",
+    "Protocol evidence section 25",
+    "Protocol evidence section 26",
+    "Protocol evidence section 27",
+    "Protocol evidence section 28",
+    "Protocol evidence section 29",
+    "Protocol evidence section 3",
+    "Protocol evidence section 30",
+    "Protocol evidence section 31",
+    "Protocol evidence section 32",
+    "Protocol evidence section 33",
+    "Protocol evidence section 34",
+    "Protocol evidence section 35",
+    "Protocol evidence section 36",
+    "Protocol evidence section 37",
+    "Protocol evidence section 38",
+    "Protocol evidence section 39",
+    "Protocol evidence section 4",
+    "Protocol evidence section 40",
+    "Protocol evidence section 41",
+    "Protocol evidence section 42",
+    "Protocol evidence section 43",
+    "Protocol evidence section 44",
+    "Protocol evidence section 45",
+    "Protocol evidence section 46",
+    "Protocol evidence section 47",
+    "Protocol evidence section 48",
+    "Protocol evidence section 49",
+    "Protocol evidence section 5",
+    "Protocol evidence section 50",
+    "Protocol evidence section 51",
+    "Protocol evidence section 52",
+    "Protocol evidence section 53",
+    "Protocol evidence section 54",
+    "Protocol evidence section 55",
+    "Protocol evidence section 56",
+    "Protocol evidence section 57",
+    "Protocol evidence section 58",
+    "Protocol evidence section 59",
+    "Protocol evidence section 6",
+    "Protocol evidence section 60",
+    "Protocol evidence section 61",
+    "Protocol evidence section 62",
+    "Protocol evidence section 63",
+    "Protocol evidence section 64",
+    "Protocol evidence section 65",
+    "Protocol evidence section 66",
+    "Protocol evidence section 67",
+    "Protocol evidence section 68",
+    "Protocol evidence section 69",
+    "Protocol evidence section 7",
+    "Protocol evidence section 70",
+    "Protocol evidence section 71",
+    "Protocol evidence section 72",
+    "Protocol evidence section 73",
+    "Protocol evidence section 74",
+    "Protocol evidence section 75",
+    "Protocol evidence section 76",
+    "Protocol evidence section 77",
+    "Protocol evidence section 78",
+    "Protocol evidence section 79",
+    "Protocol evidence section 8",
+    "Protocol evidence section 80",
+    "Protocol evidence section 81",
+    "Protocol evidence section 82",
+    "Protocol evidence section 83",
+    "Protocol evidence section 84",
+    "Protocol evidence section 85",
+    "Protocol evidence section 86",
+    "Protocol evidence section 87",
+    "Protocol evidence section 88",
+    "Protocol evidence section 89",
+    "Protocol evidence section 9",
+    "Protocol evidence section 90",
+    "Protocol evidence section 91",
+    "Protocol evidence section 92",
+    "Protocol evidence section 93",
+    "Protocol evidence section 94",
+    "Protocol evidence section 95",
+    "Protocol evidence section 96",
+    "Protocol evidence section 97",
+    "Protocol evidence section 98",
+    "Protocol evidence section 99"
+  ],
+  "expected_tokens": {
+    "bitcoin_identifiers": [],
+    "currencies": [],
+    "dates": [],
+    "evm_addresses": [],
+    "finding_ids": [],
+    "percentages": [],
+    "solana_addresses": [],
+    "symbols": []
+  },
+  "fixture": "long_whitepaper_120_pages.pdf",
+  "schema_version": "1.0.0"
+}

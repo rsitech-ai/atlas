@@ -1,0 +1,67 @@
+{
+  "bounding_region_semantics": {
+    "coordinate_system": "pdf_bottom_left_points",
+    "relation": "observed_glyph_box_must_be_contained",
+    "tolerance_points": "1.000000"
+  },
+  "expected_bounding_regions": [
+    {
+      "bottom": "732.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "252.000000",
+      "text": "TOKENOMICS",
+      "top": "762.000000"
+    },
+    {
+      "bottom": "682.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "362.000000",
+      "text": "Category Allocation Unlock",
+      "top": "710.000000"
+    },
+    {
+      "bottom": "642.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "392.000000",
+      "text": "Community 45 percent 2026-09-01",
+      "top": "670.000000"
+    },
+    {
+      "bottom": "612.000000",
+      "left": "70.000000",
+      "page": 1,
+      "right": "392.000000",
+      "text": "Treasury 25 percent 2027-01-01",
+      "top": "640.000000"
+    }
+  ],
+  "expected_page_count": 1,
+  "expected_preflight_route": "accept",
+  "expected_raw_strings": [
+    "Category Allocation Unlock",
+    "Community 45 percent 2026-09-01",
+    "TOKENOMICS",
+    "Treasury 25 percent 2027-01-01"
+  ],
+  "expected_tokens": {
+    "bitcoin_identifiers": [],
+    "currencies": [],
+    "dates": [
+      "2026-09-01",
+      "2027-01-01"
+    ],
+    "evm_addresses": [],
+    "finding_ids": [],
+    "percentages": [
+      "25 percent",
+      "45 percent"
+    ],
+    "solana_addresses": [],
+    "symbols": []
+  },
+  "fixture": "tokenomics_table.pdf",
+  "schema_version": "1.0.0"
+}
