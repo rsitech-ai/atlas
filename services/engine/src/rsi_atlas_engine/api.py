@@ -11,15 +11,21 @@ from pydantic import ValidationError
 from rsi_atlas_contracts import (
     AcquisitionMethod,
     AcquisitionRequest,
+    AlertLifecycle,
     ArtifactCommandContext,
+    ComparisonAxis,
     DocumentAdmissionRecord,
     EvidencePacket,
+    MonitoringRule,
+    Observation,
     ProviderQualityState,
     ReportDraft,
     ResearchQuery,
     RetrievalAbstention,
+    RetrievalPlan,
     ReviewAction,
     ReviewDecision,
+    SemanticTriageRequest,
     SpecialistFinding,
     SystemStatus,
 )
@@ -38,6 +44,11 @@ from starlette.requests import ClientDisconnect
 from rsi_atlas_engine.collectors import CollectorPort
 from rsi_atlas_engine.import_staging import ImportStagingArea, ImportStagingError
 from rsi_atlas_engine.ingestion import DocumentIngestionServices
+from rsi_atlas_engine.monitoring import (
+    AlertTransitionError,
+    MonitoringPort,
+    SemanticTriageBlocked,
+)
 from rsi_atlas_engine.runtime import RuntimeServices
 
 
@@ -157,6 +168,7 @@ def create_app(
     document_processing_service: DocumentProcessingPort | None = None,
     research_service: ResearchPort | None = None,
     collector_service: CollectorPort | None = None,
+    monitoring_service: MonitoringPort | None = None,
 ) -> FastAPI:
     if (document_admission_service is None) != (import_staging_area is None):
         raise ValueError("document admission service and staging area must be configured together")
@@ -194,6 +206,11 @@ def create_app(
         if collector_service is None:
             raise RuntimeError("collector service is unavailable")
         return collector_service
+
+    def resolve_monitoring() -> MonitoringPort:
+        if monitoring_service is None:
+            raise RuntimeError("monitoring service is unavailable")
+        return monitoring_service
 
     @asynccontextmanager
     async def lifespan(_application: FastAPI) -> AsyncIterator[None]:
@@ -768,6 +785,295 @@ def create_app(
             raise HTTPException(
                 status_code=503,
                 detail="Observation listing is temporarily unavailable.",
+            ) from error
+
+    @application.post("/v1/workspaces/{workspace_id}/monitoring:evaluate")
+    async def monitoring_evaluate(
+        request: Request,
+        workspace_id: UUID,
+    ) -> dict[str, object]:
+        context = _workspace_context(request, workspace_id)
+        try:
+            monitoring = await run_in_threadpool(resolve_monitoring)
+            body = await request.json()
+            previous_raw = body.get("previous_observation")
+            previous = (
+                None
+                if previous_raw is None
+                else Observation.model_validate_json(dumps(previous_raw))
+            )
+            current = Observation.model_validate_json(dumps(body["current_observation"]))
+            rules = tuple(
+                MonitoringRule.model_validate_json(dumps(item)) for item in body.get("rules", [])
+            )
+            affected = tuple(str(item) for item in body.get("affected_report_ids", []))
+            result = await run_in_threadpool(
+                monitoring.evaluate_change,
+                context=context,
+                previous=previous,
+                current=current,
+                rules=rules,
+                affected_report_ids=affected,
+            )
+            detection = result["detection"]
+            return {
+                "detection": detection.model_dump(mode="json"),  # type: ignore[union-attr]
+                "matched_rules": [
+                    rule.model_dump(mode="json")
+                    for rule in result["matched_rules"]  # type: ignore[union-attr]
+                ],
+                "decisions": [
+                    decision.model_dump(mode="json")
+                    for decision in result["decisions"]  # type: ignore[union-attr]
+                ],
+                "alerts": [
+                    alert.model_dump(mode="json")
+                    for alert in result["alerts"]  # type: ignore[union-attr]
+                ],
+                "created": list(result["created"]),  # type: ignore[arg-type]
+            }
+        except HTTPException:
+            raise
+        except RuntimeError as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Monitoring evaluate is temporarily unavailable.",
+            ) from error
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(
+                status_code=422,
+                detail="Monitoring evaluate is invalid.",
+            ) from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Monitoring evaluate is temporarily unavailable.",
+            ) from error
+
+    @application.post("/v1/workspaces/{workspace_id}/monitoring/alerts/{alert_id}:transition")
+    async def monitoring_transition(
+        request: Request,
+        workspace_id: UUID,
+        alert_id: str,
+    ) -> dict[str, object]:
+        context = _workspace_context(request, workspace_id)
+        try:
+            monitoring = await run_in_threadpool(resolve_monitoring)
+            body = await request.json()
+            to_status = AlertLifecycle(str(body["to_status"]))
+            note = str(body.get("note", ""))
+            result = await run_in_threadpool(
+                monitoring.transition,
+                context=context,
+                alert_id=alert_id,
+                to_status=to_status,
+                note=note,
+            )
+            return {
+                "alert": result["alert"].model_dump(mode="json"),  # type: ignore[union-attr]
+                "event": result["event"].model_dump(mode="json"),  # type: ignore[union-attr]
+            }
+        except HTTPException:
+            raise
+        except RuntimeError as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Alert transition is temporarily unavailable.",
+            ) from error
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail="Alert was not found.") from error
+        except AlertTransitionError as error:
+            raise HTTPException(status_code=422, detail="Alert transition is illegal.") from error
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Alert transition is invalid.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Alert transition is temporarily unavailable.",
+            ) from error
+
+    @application.post("/v1/workspaces/{workspace_id}/monitoring:invalidate")
+    async def monitoring_invalidate(
+        request: Request,
+        workspace_id: UUID,
+    ) -> dict[str, object]:
+        context = _workspace_context(request, workspace_id)
+        try:
+            monitoring = await run_in_threadpool(resolve_monitoring)
+            body = await request.json()
+            previous_raw = body.get("previous_observation")
+            previous = (
+                None
+                if previous_raw is None
+                else Observation.model_validate_json(dumps(previous_raw))
+            )
+            current = Observation.model_validate_json(dumps(body["current_observation"]))
+            affected = tuple(str(item) for item in body.get("affected_report_ids", []))
+            alert_id = body.get("alert_id")
+            record = await run_in_threadpool(
+                monitoring.invalidate,
+                context=context,
+                previous=previous,
+                current=current,
+                affected_report_ids=affected,
+                alert_id=None if alert_id is None else str(alert_id),
+            )
+            return {"invalidation": record.model_dump(mode="json")}
+        except HTTPException:
+            raise
+        except RuntimeError as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Research invalidation is temporarily unavailable.",
+            ) from error
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(
+                status_code=422,
+                detail="Invalidation request is invalid.",
+            ) from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Research invalidation is temporarily unavailable.",
+            ) from error
+
+    @application.post("/v1/workspaces/{workspace_id}/monitoring:launch-research")
+    async def monitoring_launch(
+        request: Request,
+        workspace_id: UUID,
+    ) -> dict[str, object]:
+        context = _workspace_context(request, workspace_id)
+        try:
+            monitoring = await run_in_threadpool(resolve_monitoring)
+            body = await request.json()
+            alert_id = str(body["alert_id"])
+            plan = RetrievalPlan.model_validate_json(dumps(body["plan"]))
+            launch = await run_in_threadpool(
+                monitoring.launch,
+                context=context,
+                alert_id=alert_id,
+                plan=plan,
+            )
+            return {"launch": launch.model_dump(mode="json")}
+        except HTTPException:
+            raise
+        except RuntimeError as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Research launch is temporarily unavailable.",
+            ) from error
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail="Alert was not found.") from error
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Research launch is invalid.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Research launch is temporarily unavailable.",
+            ) from error
+
+    @application.post("/v1/workspaces/{workspace_id}/monitoring:comparison")
+    async def monitoring_comparison(
+        request: Request,
+        workspace_id: UUID,
+    ) -> dict[str, object]:
+        context = _workspace_context(request, workspace_id)
+        try:
+            monitoring = await run_in_threadpool(resolve_monitoring)
+            body = await request.json()
+            observations = tuple(
+                Observation.model_validate_json(dumps(item)) for item in body["observations"]
+            )
+            axes = tuple(ComparisonAxis(str(item)) for item in body["axes"])
+            as_of = datetime.fromisoformat(str(body["as_of"]).replace("Z", "+00:00"))
+            matrix = await run_in_threadpool(
+                monitoring.comparison,
+                context=context,
+                observations=observations,
+                axes=axes,
+                as_of=as_of,
+            )
+            return {"matrix": matrix.model_dump(mode="json")}
+        except HTTPException:
+            raise
+        except RuntimeError as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Comparison matrix is temporarily unavailable.",
+            ) from error
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Comparison request is invalid.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Comparison matrix is temporarily unavailable.",
+            ) from error
+
+    @application.post("/v1/workspaces/{workspace_id}/monitoring:timeline")
+    async def monitoring_timeline(
+        request: Request,
+        workspace_id: UUID,
+    ) -> dict[str, object]:
+        context = _workspace_context(request, workspace_id)
+        try:
+            monitoring = await run_in_threadpool(resolve_monitoring)
+            body = await request.json()
+            observations = tuple(
+                Observation.model_validate_json(dumps(item)) for item in body["observations"]
+            )
+            as_of = datetime.fromisoformat(str(body["as_of"]).replace("Z", "+00:00"))
+            timeline = await run_in_threadpool(
+                monitoring.timeline,
+                context=context,
+                observations=observations,
+                as_of=as_of,
+            )
+            return {"timeline": timeline.model_dump(mode="json")}
+        except HTTPException:
+            raise
+        except RuntimeError as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Timeline is temporarily unavailable.",
+            ) from error
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Timeline request is invalid.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Timeline is temporarily unavailable.",
+            ) from error
+
+    @application.post("/v1/workspaces/{workspace_id}/monitoring:semantic-triage")
+    async def monitoring_semantic_triage(
+        request: Request,
+        workspace_id: UUID,
+    ) -> dict[str, object]:
+        _workspace_context(request, workspace_id)
+        try:
+            monitoring = await run_in_threadpool(resolve_monitoring)
+            body = await request.json()
+            triage_request = SemanticTriageRequest.model_validate_json(dumps(body))
+            await run_in_threadpool(monitoring.triage, request=triage_request)
+            raise HTTPException(status_code=503, detail="Semantic triage is unavailable.")
+        except SemanticTriageBlocked as error:
+            raise HTTPException(
+                status_code=422,
+                detail="blocked_semantic_triage",
+            ) from error
+        except HTTPException:
+            raise
+        except RuntimeError as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Semantic triage is temporarily unavailable.",
+            ) from error
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Semantic triage is invalid.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Semantic triage is temporarily unavailable.",
             ) from error
 
     return application
