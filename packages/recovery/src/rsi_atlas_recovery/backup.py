@@ -15,6 +15,8 @@ from rsi_atlas_contracts import (
     compute_root_hash,
 )
 
+from rsi_atlas_recovery.file_key import encrypt_bytes, load_owner_key
+
 
 def _iter_files(root: Path) -> list[Path]:
     return sorted(path for path in root.rglob("*") if path.is_file())
@@ -26,10 +28,23 @@ def create_workspace_backup(
     *,
     created_at: datetime,
     encryption_status: BackupEncryptionStatus = BackupEncryptionStatus.PLAINTEXT_DEV_ONLY,
+    owner_key_path: Path | None = None,
 ) -> BackupManifest:
-    """Copy workspace files, write hashed manifest. Keychain wrap remains blocked."""
+    """Copy workspace files, write hashed manifest.
+
+    Keychain wrap remains blocked. Optional FILE_KEY_AES_GCM uses an owner key file (0600).
+    """
     if not source_root.is_dir():
         raise FileNotFoundError(f"source root missing: {source_root}")
+    key: bytes | None = None
+    if encryption_status is BackupEncryptionStatus.FILE_KEY_AES_GCM:
+        if owner_key_path is None:
+            raise ValueError("owner_key_path required for file_key_aes_gcm")
+        key = load_owner_key(owner_key_path)
+    elif encryption_status is BackupEncryptionStatus.BLOCKED_KEYCHAIN_UNAVAILABLE:
+        raise ValueError(
+            "keychain backup remains blocked; use plaintext_dev_only or file_key_aes_gcm"
+        )
     destination_root.mkdir(parents=True, exist_ok=True)
     data_dir = destination_root / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
@@ -39,15 +54,18 @@ def create_workspace_backup(
         target = data_dir / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         payload = path.read_bytes()
-        target.write_bytes(payload)
+        stored = encrypt_bytes(payload, key=key) if key is not None else payload
+        target.write_bytes(stored)
+        # Manifest hashes plaintext so restore can verify after decrypt.
         entries.append(
             BackupEntry(path=rel, sha256=sha256(payload).hexdigest(), size_bytes=len(payload))
         )
     if not entries:
-        # empty workspace still needs a sentinel for contract min_length
         sentinel = data_dir / ".empty"
-        sentinel.write_bytes(b"")
-        entries.append(BackupEntry(path=".empty", sha256=sha256(b"").hexdigest(), size_bytes=0))
+        empty = b""
+        stored = encrypt_bytes(empty, key=key) if key is not None else empty
+        sentinel.write_bytes(stored)
+        entries.append(BackupEntry(path=".empty", sha256=sha256(empty).hexdigest(), size_bytes=0))
     entry_tuple = tuple(entries)
     root_hash = compute_root_hash(entry_tuple)
     manifest = BackupManifest(

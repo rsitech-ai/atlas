@@ -27,8 +27,11 @@ def run_release_check(
     now = created_at or datetime.now(tz=UTC)
     lock_path = repo_root / "uv.lock"
     sbom_present = False
+    sbom_path = repo_root / "dist" / "sbom.cdx.json"
     if lock_path.is_file():
-        build_sbom_from_lock(lock_path, created_at=now)
+        sbom = build_sbom_from_lock(lock_path, created_at=now)
+        sbom_path.parent.mkdir(parents=True, exist_ok=True)
+        sbom_path.write_bytes(sbom.model_dump_json(indent=2).encode("utf-8"))
         sbom_present = True
     bundle = repo_root / "dist" / "RSIAtlas.app"
     inventory = inventory_staged_bundle(bundle)
@@ -50,7 +53,13 @@ def run_release_check(
         blockers.append("notarization_unverified")
     if not sbom_present:
         blockers.append("sbom_missing")
-    blockers.append("entitlement_matrix_missing")
+    entitlement_matrix = repo_root / "docs" / "release" / "entitlement-matrix.md"
+    entitlement_present = entitlement_matrix.is_file()
+    if not entitlement_present:
+        blockers.append("entitlement_matrix_missing")
+    governance = repo_root / "docs" / "dependency-governance"
+    if not (governance / "embedding-model-approval.md").is_file():
+        blockers.append("embedding_governance_missing")
     if (
         inventory.signing_status is SigningStatus.UNSIGNED_DEVELOPMENT
         and "unsigned" not in blockers
@@ -67,7 +76,7 @@ def run_release_check(
         signing_status=signing_status,
         notarization_status=notarization_status,
         sbom_present=sbom_present,
-        entitlement_matrix_present=False,
+        entitlement_matrix_present=entitlement_present,
         zero_egress_recorded=True,
         blockers=tuple(dict.fromkeys(blockers)),
         release_ready=release_ready,

@@ -38,3 +38,5 @@ def test_development_check_not_ready() -> None:
     assert report.claim is ReleaseClaim.DEVELOPMENT_ONLY
     assert report.release_ready is False
     assert report.sbom_present is True
+    assert report.entitlement_matrix_present is True
+    assert "notarization_blocked" in report.blockers

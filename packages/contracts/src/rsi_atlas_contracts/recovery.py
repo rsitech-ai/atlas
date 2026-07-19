@@ -39,6 +39,7 @@ class BackupEncryptionStatus(StrEnum):
     DEVELOPMENT_PASSPHRASE = "development_passphrase"
     BLOCKED_KEYCHAIN_UNAVAILABLE = "blocked_keychain_unavailable"
     PLAINTEXT_DEV_ONLY = "plaintext_dev_only"
+    FILE_KEY_AES_GCM = "file_key_aes_gcm"
 
 
 class SafeModeCapability(StrEnum):

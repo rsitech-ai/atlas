@@ -8,5 +8,6 @@ version = "0.1.0"
 description = "Development backup, restore, Safe Mode, and integrity scrub"
 requires-python = ">=3.11,<3.15"
 dependencies = [
+  "cryptography>=44.0.0,<50",
   "rsi-atlas-contracts==0.1.0",
 ]
