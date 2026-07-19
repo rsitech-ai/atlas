@@ -4,6 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.11,<3.15"
 dependencies = [
   "rsi-atlas-contracts",
+  "rsi-atlas-document-worker",
   "rsi-atlas-engine",
   "rsi-atlas-ingestion",
   "rsi-atlas-models",
@@ -22,6 +23,7 @@ dev = [
 
 [tool.uv.sources]
 rsi-atlas-contracts = { workspace = true }
+rsi-atlas-document-worker = { workspace = true }
 rsi-atlas-engine = { workspace = true }
 rsi-atlas-ingestion = { workspace = true }
 rsi-atlas-models = { workspace = true }
@@ -32,6 +34,7 @@ rsi-atlas-storage = { workspace = true }
 [tool.uv.workspace]
 members = [
   "packages/contracts",
+  "packages/document_worker",
   "packages/ingestion",
   "packages/models",
   "packages/observability",
@@ -43,12 +46,15 @@ members = [
 [tool.pytest.ini_options]
 testpaths = [
   "packages/contracts/tests",
+  "packages/document_worker/tests",
   "packages/ingestion/tests",
   "packages/models/tests",
   "packages/observability/tests",
   "packages/security/tests",
   "packages/storage/tests",
   "services/engine/tests",
+  "infra/security/tests",
+  "tests",
 ]
 
 [tool.ruff]
@@ -65,6 +71,7 @@ warn_unreachable = true
 exclude = "(^|/)tests/"
 mypy_path = [
   "packages/contracts/src",
+  "packages/document_worker/src",
   "packages/ingestion/src",
   "packages/models/src",
   "packages/observability/src",

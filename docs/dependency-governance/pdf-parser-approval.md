@@ -4,7 +4,7 @@ Status: **approved** (Tier-0 only)
 
 This record separates the product design decision from authority to change the accepted Python
 dependency set. The governance capture is bound to manifest
-`03ee447ba6c20ac78c18580f5913953453a26227dbcb2305895e2775724f5102` and to the unchanged
+`b1f80e8ef0d33d09145d73aa61bc8e20c937f011b92d8999af33b70ee15abc3d` and to the unchanged
 workspace `pyproject.toml` and `uv.lock` hashes recorded there.
 
 ## Decision
@@ -38,7 +38,7 @@ The JSON below is authoritative; prose is explanatory.
 {
   "accepted_exceptions": [],
   "actor_id": "andrzej:continue-development-instruction",
-  "approval_sha256": "7753fe823ace2c98410cba73e0264edfb1b43ac1bfd2c418693980749b23dcf4",
+  "approval_sha256": "1add542d57a79903fa0e249f31f806fa8a9dbf8f28ef6ae3a3719a9b2eb3908d",
   "authority": {
     "allows_commit_or_push": false,
     "allows_dependency_lock_change": true,
@@ -56,7 +56,7 @@ The JSON below is authoritative; prose is explanatory.
   ],
   "decided_at": "2026-07-19T08:18:00Z",
   "decision": "approved",
-  "manifest_sha256": "03ee447ba6c20ac78c18580f5913953453a26227dbcb2305895e2775724f5102",
+  "manifest_sha256": "b1f80e8ef0d33d09145d73aa61bc8e20c937f011b92d8999af33b70ee15abc3d",
   "model_artifacts": [],
   "proposed_candidates": [
     {
@@ -92,7 +92,7 @@ The JSON below is authoritative; prose is explanatory.
   ],
   "rollback": {
     "action": "remove both direct parser requirements and regenerate uv.lock from the accepted baseline",
-    "baseline_uv_lock_sha256": "5d8d6621754a3673dfc4d90e915f290664bfeaf8713235e6cab233a706bb4926"
+    "baseline_uv_lock_sha256": "ac668688ad7238d142c340fed1087bf8564a4f3f02aae1194b6e7e0c860db2c7"
   },
   "schema_version": "rsi-atlas.pdf-parser-approval.v1",
   "target_environment": {

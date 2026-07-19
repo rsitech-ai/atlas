@@ -5,10 +5,18 @@ from rsi_atlas_ingestion.service import (
     StagedPDFEvidence,
     StagedPDFEvidenceMismatchError,
 )
+from rsi_atlas_ingestion.worker_runner import (
+    DocumentWorkerRunner,
+    DocumentWorkerRunnerError,
+    DocumentWorkerRunResult,
+)
 
 __all__ = [
     "MAX_PDF_BYTES",
     "DocumentAdmissionService",
+    "DocumentWorkerRunResult",
+    "DocumentWorkerRunner",
+    "DocumentWorkerRunnerError",
     "PDFAdmissionDecision",
     "PDFAdmissionPolicy",
     "StagedPDFEvidence",

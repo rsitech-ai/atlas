@@ -1,0 +1,43 @@
+; RSI Atlas document-worker Seatbelt profile (development qualification only).
+; Deny-by-default. The runner substitutes concrete paths before sandbox-exec.
+; Release-grade isolation remains the signed helper/XPC gate in Phase 6.
+;
+; ponytail: macOS firmlinks make enumerated (subpath) roots abort CPython; allow
+; world-read then deny HOME file-read-data and re-allow only required trees.
+(version 1)
+(deny default)
+
+; Minimal process self-signals and sysctl required to start CPython.
+(allow signal (target self))
+(allow process-info* (target self))
+(allow sysctl-read)
+(allow mach-lookup (global-name-regex #"^com.apple."))
+
+; Only the exact interpreter may exec; fork/exec escapes remain denied by default.
+(allow process-exec*
+__PYTHON_EXEC_RULES__
+)
+(deny process-fork)
+
+; Broad read is required for dyld/CPython; HOME data is then denied and re-allowed.
+(allow file-read-metadata)
+(allow file-read* (subpath "/"))
+(deny file-read-data (subpath "__USER_HOME__"))
+(allow file-read-data
+__HOME_ALLOW_RULES__
+__ARTIFACT_READ_RULES__
+  (subpath "__RUN_DIRECTORY__")
+)
+
+; Owner-private run directory is the only intentional writable surface.
+(allow file-write* (subpath "__RUN_DIRECTORY__") (regex #"^/var/folders/") (subpath "/private/tmp") (subpath "/tmp"))
+(allow file-ioctl (subpath "__RUN_DIRECTORY__"))
+
+; Escape surfaces denied by policy (OS-enforced; worker cooperation is insufficient).
+(deny network*)
+(deny network-outbound)
+(deny network-inbound)
+(deny network-bind)
+(deny mach-lookup (global-name "com.apple.securityd"))
+(deny mach-lookup (global-name "com.apple.SecurityServer"))
+(deny mach-lookup (global-name "com.apple.keychain.xpc"))
