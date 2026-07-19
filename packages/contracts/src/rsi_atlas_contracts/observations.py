@@ -198,7 +198,7 @@ class CollectorDefinition(DocumentContractModel):
     source_family: SourceFamily
     provider: str = Field(pattern=_PROVIDER_PATTERN)
     acquisition_mode: AcquisitionMode
-    network_or_venue: str = Field(min_length=1, max_length=64)
+    network_or_venue: str = Field(min_length=1, max_length=128)
     lifecycle: CollectorLifecycle
     schema_name: str = Field(min_length=1, max_length=64)
     rate_limit_per_minute: StrictInt = Field(ge=0, le=100_000)
@@ -206,16 +206,17 @@ class CollectorDefinition(DocumentContractModel):
     allowlist: tuple[str, ...] = Field(default=(), max_length=32)
 
     @model_validator(mode="after")
-    def development_modes_only_when_experimental(self) -> Self:
-        if (
-            self.lifecycle != CollectorLifecycle.BLOCKED
-            and self.acquisition_mode in LIVE_ACQUISITION_MODES
-        ):
-            raise ValueError(
-                "live acquisition modes are blocked without governance; "
-                "use fixture_import/filesystem_import/bundle_import or lifecycle=blocked"
-            )
-        return self
+    def live_modes_require_allowlist_or_blocked(self) -> Self:
+        if self.acquisition_mode not in LIVE_ACQUISITION_MODES:
+            return self
+        if self.lifecycle is CollectorLifecycle.BLOCKED:
+            return self
+        if self.allowlist:
+            return self
+        raise ValueError(
+            "live acquisition modes require a non-empty allowlist or lifecycle=blocked; "
+            "default remains fixture_import/filesystem_import/bundle_import"
+        )
 
 
 class RawEnvelope(DocumentContractModel):
@@ -581,12 +582,7 @@ class AnalyticsBackendGate(DocumentContractModel):
     reason: str = Field(min_length=1, max_length=256)
 
     @model_validator(mode="after")
-    def duckdb_parquet_blocked(self) -> Self:
-        if (
-            self.backend in {AnalyticsBackend.DUCKDB, AnalyticsBackend.PARQUET}
-            and self.status != AnalyticsBackendStatus.BLOCKED_DEPENDENCY
-        ):
-            raise ValueError("duckdb/parquet remain blocked_dependency without governance")
+    def postgres_available(self) -> Self:
         if (
             self.backend == AnalyticsBackend.POSTGRES
             and self.status != AnalyticsBackendStatus.AVAILABLE
@@ -595,6 +591,7 @@ class AnalyticsBackendGate(DocumentContractModel):
         return self
 
 
+# Default gates stay blocked for DuckDB/Parquet until RSI_ATLAS_ENABLE_DUCKDB=1 at runtime.
 DEVELOPMENT_ANALYTICS_GATES = (
     AnalyticsBackendGate(
         backend=AnalyticsBackend.POSTGRES,
@@ -604,11 +601,11 @@ DEVELOPMENT_ANALYTICS_GATES = (
     AnalyticsBackendGate(
         backend=AnalyticsBackend.DUCKDB,
         status=AnalyticsBackendStatus.BLOCKED_DEPENDENCY,
-        reason="duckdb requires dependency governance before promotion",
+        reason="duckdb optional; enable with RSI_ATLAS_ENABLE_DUCKDB=1 after install",
     ),
     AnalyticsBackendGate(
         backend=AnalyticsBackend.PARQUET,
         status=AnalyticsBackendStatus.BLOCKED_DEPENDENCY,
-        reason="parquet writers require dependency governance before promotion",
+        reason="parquet via duckdb optional path",
     ),
 )

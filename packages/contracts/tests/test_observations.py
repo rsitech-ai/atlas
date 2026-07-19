@@ -316,14 +316,16 @@ def test_research_signal_forbids_trading_capabilities() -> None:
         ResearchSignal.model_validate({**dumped, "can_place_trade": True})
 
 
-def test_analytics_gates_block_duckdb_and_parquet() -> None:
+def test_analytics_gates_default_block_duckdb_and_parquet() -> None:
     assert len(DEVELOPMENT_ANALYTICS_GATES) == 3
-    with pytest.raises(ValidationError, match="blocked_dependency"):
-        AnalyticsBackendGate(
-            backend=AnalyticsBackend.DUCKDB,
-            status=AnalyticsBackendStatus.AVAILABLE,
-            reason="should fail",
-        )
+    assert DEVELOPMENT_ANALYTICS_GATES[1].status is AnalyticsBackendStatus.BLOCKED_DEPENDENCY
+    # Governed optional path may mark DuckDB available without ValidationError.
+    gate = AnalyticsBackendGate(
+        backend=AnalyticsBackend.DUCKDB,
+        status=AnalyticsBackendStatus.AVAILABLE,
+        reason="optional local duckdb after RSI_ATLAS_ENABLE_DUCKDB=1",
+    )
+    assert gate.status is AnalyticsBackendStatus.AVAILABLE
 
 
 def test_observation_id_stable() -> None:

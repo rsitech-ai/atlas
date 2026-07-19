@@ -5,8 +5,15 @@ build-backend = "hatchling.build"
 [project]
 name = "rsi-atlas-collectors"
 version = "0.1.0"
-description = "Offline fixture collectors, observation pipeline, and fail-closed live stubs"
+description = "Offline fixture collectors, observation pipeline, and optional monitored live HTTPS"
 requires-python = ">=3.11,<3.15"
 dependencies = [
   "rsi-atlas-contracts==0.1.0",
+  "rsi-atlas-security==0.1.0",
 ]
+
+[project.optional-dependencies]
+duckdb = [
+  "duckdb>=1.2.0,<2",
+]
+
