@@ -41,48 +41,47 @@ publication:
 - five implemented chunking families (`fixed_token`, `recursive`, `page_based`, `parent_child`,
   `table_aware`) with frozen intrinsic goldens, CAS-first chunk-set persistence, and loopback
   chunk inspect APIs (`chunking:start`, list, get);
-- development fixture embeddings (stdlib hash→vector; production embedding models blocked),
+- development fixture embeddings (stdlib hash→vector) plus governed offline OSS
+  `oss_token_hash_v1` candidate embedder and fail-closed optional ONNX artifact path
+  (`script/install_embedding_model.py`; no silent download); lexical overlap post-RRF
+  rerank (stdlib); fixture remains the default for tests;
   migration `0008` staging dense pgvector + PostgreSQL FTS lexical + exact-identifier rows,
   atomic publication activate/rollback via an active pointer, and loopback
   `indexing:start` / index-version list / `publication:activate` /
   `publication:rollback` APIs. Staging stays non-searchable until activation;
-- Phase 3 development hybrid retrieval: active-only dense/lexical/exact candidate generation,
-  intent-weighted RRF fusion with inspectable component ranks, coverage/abstention,
+- Phase 3 hybrid retrieval: active-only dense/lexical/exact candidate generation,
+  intent-weighted RRF + lexical rerank, coverage/abstention,
   Document Evidence specialist (extractive, no LLM), assertion→citation→report draft gate,
-  immutable review events, migration `0009`, and loopback
+  immutable review events, minimal durable linear workflow interrupt/resume (no LangGraph),
+  migration `0009`, and loopback
   `research:retrieve` / `specialist:document` / `reports:draft` / review APIs;
-- Phase 4 development multi-chain / quantitative fixtures: strict observation/collector
-  contracts, offline Bitcoin/EVM/Solana/market/governance/GitHub fixture adapters, immutable
-  raw envelopes, bitemporal observation persistence (migration `0010`), quality quarantine,
-  reorg orphan stub, leakage-safe feature eligibility, non-trading research signals,
-  fail-closed live/DuckDB/Parquet stubs, and loopback
+- Phase 4 multi-chain / quantitative: offline Bitcoin/EVM/Solana/market/governance/GitHub
+  fixtures; optional monitored live HTTPS collect behind user-supplied allowlisted origins
+  (deny-by-default NetworkPolicy; no baked-in API keys); optional DuckDB/Parquet analytics
+  when `RSI_ATLAS_ENABLE_DUCKDB=1` + duckdb install; otherwise fail-closed; loopback
   `collectors:import-fixture` / observations list APIs;
-- Phase 5 development monitoring / comparison: deterministic change detection before
+- Phase 5 monitoring / comparison: deterministic change detection before
   semantic triage, rule matching (threshold / rate-of-change / finality / quality),
-  materiality screen, alert dedup + append-only lifecycle, research invalidation for
-  orphaned/quarantined inputs, targeted research launch stubs (plan validation only;
-  no LangGraph), comparison matrix / cross-chain timeline payloads with envelope links,
-  migration `0011`, and loopback monitoring APIs. Semantic triage stays
-  `blocked_semantic_triage`; native timeline/matrix UI deferred;
-- Phase 6 engineering / release maturity (development): offline evaluation harness over a
-  frozen fixture dataset with deterministic evaluators before fail-closed uncalibrated judges;
-  Codex sanitized reproduction bundles + approval policy + candidate patch gate with automatic
-  merge/push/deploy/promote denied; filesystem workspace backup/restore verify, Safe Mode
-  capability mask, and integrity scrub; CycloneDX-ish SBOM from `uv.lock`; unsigned package
-  inventory honesty; fail-closed `script/release_check.py`; loopback
-  `evaluation:run` / `engineering/codex:gate` / recovery backup+Safe Mode / `release:check`
-  APIs.
+  materiality screen, alert dedup + append-only lifecycle, research invalidation,
+  targeted research launch (plan validation; linear workflow available), comparison matrix /
+  cross-chain timeline payloads with envelope links, migration `0011`, and loopback
+  monitoring APIs. Semantic triage stays `blocked_semantic_triage`;
+- Phase 6 engineering / release maturity: offline evaluation harness; Codex sanitize/gate;
+  filesystem backup/restore + optional owner file-key AES-GCM encryption (Keychain still
+  blocked); Safe Mode; integrity scrub; SBOM from `uv.lock`; entitlement-matrix draft;
+  fail-closed `script/release_check.py`; loopback Phase 6 APIs;
+- native sidebar destinations for Command Center, Evidence, Research Canvas, Comparison,
+  and Chunk Inspector (Research/Comparison/Chunks are honest empty shells pointing at
+  loopback APIs until full clients bind).
 
-OCR/scanned fallback, Docling/Tier-1 promotion, production embedding-model promotion, Tantivy,
-production cross-encoder/LLM rerankers, LangGraph interrupt/resume, remaining specialists,
-qualified model execution, live RPC/WebSocket collectors, DuckDB/Parquet writers, calibrated
-semantic triage / judges, native comparison/timeline/Evaluation/Codex UI, XPC, Apple Developer
-ID signing, notarization, stapling, embedded signed Python, and release qualification are not
-implemented. Hybrid retrieval, cited reports, fixture observations, monitoring, offline eval,
-Codex product-plane gates, and development backup/Safe Mode are development evidence only—not
-criterion closure for §§16–32 / 25–60 / 45 / 61–134. Parent-child/table-aware remain
-development-only—not production-ready. The development database is project-owned; release data
-placement and signed distribution remain packaging gates blocked on signing secrets.
+Docling stays blocked. System Tesseract OCR is fail-closed when absent. Sealed-holdout
+`PRODUCTION` embedding promotion, neural cross-encoder, calibrated judges/semantic triage,
+WebSocket collectors, LangGraph, XPC, Apple Developer ID signing, notarization, stapling,
+embedded signed Python, and Section 33 criterion closure remain open. Hybrid retrieval,
+cited reports, collectors, monitoring, eval, and backup are production-local OSS
+capabilities with tests—not automatic criterion `Proven` without release-artifact proof.
+Parent-child/table-aware remain development-only. Signing/notarization stay blocked on
+owner certs/secrets.
 
 ## Requirements
 
