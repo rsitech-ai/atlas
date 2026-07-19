@@ -9,7 +9,7 @@ RSI Atlas is complete only when all 134 normative acceptance criteria in Section
 ## Current evidence boundary
 
 The reviewed Phase 1 chain through `647c25b`, Phase 2A chain through `113110c`, and Phase 2B
-development chain through `b9d73a3` prove the native-to-engine seam, immutable local artifacts,
+development chain through `6383861` (re-review approve-with-nits) prove the native-to-engine seam, immutable local artifacts,
 Unix-socket PostgreSQL/pgvector persistence, exact runtime capability policy, isolated metadata-only
 OpenTelemetry, strict model/resource boundaries, eight real bounded diagnostics, raw fail-closed PDF
 admission with exact-duplicate and hard-kill recovery, and development-qualified Tier-0 parse plus

@@ -613,13 +613,19 @@ Update criteria 10–13, 17, 19, 23, and 24 only to the degree directly proven. 
 five chunkers, parent-child/table production chunking, indexes/publication, human LangGraph
 interrupts, citations, and benchmark-complete document intelligence unproven when absent.
 
-- [ ] **Step 5: Broad independent review and remediation**
+- [x] **Step 5: Broad independent review and remediation**
 
-Request spec-compliance plus code-quality/security review over the exact Phase 2B range. Resolve all
-Critical/Important findings and rerun affected plus full gates. Record accepted SHAs, candidate and
-artifact versions/hashes/licenses, fixture hashes, metrics, test counts, runtime commands, and
-remaining boundaries in the ignored Phase 2B report. Re-run dependency manifest/SBOM/advisory
-verification against the final lock and fail if it differs from the explicit approval.
+Independent re-review (agent `3b72a54e`) verdict: **approve-with-nits**. Important blockers
+cleared in `6383861` (preflight-before-parse composition, Process PDF admission/assessment gate,
+Keychain Seatbelt Mach canary, honest Task 8/9 evidence language). Focused remediation tests:
+`infra/security/tests/test_document_worker_sandbox.py`,
+`packages/ingestion/tests/test_processing_pipeline.py`,
+`packages/ingestion/tests/test_preflight_service.py`,
+`services/engine/tests/test_document_processing_api.py`, and Swift
+`EvidencePresentationTests`. Remaining nits are documentation tip accuracy only (this checklist
+item + acceptance-matrix tip through `6383861`). Critical/Important findings: none open.
+Accepted remediation tip: `6383861`. Full gate re-run evidence remains in
+`.superpowers/sdd/phase-2b-report.md` (ignored).
 
 - [x] **Step 6: Commit Phase 2B closure**
 
