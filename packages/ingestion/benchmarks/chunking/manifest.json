@@ -1,0 +1,80 @@
+{
+  "canonical_content_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "configuration_hash": "b04f2b51ae20b612943d2cf4e721add108b70aa3118142bb422ddb49d2cd4cf2",
+  "document_version_id": "canonical:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "families": [
+    {
+      "chunk_count": 1,
+      "chunk_set_id": "chunkset:72039b4d1e0acf41d746f3215e693ff7858b740dae4ca1f2bc4b3fb5b8a0db47",
+      "content_hash": "5517341df8b8a5abd80be1d6daa45253206119629b1af8d8ba827adaa21cf210",
+      "family": "fixed_token",
+      "golden_path": "golden/fixed_token.json",
+      "golden_sha256": "5517341df8b8a5abd80be1d6daa45253206119629b1af8d8ba827adaa21cf210",
+      "required_tokens": [
+        "Bitcoin",
+        "0xabc123",
+        "20%"
+      ]
+    },
+    {
+      "chunk_count": 1,
+      "chunk_set_id": "chunkset:5ff5d4d4a30dd6727593a192042f32258ed020bf1e81e122c00d40b1f5044e3f",
+      "content_hash": "b286f24c3801fcc42d72ec0be274b15f136d6eb05ee33ee3f3b9703996a03a81",
+      "family": "recursive",
+      "golden_path": "golden/recursive.json",
+      "golden_sha256": "b286f24c3801fcc42d72ec0be274b15f136d6eb05ee33ee3f3b9703996a03a81",
+      "required_tokens": [
+        "Bitcoin",
+        "0xabc123",
+        "20%"
+      ]
+    },
+    {
+      "chunk_count": 2,
+      "chunk_set_id": "chunkset:2f924ae9b620d38ecc8a68bd3c040770e6b326a938861eb44fd96e8ac2fa7656",
+      "content_hash": "f9fd1a12ce1102f7dd366b375fa1adeca9bc3038da4b2d0d640dd95bd29f98e1",
+      "family": "page_based",
+      "golden_path": "golden/page_based.json",
+      "golden_sha256": "f9fd1a12ce1102f7dd366b375fa1adeca9bc3038da4b2d0d640dd95bd29f98e1",
+      "required_tokens": [
+        "Bitcoin",
+        "0xabc123",
+        "20%"
+      ]
+    },
+    {
+      "chunk_count": 4,
+      "chunk_set_id": "chunkset:5de41c21ea0f094dba6047ecb02fda2570ee2fce1bcf0b68e77684e5697d97b1",
+      "content_hash": "9ce5a5cb3510a36dadec2af2cf77aa4e96cce45c5667450d1222403a99659aa0",
+      "family": "parent_child",
+      "golden_path": "golden/parent_child.json",
+      "golden_sha256": "9ce5a5cb3510a36dadec2af2cf77aa4e96cce45c5667450d1222403a99659aa0",
+      "required_tokens": [
+        "Bitcoin",
+        "0xabc123",
+        "20%"
+      ]
+    },
+    {
+      "chunk_count": 6,
+      "chunk_set_id": "chunkset:8e5ee3750c04f009e266e03427c03ed0b54e6d99132f999a0e492ff185aa52cf",
+      "content_hash": "16c19463a0e55115207f96a7152ec5ffeb225e18795731356a1231c24b82141e",
+      "family": "table_aware",
+      "golden_path": "golden/table_aware.json",
+      "golden_sha256": "16c19463a0e55115207f96a7152ec5ffeb225e18795731356a1231c24b82141e",
+      "required_tokens": [
+        "Bitcoin",
+        "0xabc123",
+        "20%"
+      ]
+    }
+  ],
+  "fixture": {
+    "element_count": 6,
+    "page_count": 2,
+    "path": "fixtures/crypto_two_page_canonical.json",
+    "sha256": "93950c204ef48356561b5705a88fbed77b161ed7a13367b2dfe994509331243e"
+  },
+  "partition": "development",
+  "schema_version": "1.0.0"
+}
