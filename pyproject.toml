@@ -3,6 +3,7 @@ name = "rsi-atlas-workspace"
 version = "0.1.0"
 requires-python = ">=3.11,<3.15"
 dependencies = [
+  "rsi-atlas-collectors",
   "rsi-atlas-contracts",
   "rsi-atlas-document-worker",
   "rsi-atlas-engine",
@@ -24,6 +25,7 @@ dev = [
 ]
 
 [tool.uv.sources]
+rsi-atlas-collectors = { workspace = true }
 rsi-atlas-contracts = { workspace = true }
 rsi-atlas-document-worker = { workspace = true }
 rsi-atlas-engine = { workspace = true }
@@ -37,6 +39,7 @@ rsi-atlas-storage = { workspace = true }
 
 [tool.uv.workspace]
 members = [
+  "packages/collectors",
   "packages/contracts",
   "packages/document_worker",
   "packages/ingestion",
@@ -51,6 +54,7 @@ members = [
 
 [tool.pytest.ini_options]
 testpaths = [
+  "packages/collectors/tests",
   "packages/contracts/tests",
   "packages/document_worker/tests",
   "packages/ingestion/tests",
@@ -78,6 +82,7 @@ strict = true
 warn_unreachable = true
 exclude = "(^|/)tests/"
 mypy_path = [
+  "packages/collectors/src",
   "packages/contracts/src",
   "packages/document_worker/src",
   "packages/ingestion/src",

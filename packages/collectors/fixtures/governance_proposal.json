@@ -1,0 +1,10 @@
+{
+  "family": "governance",
+  "subject_ids": ["protocol:uniswap"],
+  "proposal_id": "prop-42",
+  "on_chain_execution_id": "0xexecdeadbeef",
+  "off_chain_discussion_id": "forum:42",
+  "status": "executed",
+  "quorum_reached": true,
+  "participation_bps": 4200
+}

@@ -1,0 +1,19 @@
+{
+  "family": "market",
+  "subject_ids": ["instrument:btc-usd"],
+  "venue": "fixture",
+  "venue_symbol": "BTC-USD",
+  "base": "BTC",
+  "quote": "USD",
+  "instrument_type": "spot",
+  "tick_size": "0.01",
+  "quantity_step": "0.0001",
+  "multiplier": "1",
+  "sequence": 42,
+  "bid": "64000.00",
+  "ask": "64001.00",
+  "last": "64000.50",
+  "bid_size": "1.25",
+  "ask_size": "0.80",
+  "exchange_event_time": "2026-07-19T12:00:00Z"
+}

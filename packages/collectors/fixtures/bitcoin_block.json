@@ -1,0 +1,10 @@
+{
+  "family": "bitcoin",
+  "subject_ids": ["asset:btc"],
+  "network": "regtest",
+  "block_height": 100,
+  "block_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "tx_count": 2,
+  "fee_rate_sat_vb": "12.5",
+  "main_chain": true
+}

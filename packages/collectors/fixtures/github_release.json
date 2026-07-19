@@ -1,0 +1,11 @@
+{
+  "family": "github",
+  "subject_ids": ["repo:rsi/atlas"],
+  "repository": "rsi/atlas",
+  "event_type": "release",
+  "cursor": "page:1",
+  "rate_limit_remaining": 58,
+  "rate_limit_reset_at": "2026-07-19T13:00:00Z",
+  "ref": "v0.1.0",
+  "is_bot": false
+}

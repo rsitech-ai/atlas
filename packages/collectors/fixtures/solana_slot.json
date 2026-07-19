@@ -1,0 +1,10 @@
+{
+  "family": "solana",
+  "subject_ids": ["protocol:marinade"],
+  "cluster": "localnet",
+  "slot": 1234567,
+  "blockhash": "11111111111111111111111111111111111111111111",
+  "commitment": "finalized",
+  "tx_count": 40,
+  "fee_lamports": 5000
+}

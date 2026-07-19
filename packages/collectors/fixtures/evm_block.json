@@ -1,0 +1,10 @@
+{
+  "family": "evm",
+  "subject_ids": ["protocol:uniswap"],
+  "chain_id": 1,
+  "block_number": 20000000,
+  "block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "finality": "finalized",
+  "tx_count": 120,
+  "gas_used": 15000000
+}
