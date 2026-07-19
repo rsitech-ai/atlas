@@ -1,0 +1,13 @@
+[build-system]
+requires = ["hatchling==1.31.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rsi-atlas-monitoring"
+version = "0.1.0"
+description = "Deterministic change detection, materiality, alerts, and comparison"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+  "rsi-atlas-contracts==0.1.0",
+  "rsi-atlas-research==0.1.0",
+]

@@ -13,6 +13,7 @@ dependencies = [
   "rsi-atlas-contracts",
   "rsi-atlas-ingestion",
   "rsi-atlas-models",
+  "rsi-atlas-monitoring",
   "rsi-atlas-observability",
   "rsi-atlas-research",
   "rsi-atlas-retrieval",
@@ -29,6 +30,7 @@ rsi-atlas-collectors = { workspace = true }
 rsi-atlas-contracts = { workspace = true }
 rsi-atlas-ingestion = { workspace = true }
 rsi-atlas-models = { workspace = true }
+rsi-atlas-monitoring = { workspace = true }
 rsi-atlas-observability = { workspace = true }
 rsi-atlas-research = { workspace = true }
 rsi-atlas-retrieval = { workspace = true }

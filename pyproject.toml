@@ -9,6 +9,7 @@ dependencies = [
   "rsi-atlas-engine",
   "rsi-atlas-ingestion",
   "rsi-atlas-models",
+  "rsi-atlas-monitoring",
   "rsi-atlas-observability",
   "rsi-atlas-research",
   "rsi-atlas-retrieval",
@@ -31,6 +32,7 @@ rsi-atlas-document-worker = { workspace = true }
 rsi-atlas-engine = { workspace = true }
 rsi-atlas-ingestion = { workspace = true }
 rsi-atlas-models = { workspace = true }
+rsi-atlas-monitoring = { workspace = true }
 rsi-atlas-observability = { workspace = true }
 rsi-atlas-research = { workspace = true }
 rsi-atlas-retrieval = { workspace = true }
@@ -44,6 +46,7 @@ members = [
   "packages/document_worker",
   "packages/ingestion",
   "packages/models",
+  "packages/monitoring",
   "packages/observability",
   "packages/research",
   "packages/retrieval",
@@ -59,6 +62,7 @@ testpaths = [
   "packages/document_worker/tests",
   "packages/ingestion/tests",
   "packages/models/tests",
+  "packages/monitoring/tests",
   "packages/observability/tests",
   "packages/research/tests",
   "packages/retrieval/tests",

@@ -10,6 +10,7 @@ members = [
     "rsi-atlas-engine",
     "rsi-atlas-ingestion",
     "rsi-atlas-models",
+    "rsi-atlas-monitoring",
     "rsi-atlas-observability",
     "rsi-atlas-research",
     "rsi-atlas-retrieval",
@@ -884,6 +885,7 @@ dependencies = [
     { name = "rsi-atlas-contracts" },
     { name = "rsi-atlas-ingestion" },
     { name = "rsi-atlas-models" },
+    { name = "rsi-atlas-monitoring" },
     { name = "rsi-atlas-observability" },
     { name = "rsi-atlas-research" },
     { name = "rsi-atlas-retrieval" },
@@ -899,6 +901,7 @@ requires-dist = [
     { name = "rsi-atlas-contracts", editable = "packages/contracts" },
     { name = "rsi-atlas-ingestion", editable = "packages/ingestion" },
     { name = "rsi-atlas-models", editable = "packages/models" },
+    { name = "rsi-atlas-monitoring", editable = "packages/monitoring" },
     { name = "rsi-atlas-observability", editable = "packages/observability" },
     { name = "rsi-atlas-research", editable = "packages/research" },
     { name = "rsi-atlas-retrieval", editable = "packages/retrieval" },
@@ -932,6 +935,21 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "rsi-atlas-contracts", editable = "packages/contracts" }]
+
+[[package]]
+name = "rsi-atlas-monitoring"
+version = "0.1.0"
+source = { editable = "packages/monitoring" }
+dependencies = [
+    { name = "rsi-atlas-contracts" },
+    { name = "rsi-atlas-research" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "rsi-atlas-contracts", editable = "packages/contracts" },
+    { name = "rsi-atlas-research", editable = "packages/research" },
+]
 
 [[package]]
 name = "rsi-atlas-observability"
@@ -1009,6 +1027,7 @@ dependencies = [
     { name = "rsi-atlas-engine" },
     { name = "rsi-atlas-ingestion" },
     { name = "rsi-atlas-models" },
+    { name = "rsi-atlas-monitoring" },
     { name = "rsi-atlas-observability" },
     { name = "rsi-atlas-research" },
     { name = "rsi-atlas-retrieval" },
@@ -1032,6 +1051,7 @@ requires-dist = [
     { name = "rsi-atlas-engine", editable = "services/engine" },
     { name = "rsi-atlas-ingestion", editable = "packages/ingestion" },
     { name = "rsi-atlas-models", editable = "packages/models" },
+    { name = "rsi-atlas-monitoring", editable = "packages/monitoring" },
     { name = "rsi-atlas-observability", editable = "packages/observability" },
     { name = "rsi-atlas-research", editable = "packages/research" },
     { name = "rsi-atlas-retrieval", editable = "packages/retrieval" },
