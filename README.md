@@ -56,13 +56,21 @@ publication:
   raw envelopes, bitemporal observation persistence (migration `0010`), quality quarantine,
   reorg orphan stub, leakage-safe feature eligibility, non-trading research signals,
   fail-closed live/DuckDB/Parquet stubs, and loopback
-  `collectors:import-fixture` / observations list APIs.
+  `collectors:import-fixture` / observations list APIs;
+- Phase 5 development monitoring / comparison: deterministic change detection before
+  semantic triage, rule matching (threshold / rate-of-change / finality / quality),
+  materiality screen, alert dedup + append-only lifecycle, research invalidation for
+  orphaned/quarantined inputs, targeted research launch stubs (plan validation only;
+  no LangGraph), comparison matrix / cross-chain timeline payloads with envelope links,
+  migration `0011`, and loopback monitoring APIs. Semantic triage stays
+  `blocked_semantic_triage`; native timeline/matrix UI deferred.
 
 OCR/scanned fallback, Docling/Tier-1 promotion, production embedding-model promotion, Tantivy,
 production cross-encoder/LLM rerankers, LangGraph interrupt/resume, remaining specialists,
-qualified model execution, live RPC/WebSocket collectors, DuckDB/Parquet writers, XPC, signing,
-and release qualification are not implemented. Hybrid retrieval, cited reports, and fixture
-observations are development evidence only—not criterion closure for §§16–23 / 25–60 / 61–81.
+qualified model execution, live RPC/WebSocket collectors, DuckDB/Parquet writers, calibrated
+semantic triage, native comparison/timeline UI, XPC, signing, and release qualification are not
+implemented. Hybrid retrieval, cited reports, fixture observations, and monitoring are
+development evidence only—not criterion closure for §§16–24 / 25–60 / 45 / 61–84.
 Parent-child/table-aware remain development-only—not production-ready. The development database
 is project-owned; release data placement remains a later packaging gate.
 

@@ -11,23 +11,26 @@ RSI Atlas is complete only when all 134 normative acceptance criteria in Section
 The reviewed Phase 1 chain through `647c25b`, Phase 2A chain through `113110c`, Phase 2B
 development chain through `6383861` (re-review approve-with-nits), Phase 2C development chain
 through `a51545d`, Phase 2D development chain through `c634b25`, Phase 3 development slice
-through `a64dfec`, and Phase 4 development slice through the tip prove the native-to-engine seam,
-immutable local artifacts, Unix-socket PostgreSQL/pgvector persistence, exact runtime capability
-policy, isolated metadata-only OpenTelemetry, strict model/resource boundaries, eight real
-bounded diagnostics, raw fail-closed PDF admission with exact-duplicate and hard-kill recovery,
-development-qualified Tier-0 parse plus inspectable canonical pages under Seatbelt (Docling
-blocked; not production-promoted), five implemented chunking families with frozen intrinsic
-benchmarks plus chunk-set persistence/inspect APIs, development dense/lexical staging indexes
-with atomic publication activation under fixture embeddings, development hybrid retrieval
-(dense+lexical+exact RRF, coverage/abstention), Document Evidence specialist,
-assertion/citation/report draft gate, loopback research APIs, and offline fixture collectors for
-Bitcoin/EVM/Solana/market/governance/GitHub into bitemporal observations with quarantine,
-leakage-safe features, and non-trading signals. This does not complete document intelligence,
-live multi-chain collection, or a full release criterion: no production-promoted parser or
-embedding model, OCR/scanned path, production reranker, LangGraph durability, remaining
-specialists, calibrated judges, native Research Canvas/Report Studio, live RPC/WebSocket
-providers, DuckDB/Parquet writers, or continuous monitoring; observability is not end-to-end
-Swift-to-publication; loopback HTTP remains development-only; and the artifact is unsigned.
+through `a64dfec`, Phase 4 development slice through `27d1656`, and Phase 5 development slice
+through the tip prove the native-to-engine seam, immutable local artifacts, Unix-socket
+PostgreSQL/pgvector persistence, exact runtime capability policy, isolated metadata-only
+OpenTelemetry, strict model/resource boundaries, eight real bounded diagnostics, raw fail-closed
+PDF admission with exact-duplicate and hard-kill recovery, development-qualified Tier-0 parse
+plus inspectable canonical pages under Seatbelt (Docling blocked; not production-promoted), five
+implemented chunking families with frozen intrinsic benchmarks plus chunk-set persistence/inspect
+APIs, development dense/lexical staging indexes with atomic publication activation under fixture
+embeddings, development hybrid retrieval (dense+lexical+exact RRF, coverage/abstention), Document
+Evidence specialist, assertion/citation/report draft gate, loopback research APIs, offline fixture
+collectors for Bitcoin/EVM/Solana/market/governance/GitHub into bitemporal observations with
+quarantine, leakage-safe features, non-trading signals, and deterministic monitoring (change
+detection, materiality, alert dedup/lifecycle, research invalidation, targeted research launch
+stub, comparison/timeline payloads). This does not complete document intelligence, live
+multi-chain collection, calibrated semantic triage, native comparison UI, or a full release
+criterion: no production-promoted parser or embedding model, OCR/scanned path, production
+reranker, LangGraph durability, remaining specialists, calibrated judges, native Research
+Canvas/Report Studio, live RPC/WebSocket providers, DuckDB/Parquet writers, or continuous live
+monitors; observability is not end-to-end Swift-to-publication; loopback HTTP remains
+development-only; and the artifact is unsigned.
 
 | Phase | Specification scope | Acceptance criteria | Current status | Phase demonstration |
 | --- | --- | --- | --- | --- |
@@ -35,7 +38,7 @@ Swift-to-publication; loopback HTTP remains development-only; and the artifact i
 | 2. Document intelligence | §§12–15 | 10–24 plus Evidence Inspector portion of 6 | Phase 2A–2D complete (dev); production promotion/OCR/interrupt still open | Native PDF import reaches immutable raw evidence, durable fail-closed admission, development-qualified Tier-0 parse, inspectable canonical pages, five development chunkers, fixture dense/lexical indexes, and atomic publication activation. Completion still requires production promotion/OCR, interrupt/resume, and complete offline proof. |
 | 3. Retrieval and research | §§16–18 | 4–8, 25–60 | Phase 3 development slice closed (hybrid retrieve / document specialist / cited draft); full criteria open | Development loopback APIs produce an inspectable plan, hybrid evidence packet (or abstention), Document Evidence finding, cited report draft, and immutable review. Production rerankers, LangGraph, remaining specialists, native Report Studio, and criteria 4–8/25–60 remain open. |
 | 4. Multi-chain and quantitative data | §§19–23 | 43–44 and 61–81 | Phase 4 development slice closed (offline fixtures / bitemporal observations); full criteria open | Offline Bitcoin/EVM/Solana/market/governance/GitHub fixtures share raw-envelope → observation contracts with quarantine, pinned identity, leakage-safe features, and non-trading signals. Live providers, DuckDB/Parquet, and criteria 43–44/61–81 remain open. |
-| 5. Monitoring and comparison | §24 and cross-surface UX | 45, 61, 82–84 plus comparison/timeline UX | Missing | A deterministic material change invalidates affected research, deduplicates an alert, launches targeted research, and appears on the cross-chain timeline/comparison matrix. |
+| 5. Monitoring and comparison | §24 and cross-surface UX | 45, 61, 82–84 plus comparison/timeline UX | Phase 5 development slice closed (deterministic monitoring / comparison payloads); full criteria open | Deterministic material change yields deduplicated alert, research invalidation, targeted research launch stub, and comparison/timeline payloads with envelope links. Semantic triage blocked; native UI and criteria 45/61/82–84 remain open. |
 | 6. Engineering and release maturity | §§25–32 complete | 85–134 | Missing | Frozen evaluations qualify components, Codex produces a gated patch from a sanitized bundle, and a signed/notarized release passes zero-egress, clean install/update/rollback, backup/restore, Safe Mode, and integrity recovery. |
 
 ## Governed decisions

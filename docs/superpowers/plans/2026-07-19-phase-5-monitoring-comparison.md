@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
 > (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use
-> checkbox (`- [ ]`) syntax for tracking.
+> checkbox (`- [x]`) syntax for tracking.
 >
 > **Execution:** Follow repository TDD and review gates task by task. Do not claim Section 33
 > criteria 45, 61, or 82–84 closed. Do not begin Phase 6 evaluation/release until every Phase 5
@@ -118,10 +118,10 @@ pytest + real test DB. **No new third-party dependency.** Decimal for thresholds
 - `TimelineEventKind`, `TimelineEvent`, `CrossChainTimeline`
 - `SemanticTriageRequest` / gate → always blocked in development
 
-- [ ] **Step 1: Write RED contract tests**
-- [ ] **Step 2: Run RED**
-- [ ] **Step 3: Implement smallest strict models**
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 1: Write RED contract tests**
+- [x] **Step 2: Run RED**
+- [x] **Step 3: Implement smallest strict models**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 uv run pytest packages/contracts/tests/test_monitoring.py -q
@@ -142,9 +142,9 @@ git commit -m "feat: define monitoring and comparison contracts"
   `test_triage.py`
 - Modify: root `pyproject.toml` workspace members + engine deps
 
-- [ ] **Step 1: RED** — previous/current pair detects delta; blocked rule type fails; triage blocked
-- [ ] **Step 2: Implement deterministic detectors + matcher + screen**
-- [ ] **Step 3: GREEN + commit**
+- [x] **Step 1: RED** — previous/current pair detects delta; blocked rule type fails; triage blocked
+- [x] **Step 2: Implement deterministic detectors + matcher + screen**
+- [x] **Step 3: GREEN + commit**
 
 ```bash
 uv run pytest packages/monitoring/tests -q
@@ -160,10 +160,10 @@ git commit -m "feat: add deterministic change detection and materiality screen"
 - Create: `packages/monitoring/src/rsi_atlas_monitoring/{alerts,invalidation,launch}.py`
 - Create: `packages/monitoring/tests/test_alerts.py`, `test_invalidation.py`, `test_launch.py`
 
-- [ ] **Step 1: RED** — dedup collapses duplicates; lifecycle append-only; orphan invalidates;
+- [x] **Step 1: RED** — dedup collapses duplicates; lifecycle append-only; orphan invalidates;
       launch stub validates plan hash
-- [ ] **Step 2: Implement**
-- [ ] **Step 3: GREEN + commit**
+- [x] **Step 2: Implement**
+- [x] **Step 3: GREEN + commit**
 
 ```bash
 uv run pytest packages/monitoring/tests/test_alerts.py packages/monitoring/tests/test_invalidation.py packages/monitoring/tests/test_launch.py -q
@@ -179,9 +179,9 @@ git commit -m "feat: add alert dedup, lifecycle, and research invalidation"
 - Create: `packages/monitoring/src/rsi_atlas_monitoring/comparison.py`
 - Create: `packages/monitoring/tests/test_comparison.py`
 
-- [ ] **Step 1: RED** — matrix cells and timeline events carry observation + envelope IDs
-- [ ] **Step 2: Implement builders**
-- [ ] **Step 3: GREEN + commit**
+- [x] **Step 1: RED** — matrix cells and timeline events carry observation + envelope IDs
+- [x] **Step 2: Implement builders**
+- [x] **Step 3: GREEN + commit**
 
 ```bash
 uv run pytest packages/monitoring/tests/test_comparison.py -q
@@ -199,9 +199,9 @@ git commit -m "feat: build comparison matrix and cross-chain timeline payloads"
 - Create: `packages/storage/tests/test_monitoring_repository.py`
 - Modify: `packages/storage/src/rsi_atlas_storage/__init__.py`
 
-- [ ] **Step 1: RED** — persist alert + event + invalidation; dedup lookup returns existing
-- [ ] **Step 2: Migration + repository**
-- [ ] **Step 3: GREEN + commit**
+- [x] **Step 1: RED** — persist alert + event + invalidation; dedup lookup returns existing
+- [x] **Step 2: Migration + repository**
+- [x] **Step 3: GREEN + commit**
 
 ```bash
 uv run pytest packages/storage/tests/test_monitoring_repository.py -q
@@ -219,9 +219,9 @@ git commit -m "feat: persist monitoring alerts and research invalidations"
 - Create: `services/engine/tests/test_monitoring_api.py`
 - Modify: `services/engine/pyproject.toml` (+ monitoring package)
 
-- [ ] **Step 1: RED** — evaluate change → alert; lifecycle; invalidate; comparison; triage 422/503
-- [ ] **Step 2: Wire service**
-- [ ] **Step 3: GREEN + commit**
+- [x] **Step 1: RED** — evaluate change → alert; lifecycle; invalidate; comparison; triage 422/503
+- [x] **Step 2: Wire service**
+- [x] **Step 3: GREEN + commit**
 
 ```bash
 uv run pytest services/engine/tests/test_monitoring_api.py -q
@@ -238,9 +238,9 @@ git commit -m "feat: expose monitoring and comparison loopback APIs"
   `docs/superpowers/plans/2026-07-18-full-product-delivery-roadmap.md`, this plan (checkboxes)
 - Delete: `docs/superpowers/plans/2026-07-19-phase-5-monitoring-comparison-stub.md`
 
-- [ ] **Step 1: Update evidence language (development partial only)**
-- [ ] **Step 2: Full focused verification**
-- [ ] **Step 3: Commit close**
+- [x] **Step 1: Update evidence language (development partial only)**
+- [x] **Step 2: Full focused verification**
+- [x] **Step 3: Commit close**
 
 ```bash
 uv run pytest packages/contracts/tests/test_monitoring.py packages/monitoring/tests packages/storage/tests/test_monitoring_repository.py services/engine/tests/test_monitoring_api.py -q
