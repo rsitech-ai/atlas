@@ -12,6 +12,7 @@ from uuid import UUID, uuid4
 from psycopg.types.json import Jsonb
 from pydantic import Field
 from rsi_atlas_contracts import ArtifactCommandContext
+from rsi_atlas_contracts.chunking import ChunkSetManifest
 from rsi_atlas_contracts.document_parsing import CanonicalDocumentManifest
 from rsi_atlas_contracts.system_status import StrictModel
 
@@ -488,6 +489,143 @@ class DocumentProcessingRepository:
                 "parser_configuration_hash": row[2],
                 "recorded_at": row[3],
                 "manifest": dict(row[4]),
+            }
+            for row in rows
+        ]
+
+    def commit_chunk_set_manifest(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        manifest: ChunkSetManifest,
+    ) -> None:
+        command = ArtifactCommandContext.model_validate(context)
+        payload = manifest.model_dump(mode="json")
+        strategy = manifest.chunk_set.strategy
+        with self._database.connect() as connection:
+            existing = connection.execute(
+                """
+                SELECT chunk_set_content_hash
+                FROM atlas_ingestion.chunk_set_versions
+                WHERE tenant_id = %s
+                  AND workspace_id = %s
+                  AND document_version_id = %s
+                  AND strategy_id = %s
+                  AND configuration_hash = %s
+                """,
+                (
+                    command.tenant_id,
+                    command.workspace_id,
+                    manifest.document_version_id,
+                    strategy.strategy_id,
+                    strategy.configuration_hash,
+                ),
+            ).fetchone()
+            if existing is not None:
+                if existing[0] == manifest.chunk_set_content_hash:
+                    return
+                raise DocumentProcessingConflictError("chunk set identity conflict")
+            connection.execute(
+                """
+                INSERT INTO atlas_ingestion.chunk_set_versions (
+                    tenant_id, workspace_id, chunk_set_id, manifest_id,
+                    acquisition_id, document_version_id, strategy_id,
+                    configuration_hash, chunk_set_content_hash, chunk_set_artifact_id,
+                    manifest, recorded_at
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                )
+                """,
+                (
+                    command.tenant_id,
+                    command.workspace_id,
+                    manifest.chunk_set.chunk_set_id,
+                    manifest.manifest_id,
+                    manifest.acquisition_id,
+                    manifest.document_version_id,
+                    strategy.strategy_id,
+                    strategy.configuration_hash,
+                    manifest.chunk_set_content_hash,
+                    str(manifest.chunk_set_artifact.artifact_id),
+                    Jsonb(payload),
+                    manifest.recorded_at,
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO atlas_ingestion.chunk_set_lifecycle_events (
+                    tenant_id, workspace_id, event_id, acquisition_id,
+                    chunk_set_id, event_type, payload, recorded_at
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s
+                )
+                """,
+                (
+                    command.tenant_id,
+                    command.workspace_id,
+                    uuid4(),
+                    manifest.acquisition_id,
+                    manifest.chunk_set.chunk_set_id,
+                    "ChunkSetRecorded",
+                    Jsonb(
+                        {
+                            "chunk_set_id": manifest.chunk_set.chunk_set_id,
+                            "document_version_id": manifest.document_version_id,
+                            "strategy_id": strategy.strategy_id,
+                            "chunk_set_content_hash": manifest.chunk_set_content_hash,
+                        }
+                    ),
+                    manifest.recorded_at,
+                ),
+            )
+            connection.commit()
+
+    def get_chunk_set_manifest(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        chunk_set_id: str,
+    ) -> dict[str, Any] | None:
+        command = ArtifactCommandContext.model_validate(context)
+        row = self._database.fetch_one(
+            """
+            SELECT manifest FROM atlas_ingestion.chunk_set_versions
+            WHERE tenant_id = %s AND workspace_id = %s AND chunk_set_id = %s
+            """,
+            (command.tenant_id, command.workspace_id, chunk_set_id),
+        )
+        if row is None:
+            return None
+        return dict(row[0])
+
+    def list_chunk_sets(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        document_version_id: str,
+    ) -> list[dict[str, Any]]:
+        command = ArtifactCommandContext.model_validate(context)
+        with self._database.connect(autocommit=True) as connection:
+            rows = connection.execute(
+                """
+                SELECT chunk_set_id, strategy_id, configuration_hash,
+                       chunk_set_content_hash, recorded_at, manifest
+                FROM atlas_ingestion.chunk_set_versions
+                WHERE tenant_id = %s
+                  AND workspace_id = %s
+                  AND document_version_id = %s
+                ORDER BY strategy_id ASC, recorded_at ASC
+                """,
+                (command.tenant_id, command.workspace_id, document_version_id),
+            ).fetchall()
+        return [
+            {
+                "chunk_set_id": row[0],
+                "strategy_id": row[1],
+                "configuration_hash": row[2],
+                "chunk_set_content_hash": row[3],
+                "recorded_at": row[4],
+                "manifest": dict(row[5]),
             }
             for row in rows
         ]
