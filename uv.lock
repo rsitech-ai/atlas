@@ -10,6 +10,7 @@ members = [
     "rsi-atlas-ingestion",
     "rsi-atlas-models",
     "rsi-atlas-observability",
+    "rsi-atlas-retrieval",
     "rsi-atlas-security",
     "rsi-atlas-storage",
     "rsi-atlas-workspace",
@@ -929,6 +930,21 @@ requires-dist = [
 ]
 
 [[package]]
+name = "rsi-atlas-retrieval"
+version = "0.1.0"
+source = { editable = "packages/retrieval" }
+dependencies = [
+    { name = "rsi-atlas-contracts" },
+    { name = "rsi-atlas-storage" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "rsi-atlas-contracts", editable = "packages/contracts" },
+    { name = "rsi-atlas-storage", editable = "packages/storage" },
+]
+
+[[package]]
 name = "rsi-atlas-security"
 version = "0.1.0"
 source = { editable = "packages/security" }
@@ -959,6 +975,7 @@ dependencies = [
     { name = "rsi-atlas-ingestion" },
     { name = "rsi-atlas-models" },
     { name = "rsi-atlas-observability" },
+    { name = "rsi-atlas-retrieval" },
     { name = "rsi-atlas-security" },
     { name = "rsi-atlas-storage" },
 ]
@@ -979,6 +996,7 @@ requires-dist = [
     { name = "rsi-atlas-ingestion", editable = "packages/ingestion" },
     { name = "rsi-atlas-models", editable = "packages/models" },
     { name = "rsi-atlas-observability", editable = "packages/observability" },
+    { name = "rsi-atlas-retrieval", editable = "packages/retrieval" },
     { name = "rsi-atlas-security", editable = "packages/security" },
     { name = "rsi-atlas-storage", editable = "packages/storage" },
 ]

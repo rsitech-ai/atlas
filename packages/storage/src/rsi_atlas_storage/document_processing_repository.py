@@ -1177,32 +1177,198 @@ class DocumentProcessingRepository:
         chunk_set_id: str,
         query: str,
     ) -> list[str]:
+        return [
+            str(row["chunk_id"])
+            for row in self.search_lexical_active_ranked(
+                context=context,
+                document_version_id=document_version_id,
+                chunk_set_id=chunk_set_id,
+                query=query,
+                top_k=10_000,
+            )
+        ]
+
+    def search_lexical_active_ranked(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        document_version_id: str,
+        chunk_set_id: str,
+        query: str,
+        top_k: int = 40,
+    ) -> list[dict[str, Any]]:
         command = ArtifactCommandContext.model_validate(context)
         with self._database.connect(autocommit=True) as connection:
             rows = connection.execute(
                 """
-                SELECT lcd.chunk_id
+                SELECT lcd.chunk_id, lcd.chunk_text_hash, lcd.body, lcd.ordinal,
+                       ts_rank_cd(lcd.tsv, plainto_tsquery('english', %s)) AS score,
+                       dra.index_version_id, m.publication_id
                 FROM atlas_ingestion.document_retrieval_active dra
                 JOIN atlas_ingestion.lexical_chunk_documents lcd
                   ON lcd.tenant_id = dra.tenant_id
                  AND lcd.workspace_id = dra.workspace_id
                  AND lcd.index_version_id = dra.index_version_id
+                JOIN atlas_ingestion.retrieval_publication_manifests m
+                  ON m.tenant_id = dra.tenant_id
+                 AND m.workspace_id = dra.workspace_id
+                 AND m.index_version_id = dra.index_version_id
+                 AND m.lifecycle = 'published'
                 WHERE dra.tenant_id = %s
                   AND dra.workspace_id = %s
                   AND dra.document_version_id = %s
                   AND dra.chunk_set_id = %s
                   AND lcd.tsv @@ plainto_tsquery('english', %s)
-                ORDER BY lcd.ordinal ASC
+                ORDER BY score DESC, lcd.ordinal ASC
+                LIMIT %s
+                """,
+                (
+                    query,
+                    command.tenant_id,
+                    command.workspace_id,
+                    document_version_id,
+                    chunk_set_id,
+                    query,
+                    top_k,
+                ),
+            ).fetchall()
+        return [
+            {
+                "chunk_id": str(row[0]),
+                "chunk_text_hash": str(row[1]),
+                "body": str(row[2]),
+                "ordinal": int(row[3]),
+                "score": float(row[4]),
+                "index_version_id": row[5],
+                "publication_id": str(row[6]),
+            }
+            for row in rows
+        ]
+
+    def search_dense_active_ranked(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        document_version_id: str,
+        chunk_set_id: str,
+        query_vector: str,
+        top_k: int = 40,
+    ) -> list[dict[str, Any]]:
+        command = ArtifactCommandContext.model_validate(context)
+        with self._database.connect(autocommit=True) as connection:
+            rows = connection.execute(
+                """
+                SELECT dce.chunk_id, dce.chunk_text_hash, lcd.body, dce.ordinal,
+                       (1.0 - (dce.embedding <=> %s::vector)) AS score,
+                       dra.index_version_id, m.publication_id
+                FROM atlas_ingestion.document_retrieval_active dra
+                JOIN atlas_ingestion.dense_chunk_embeddings dce
+                  ON dce.tenant_id = dra.tenant_id
+                 AND dce.workspace_id = dra.workspace_id
+                 AND dce.index_version_id = dra.index_version_id
+                JOIN atlas_ingestion.lexical_chunk_documents lcd
+                  ON lcd.tenant_id = dce.tenant_id
+                 AND lcd.workspace_id = dce.workspace_id
+                 AND lcd.index_version_id = dce.index_version_id
+                 AND lcd.chunk_id = dce.chunk_id
+                JOIN atlas_ingestion.retrieval_publication_manifests m
+                  ON m.tenant_id = dra.tenant_id
+                 AND m.workspace_id = dra.workspace_id
+                 AND m.index_version_id = dra.index_version_id
+                 AND m.lifecycle = 'published'
+                WHERE dra.tenant_id = %s
+                  AND dra.workspace_id = %s
+                  AND dra.document_version_id = %s
+                  AND dra.chunk_set_id = %s
+                ORDER BY dce.embedding <=> %s::vector ASC, dce.ordinal ASC
+                LIMIT %s
+                """,
+                (
+                    query_vector,
+                    command.tenant_id,
+                    command.workspace_id,
+                    document_version_id,
+                    chunk_set_id,
+                    query_vector,
+                    top_k,
+                ),
+            ).fetchall()
+        return [
+            {
+                "chunk_id": str(row[0]),
+                "chunk_text_hash": str(row[1]),
+                "body": str(row[2]),
+                "ordinal": int(row[3]),
+                "score": float(row[4]),
+                "index_version_id": row[5],
+                "publication_id": str(row[6]),
+            }
+            for row in rows
+        ]
+
+    def search_exact_active_ranked(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        document_version_id: str,
+        chunk_set_id: str,
+        identifier_value: str,
+        top_k: int = 200,
+    ) -> list[dict[str, Any]]:
+        command = ArtifactCommandContext.model_validate(context)
+        with self._database.connect(autocommit=True) as connection:
+            rows = connection.execute(
+                """
+                SELECT eih.chunk_id, lcd.chunk_text_hash, lcd.body, eih.ordinal,
+                       1.0::float8 AS score,
+                       dra.index_version_id, m.publication_id,
+                       eih.identifier_kind, eih.identifier_value
+                FROM atlas_ingestion.document_retrieval_active dra
+                JOIN atlas_ingestion.exact_identifier_hits eih
+                  ON eih.tenant_id = dra.tenant_id
+                 AND eih.workspace_id = dra.workspace_id
+                 AND eih.index_version_id = dra.index_version_id
+                JOIN atlas_ingestion.lexical_chunk_documents lcd
+                  ON lcd.tenant_id = eih.tenant_id
+                 AND lcd.workspace_id = eih.workspace_id
+                 AND lcd.index_version_id = eih.index_version_id
+                 AND lcd.chunk_id = eih.chunk_id
+                JOIN atlas_ingestion.retrieval_publication_manifests m
+                  ON m.tenant_id = dra.tenant_id
+                 AND m.workspace_id = dra.workspace_id
+                 AND m.index_version_id = dra.index_version_id
+                 AND m.lifecycle = 'published'
+                WHERE dra.tenant_id = %s
+                  AND dra.workspace_id = %s
+                  AND dra.document_version_id = %s
+                  AND dra.chunk_set_id = %s
+                  AND lower(eih.identifier_value) = lower(%s)
+                ORDER BY eih.ordinal ASC
+                LIMIT %s
                 """,
                 (
                     command.tenant_id,
                     command.workspace_id,
                     document_version_id,
                     chunk_set_id,
-                    query,
+                    identifier_value,
+                    top_k,
                 ),
             ).fetchall()
-        return [str(row[0]) for row in rows]
+        return [
+            {
+                "chunk_id": str(row[0]),
+                "chunk_text_hash": str(row[1]),
+                "body": str(row[2]),
+                "ordinal": int(row[3]),
+                "score": float(row[4]),
+                "index_version_id": row[5],
+                "publication_id": str(row[6]),
+                "identifier_kind": str(row[7]),
+                "identifier_value": str(row[8]),
+            }
+            for row in rows
+        ]
 
     def search_lexical_any_status(
         self,

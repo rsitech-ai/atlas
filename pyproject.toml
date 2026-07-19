@@ -9,6 +9,7 @@ dependencies = [
   "rsi-atlas-ingestion",
   "rsi-atlas-models",
   "rsi-atlas-observability",
+  "rsi-atlas-retrieval",
   "rsi-atlas-security",
   "rsi-atlas-storage",
 ]
@@ -28,6 +29,7 @@ rsi-atlas-engine = { workspace = true }
 rsi-atlas-ingestion = { workspace = true }
 rsi-atlas-models = { workspace = true }
 rsi-atlas-observability = { workspace = true }
+rsi-atlas-retrieval = { workspace = true }
 rsi-atlas-security = { workspace = true }
 rsi-atlas-storage = { workspace = true }
 
@@ -38,6 +40,7 @@ members = [
   "packages/ingestion",
   "packages/models",
   "packages/observability",
+  "packages/retrieval",
   "packages/security",
   "packages/storage",
   "services/engine",
@@ -50,6 +53,7 @@ testpaths = [
   "packages/ingestion/tests",
   "packages/models/tests",
   "packages/observability/tests",
+  "packages/retrieval/tests",
   "packages/security/tests",
   "packages/storage/tests",
   "services/engine/tests",
@@ -75,6 +79,7 @@ mypy_path = [
   "packages/ingestion/src",
   "packages/models/src",
   "packages/observability/src",
+  "packages/retrieval/src",
   "packages/security/src",
   "packages/storage/src",
   "services/engine/src",
