@@ -15,6 +15,7 @@ from rsi_atlas_storage.document_processing_repository import (
     DocumentProcessingRepository,
 )
 from rsi_atlas_storage.migrations import MigrationIntegrityError, MigrationRunner
+from rsi_atlas_storage.retrieval_research_repository import RetrievalResearchRepository
 
 __all__ = [
     "AcquisitionConflictError",
@@ -32,4 +33,5 @@ __all__ = [
     "MigrationIntegrityError",
     "MigrationRunner",
     "PostgresDatabase",
+    "RetrievalResearchRepository",
 ]

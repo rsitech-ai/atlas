@@ -9,4 +9,5 @@ description = "Bounded specialists, assertions, citations, and report gates"
 requires-python = ">=3.11,<3.15"
 dependencies = [
   "rsi-atlas-contracts==0.1.0",
+  "rsi-atlas-retrieval==0.1.0",
 ]

@@ -872,6 +872,8 @@ dependencies = [
     { name = "rsi-atlas-ingestion" },
     { name = "rsi-atlas-models" },
     { name = "rsi-atlas-observability" },
+    { name = "rsi-atlas-research" },
+    { name = "rsi-atlas-retrieval" },
     { name = "rsi-atlas-security" },
     { name = "rsi-atlas-storage" },
     { name = "uvicorn" },
@@ -884,6 +886,8 @@ requires-dist = [
     { name = "rsi-atlas-ingestion", editable = "packages/ingestion" },
     { name = "rsi-atlas-models", editable = "packages/models" },
     { name = "rsi-atlas-observability", editable = "packages/observability" },
+    { name = "rsi-atlas-research", editable = "packages/research" },
+    { name = "rsi-atlas-retrieval", editable = "packages/retrieval" },
     { name = "rsi-atlas-security", editable = "packages/security" },
     { name = "rsi-atlas-storage", editable = "packages/storage" },
     { name = "uvicorn", specifier = "==0.51.0" },
@@ -936,10 +940,14 @@ version = "0.1.0"
 source = { editable = "packages/research" }
 dependencies = [
     { name = "rsi-atlas-contracts" },
+    { name = "rsi-atlas-retrieval" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "rsi-atlas-contracts", editable = "packages/contracts" }]
+requires-dist = [
+    { name = "rsi-atlas-contracts", editable = "packages/contracts" },
+    { name = "rsi-atlas-retrieval", editable = "packages/retrieval" },
+]
 
 [[package]]
 name = "rsi-atlas-retrieval"

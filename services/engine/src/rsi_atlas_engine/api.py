@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, suppress
+from json import dumps
 from pathlib import Path
 from typing import Protocol
 from uuid import UUID
@@ -11,6 +12,13 @@ from rsi_atlas_contracts import (
     AcquisitionRequest,
     ArtifactCommandContext,
     DocumentAdmissionRecord,
+    EvidencePacket,
+    ReportDraft,
+    ResearchQuery,
+    RetrievalAbstention,
+    ReviewAction,
+    ReviewDecision,
+    SpecialistFinding,
     SystemStatus,
 )
 from rsi_atlas_ingestion import MAX_PDF_BYTES, StagedPDFEvidence
@@ -108,12 +116,43 @@ class DocumentProcessingPort(Protocol):
     ) -> RetrievalIndexSummary: ...
 
 
+class ResearchPort(Protocol):
+    def retrieve(self, *, query: ResearchQuery) -> EvidencePacket | RetrievalAbstention: ...
+
+    def run_document_specialist(
+        self,
+        *,
+        query: ResearchQuery,
+        packet: EvidencePacket,
+        subquestion: str | None = None,
+    ) -> SpecialistFinding: ...
+
+    def draft_report(
+        self,
+        *,
+        query: ResearchQuery,
+        packet: EvidencePacket,
+        finding: SpecialistFinding,
+        title: str,
+    ) -> ReportDraft: ...
+
+    def review_report(
+        self,
+        *,
+        query: ResearchQuery,
+        report: ReportDraft,
+        action: ReviewAction,
+        rationale: str,
+    ) -> ReviewDecision: ...
+
+
 def create_app(
     status_factory: Callable[[], SystemStatus] | None = None,
     *,
     document_admission_service: DocumentAdmissionPort | None = None,
     import_staging_area: ImportStagingArea | None = None,
     document_processing_service: DocumentProcessingPort | None = None,
+    research_service: ResearchPort | None = None,
 ) -> FastAPI:
     if (document_admission_service is None) != (import_staging_area is None):
         raise ValueError("document admission service and staging area must be configured together")
@@ -141,6 +180,11 @@ def create_app(
         if processing is None:
             raise RuntimeError("document processing is unavailable")
         return processing
+
+    def resolve_research() -> ResearchPort:
+        if research_service is None:
+            raise RuntimeError("research service is unavailable")
+        return research_service
 
     @asynccontextmanager
     async def lifespan(_application: FastAPI) -> AsyncIterator[None]:
@@ -515,6 +559,137 @@ def create_app(
             raise HTTPException(
                 status_code=503,
                 detail="Publication rollback is temporarily unavailable.",
+            ) from error
+
+    @application.post("/v1/workspaces/{workspace_id}/research:retrieve")
+    async def research_retrieve(
+        request: Request,
+        workspace_id: UUID,
+    ) -> dict[str, object]:
+        context = _workspace_context(request, workspace_id)
+        try:
+            query = ResearchQuery.model_validate_json(await request.body())
+            if query.context.workspace_id != context.workspace_id:
+                raise HTTPException(status_code=422, detail="Workspace identity is invalid.")
+            research = await run_in_threadpool(resolve_research)
+            result = await run_in_threadpool(research.retrieve, query=query)
+            return result.model_dump(mode="json")
+        except HTTPException:
+            raise
+        except ValidationError as error:
+            raise HTTPException(status_code=422, detail="Research query is invalid.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Research retrieval is temporarily unavailable.",
+            ) from error
+
+    @application.post(
+        "/v1/workspaces/{workspace_id}/research/specialist:document",
+    )
+    async def research_document_specialist(
+        request: Request,
+        workspace_id: UUID,
+    ) -> dict[str, object]:
+        context = _workspace_context(request, workspace_id)
+        try:
+            body = await request.json()
+            query = ResearchQuery.model_validate_json(dumps(body["query"]))
+            packet = EvidencePacket.model_validate_json(dumps(body["packet"]))
+            if query.context.workspace_id != context.workspace_id:
+                raise HTTPException(status_code=422, detail="Workspace identity is invalid.")
+            subquestion = body.get("subquestion")
+            research = await run_in_threadpool(resolve_research)
+            finding = await run_in_threadpool(
+                research.run_document_specialist,
+                query=query,
+                packet=packet,
+                subquestion=str(subquestion) if subquestion is not None else None,
+            )
+            return finding.model_dump(mode="json")
+        except HTTPException:
+            raise
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Specialist request is invalid.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Document specialist is temporarily unavailable.",
+            ) from error
+
+    @application.post(
+        "/v1/workspaces/{workspace_id}/research/reports:draft",
+    )
+    async def research_draft_report(
+        request: Request,
+        workspace_id: UUID,
+    ) -> dict[str, object]:
+        context = _workspace_context(request, workspace_id)
+        try:
+            body = await request.json()
+            query = ResearchQuery.model_validate_json(dumps(body["query"]))
+            packet = EvidencePacket.model_validate_json(dumps(body["packet"]))
+            finding = SpecialistFinding.model_validate_json(dumps(body["finding"]))
+            title = str(body["title"])
+            if query.context.workspace_id != context.workspace_id:
+                raise HTTPException(status_code=422, detail="Workspace identity is invalid.")
+            research = await run_in_threadpool(resolve_research)
+            draft = await run_in_threadpool(
+                research.draft_report,
+                query=query,
+                packet=packet,
+                finding=finding,
+                title=title,
+            )
+            return draft.model_dump(mode="json")
+        except HTTPException:
+            raise
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(
+                status_code=422, detail="Report draft request is invalid."
+            ) from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Report drafting is temporarily unavailable.",
+            ) from error
+
+    @application.post(
+        "/v1/workspaces/{workspace_id}/research/reports/{report_id}/review",
+    )
+    async def research_review_report(
+        request: Request,
+        workspace_id: UUID,
+        report_id: str,
+    ) -> dict[str, object]:
+        context = _workspace_context(request, workspace_id)
+        try:
+            body = await request.json()
+            query = ResearchQuery.model_validate_json(dumps(body["query"]))
+            report = ReportDraft.model_validate_json(dumps(body["report"]))
+            action = ReviewAction(str(body["action"]))
+            rationale = str(body["rationale"])
+            if report.report_id != report_id:
+                raise HTTPException(status_code=422, detail="Report identity is invalid.")
+            if query.context.workspace_id != context.workspace_id:
+                raise HTTPException(status_code=422, detail="Workspace identity is invalid.")
+            research = await run_in_threadpool(resolve_research)
+            decision = await run_in_threadpool(
+                research.review_report,
+                query=query,
+                report=report,
+                action=action,
+                rationale=rationale,
+            )
+            return decision.model_dump(mode="json")
+        except HTTPException:
+            raise
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Review request is invalid.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Report review is temporarily unavailable.",
             ) from error
 
     return application
