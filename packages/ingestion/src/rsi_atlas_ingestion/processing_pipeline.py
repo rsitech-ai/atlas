@@ -25,9 +25,11 @@ from rsi_atlas_storage.document_processing_repository import DocumentProcessingR
 from rsi_atlas_ingestion.canonical_service import CanonicalizationService
 from rsi_atlas_ingestion.canonicalization import CanonicalizationError
 from rsi_atlas_ingestion.chunk_service import ChunkService
+from rsi_atlas_ingestion.index_service import IndexService
 from rsi_atlas_ingestion.parser_benchmark import QUALIFICATION_PATH, qualify_development_candidate
 from rsi_atlas_ingestion.parser_service import ParserService
 from rsi_atlas_ingestion.preflight_service import PreflightService
+from rsi_atlas_ingestion.publication_service import PublicationService
 from rsi_atlas_ingestion.worker_runner import DocumentWorkerRunnerError
 
 # Phase 2A quarantine-for-review is the only admitted raw path that may start development parse.
@@ -126,6 +128,21 @@ class ChunkSetEvidence(StrictModel):
     chunk_count: int = Field(ge=1, le=1_000_000)
     searchable: Literal[False] = False
     chunks: tuple[dict[str, Any], ...] = Field(max_length=10_000)
+
+
+class RetrievalIndexSummary(StrictModel):
+    schema_version: Literal["rsi-atlas.retrieval-index-summary.v1"] = (
+        "rsi-atlas.retrieval-index-summary.v1"
+    )
+    index_version_id: UUID
+    document_version_id: str = Field(pattern=r"^canonical:[0-9a-f]{64}$")
+    chunk_set_id: str = Field(pattern=r"^chunkset:[0-9a-f]{64}$")
+    status: Literal["staging", "active", "superseded", "failed"]
+    dense_cardinality: int = Field(ge=1, le=1_000_000)
+    lexical_cardinality: int = Field(ge=1, le=1_000_000)
+    exact_identifier_cardinality: int = Field(ge=0, le=1_000_000)
+    searchable: bool
+    development_fixture_embeddings: Literal[True] = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -370,6 +387,114 @@ class DocumentProcessingService:
             searchable=False,
             chunks=chunks,
         )
+
+    def start_indexing(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        chunk_set_id: str,
+    ) -> RetrievalIndexSummary:
+        row = self.processing.get_chunk_set_manifest(context=context, chunk_set_id=chunk_set_id)
+        if row is None:
+            raise LookupError("chunk_set_not_found")
+        acquisition_id = UUID(str(row["acquisition_id"]))
+        indexer = IndexService(
+            processing=self.processing, artifacts=self.artifacts, store=self.store
+        )
+        staged = indexer.stage_indexes(
+            context=context, acquisition_id=acquisition_id, chunk_set_id=chunk_set_id
+        )
+        return RetrievalIndexSummary(
+            index_version_id=UUID(str(staged["index_version_id"])),
+            document_version_id=str(staged["document_version_id"]),
+            chunk_set_id=str(staged["chunk_set_id"]),
+            status="staging",
+            dense_cardinality=_require_int(staged["dense_cardinality"], field="dense_cardinality"),
+            lexical_cardinality=_require_int(
+                staged["lexical_cardinality"], field="lexical_cardinality"
+            ),
+            exact_identifier_cardinality=_require_int(
+                staged["exact_identifier_cardinality"],
+                field="exact_identifier_cardinality",
+            ),
+            searchable=False,
+        )
+
+    def list_index_versions(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        chunk_set_id: str,
+    ) -> tuple[RetrievalIndexSummary, ...]:
+        rows = self.processing.list_retrieval_index_versions(
+            context=context, chunk_set_id=chunk_set_id
+        )
+        return tuple(
+            RetrievalIndexSummary(
+                index_version_id=UUID(str(row["index_version_id"])),
+                document_version_id=str(row["document_version_id"]),
+                chunk_set_id=str(row["chunk_set_id"]),
+                status=_require_index_status(row["status"]),
+                dense_cardinality=_require_int(row["dense_cardinality"], field="dense_cardinality"),
+                lexical_cardinality=_require_int(
+                    row["lexical_cardinality"], field="lexical_cardinality"
+                ),
+                exact_identifier_cardinality=_require_int(
+                    row["exact_identifier_cardinality"],
+                    field="exact_identifier_cardinality",
+                ),
+                searchable=bool(row["searchable"]),
+            )
+            for row in rows
+        )
+
+    def activate_publication(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        index_version_id: UUID,
+    ) -> RetrievalIndexSummary:
+        result = PublicationService(processing=self.processing).activate(
+            context=context, index_version_id=index_version_id
+        )
+        version = self.processing.get_retrieval_index_version(
+            context=context, index_version_id=index_version_id
+        )
+        if version is None:
+            raise LookupError("index_version_not_found")
+        return RetrievalIndexSummary(
+            index_version_id=index_version_id,
+            document_version_id=str(version["document_version_id"]),
+            chunk_set_id=str(version["chunk_set_id"]),
+            status="active",
+            dense_cardinality=_require_int(version["dense_cardinality"], field="dense_cardinality"),
+            lexical_cardinality=_require_int(
+                version["lexical_cardinality"], field="lexical_cardinality"
+            ),
+            exact_identifier_cardinality=_require_int(
+                version["exact_identifier_cardinality"],
+                field="exact_identifier_cardinality",
+            ),
+            searchable=bool(result["searchable"]),
+        )
+
+
+def _require_int(value: object, *, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"{field} must be an int")
+    return value
+
+
+def _require_index_status(value: object) -> Literal["staging", "active", "superseded", "failed"]:
+    if value == "staging":
+        return "staging"
+    if value == "active":
+        return "active"
+    if value == "superseded":
+        return "superseded"
+    if value == "failed":
+        return "failed"
+    raise ValueError("invalid retrieval index status")
 
 
 def _blocked_admission_status(

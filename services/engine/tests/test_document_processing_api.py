@@ -8,6 +8,7 @@ from rsi_atlas_ingestion.processing_pipeline import (
     ChunkSetEvidence,
     ChunkSetSummary,
     DocumentProcessingStatus,
+    RetrievalIndexSummary,
 )
 
 
@@ -15,6 +16,9 @@ class FakeProcessingService:
     def __init__(self) -> None:
         self.started: list[UUID] = []
         self.chunked: list[str] = []
+        self.indexed: list[str] = []
+        self.activated: list[UUID] = []
+        self._index_version_id = UUID("66666666-6666-4666-8666-666666666666")
 
     def start(
         self, *, context: ArtifactCommandContext, acquisition_id: UUID
@@ -119,6 +123,59 @@ class FakeProcessingService:
             ),
         )
 
+    def start_indexing(
+        self, *, context: ArtifactCommandContext, chunk_set_id: str
+    ) -> RetrievalIndexSummary:
+        del context
+        if chunk_set_id != "chunkset:" + ("d" * 64):
+            raise LookupError("chunk_set_not_found")
+        self.indexed.append(chunk_set_id)
+        return RetrievalIndexSummary(
+            index_version_id=self._index_version_id,
+            document_version_id="canonical:" + ("a" * 64),
+            chunk_set_id=chunk_set_id,
+            status="staging",
+            dense_cardinality=2,
+            lexical_cardinality=2,
+            exact_identifier_cardinality=0,
+            searchable=False,
+        )
+
+    def list_index_versions(
+        self, *, context: ArtifactCommandContext, chunk_set_id: str
+    ) -> tuple[RetrievalIndexSummary, ...]:
+        del context
+        return (
+            RetrievalIndexSummary(
+                index_version_id=self._index_version_id,
+                document_version_id="canonical:" + ("a" * 64),
+                chunk_set_id=chunk_set_id,
+                status="staging",
+                dense_cardinality=2,
+                lexical_cardinality=2,
+                exact_identifier_cardinality=0,
+                searchable=False,
+            ),
+        )
+
+    def activate_publication(
+        self, *, context: ArtifactCommandContext, index_version_id: UUID
+    ) -> RetrievalIndexSummary:
+        del context
+        if index_version_id != self._index_version_id:
+            raise LookupError("index_version_not_found")
+        self.activated.append(index_version_id)
+        return RetrievalIndexSummary(
+            index_version_id=index_version_id,
+            document_version_id="canonical:" + ("a" * 64),
+            chunk_set_id="chunkset:" + ("d" * 64),
+            status="active",
+            dense_cardinality=2,
+            lexical_cardinality=2,
+            exact_identifier_cardinality=0,
+            searchable=True,
+        )
+
 
 def _headers(workspace_id: UUID) -> dict[str, str]:
     return {
@@ -219,6 +276,48 @@ def test_chunk_set_inspect_routes() -> None:
         headers=headers,
     )
     assert missing.status_code == 404
+
+
+def test_retrieval_index_routes() -> None:
+    processing = FakeProcessingService()
+    client = TestClient(
+        create_app(
+            status_factory=lambda: (_ for _ in ()).throw(RuntimeError("unused")),
+            document_admission_service=object(),  # type: ignore[arg-type]
+            import_staging_area=object(),  # type: ignore[arg-type]
+            document_processing_service=processing,
+        )
+    )
+    workspace_id = UUID("44444444-4444-4444-8444-444444444444")
+    headers = _headers(workspace_id)
+    chunk_set_id = "chunkset:" + ("d" * 64)
+
+    staged = client.post(
+        f"/v1/workspaces/{workspace_id}/chunk-sets/{chunk_set_id}/indexing:start",
+        headers=headers,
+    )
+    assert staged.status_code == 200
+    body = staged.json()
+    assert body["status"] == "staging"
+    assert body["searchable"] is False
+    assert body["development_fixture_embeddings"] is True
+    assert processing.indexed == [chunk_set_id]
+
+    listed = client.get(
+        f"/v1/workspaces/{workspace_id}/chunk-sets/{chunk_set_id}/index-versions",
+        headers=headers,
+    )
+    assert listed.status_code == 200
+    assert listed.json()[0]["index_version_id"] == str(processing._index_version_id)
+
+    activated = client.post(
+        f"/v1/workspaces/{workspace_id}/index-versions/{processing._index_version_id}/publication:activate",
+        headers=headers,
+    )
+    assert activated.status_code == 200
+    assert activated.json()["status"] == "active"
+    assert activated.json()["searchable"] is True
+    assert processing.activated == [processing._index_version_id]
 
 
 def test_processing_rejects_invalid_page_bounds() -> None:

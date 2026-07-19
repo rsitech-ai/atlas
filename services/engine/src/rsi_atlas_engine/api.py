@@ -19,6 +19,7 @@ from rsi_atlas_ingestion.processing_pipeline import (
     ChunkSetEvidence,
     ChunkSetSummary,
     DocumentProcessingStatus,
+    RetrievalIndexSummary,
 )
 from rsi_atlas_storage import AcquisitionConflictError
 from starlette.concurrency import run_in_threadpool
@@ -77,6 +78,27 @@ class DocumentProcessingPort(Protocol):
         context: ArtifactCommandContext,
         chunk_set_id: str,
     ) -> ChunkSetEvidence: ...
+
+    def start_indexing(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        chunk_set_id: str,
+    ) -> RetrievalIndexSummary: ...
+
+    def list_index_versions(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        chunk_set_id: str,
+    ) -> tuple[RetrievalIndexSummary, ...]: ...
+
+    def activate_publication(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        index_version_id: UUID,
+    ) -> RetrievalIndexSummary: ...
 
 
 def create_app(
@@ -382,6 +404,85 @@ def create_app(
             raise HTTPException(
                 status_code=503,
                 detail="Chunk set retrieval is temporarily unavailable.",
+            ) from error
+
+    @application.post(
+        "/v1/workspaces/{workspace_id}/chunk-sets/{chunk_set_id}/indexing:start",
+        response_model=RetrievalIndexSummary,
+    )
+    async def start_indexing(
+        request: Request,
+        workspace_id: UUID,
+        chunk_set_id: str,
+    ) -> RetrievalIndexSummary:
+        if not chunk_set_id.startswith("chunkset:"):
+            raise HTTPException(status_code=422, detail="Chunk set id is invalid.")
+        context = _workspace_context(request, workspace_id)
+        try:
+            processing = await run_in_threadpool(resolve_processing)
+            return await run_in_threadpool(
+                processing.start_indexing,
+                context=context,
+                chunk_set_id=chunk_set_id,
+            )
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail="Chunk set was not found.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Index staging is temporarily unavailable.",
+            ) from error
+
+    @application.get(
+        "/v1/workspaces/{workspace_id}/chunk-sets/{chunk_set_id}/index-versions",
+        response_model=list[RetrievalIndexSummary],
+    )
+    async def list_index_versions(
+        request: Request,
+        workspace_id: UUID,
+        chunk_set_id: str,
+    ) -> list[RetrievalIndexSummary]:
+        if not chunk_set_id.startswith("chunkset:"):
+            raise HTTPException(status_code=422, detail="Chunk set id is invalid.")
+        context = _workspace_context(request, workspace_id)
+        try:
+            processing = await run_in_threadpool(resolve_processing)
+            return list(
+                await run_in_threadpool(
+                    processing.list_index_versions,
+                    context=context,
+                    chunk_set_id=chunk_set_id,
+                )
+            )
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Index version listing is temporarily unavailable.",
+            ) from error
+
+    @application.post(
+        "/v1/workspaces/{workspace_id}/index-versions/{index_version_id}/publication:activate",
+        response_model=RetrievalIndexSummary,
+    )
+    async def activate_publication(
+        request: Request,
+        workspace_id: UUID,
+        index_version_id: UUID,
+    ) -> RetrievalIndexSummary:
+        context = _workspace_context(request, workspace_id)
+        try:
+            processing = await run_in_threadpool(resolve_processing)
+            return await run_in_threadpool(
+                processing.activate_publication,
+                context=context,
+                index_version_id=index_version_id,
+            )
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail="Index version was not found.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Publication activation is temporarily unavailable.",
             ) from error
 
     return application
