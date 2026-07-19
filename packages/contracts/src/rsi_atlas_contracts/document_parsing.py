@@ -68,6 +68,7 @@ class DocumentProcessingLifecycle(StrEnum):
     PARSING = "parsing"
     PARSE_VALIDATED = "parse_validated"
     CANONICALIZED = "canonicalized"
+    CHUNKED = "chunked"
     AWAITING_REVIEW = "awaiting_review"
     AWAITING_PASSWORD = "awaiting_password"
     FAILED_RETRYABLE = "failed_retryable"
