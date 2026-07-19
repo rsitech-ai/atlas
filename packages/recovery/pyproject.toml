@@ -1,0 +1,12 @@
+[build-system]
+requires = ["hatchling==1.31.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rsi-atlas-recovery"
+version = "0.1.0"
+description = "Development backup, restore, Safe Mode, and integrity scrub"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+  "rsi-atlas-contracts==0.1.0",
+]
