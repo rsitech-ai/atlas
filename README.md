@@ -45,15 +45,20 @@ publication:
   migration `0008` staging dense pgvector + PostgreSQL FTS lexical + exact-identifier rows,
   atomic publication activate/rollback via an active pointer, and loopback
   `indexing:start` / index-version list / `publication:activate` /
-  `publication:rollback` APIs. Staging stays non-searchable until activation.
+  `publication:rollback` APIs. Staging stays non-searchable until activation;
+- Phase 3 development hybrid retrieval: active-only dense/lexical/exact candidate generation,
+  intent-weighted RRF fusion with inspectable component ranks, coverage/abstention,
+  Document Evidence specialist (extractive, no LLM), assertion→citation→report draft gate,
+  immutable review events, migration `0009`, and loopback
+  `research:retrieve` / `specialist:document` / `reports:draft` / review APIs.
 
 OCR/scanned fallback, Docling/Tier-1 promotion, production embedding-model promotion, Tantivy,
-hybrid retrieval/fusion/rerank, qualified model execution, collectors, LangGraph workflows, XPC,
-signing, and release qualification are not implemented yet. Canonical pages, chunk sets, and
-fixture indexes are development evidence: searchable only after explicit publication activation,
-and not production-promoted. Parent-child/table-aware are implemented and benchmarked for
-development only—not production-ready. The development database is project-owned; release data
-placement remains a later packaging gate.
+production cross-encoder/LLM rerankers, LangGraph interrupt/resume, remaining specialists,
+qualified model execution, collectors, XPC, signing, and release qualification are not
+implemented. Hybrid retrieval and cited reports are development evidence only—not criterion
+closure for §§16–18 / 25–60. Parent-child/table-aware remain development-only—not
+production-ready. The development database is project-owned; release data placement remains a
+later packaging gate.
 
 ## Requirements
 

@@ -10,16 +10,19 @@ RSI Atlas is complete only when all 134 normative acceptance criteria in Section
 
 The reviewed Phase 1 chain through `647c25b`, Phase 2A chain through `113110c`, Phase 2B
 development chain through `6383861` (re-review approve-with-nits), Phase 2C development chain
-through `a51545d`, and Phase 2D development chain through `63b0653` prove the native-to-engine
-seam, immutable local artifacts, Unix-socket PostgreSQL/pgvector persistence, exact runtime
-capability policy, isolated metadata-only OpenTelemetry, strict model/resource boundaries, eight
-real bounded diagnostics, raw fail-closed PDF admission with exact-duplicate and hard-kill
-recovery, development-qualified Tier-0 parse plus inspectable canonical pages under Seatbelt
-(Docling blocked; not production-promoted), five implemented chunking families with frozen
-intrinsic benchmarks plus chunk-set persistence/inspect APIs, and development dense/lexical
-staging indexes with atomic publication activation under fixture embeddings. This does not
-complete document intelligence or a full release criterion: no production-promoted parser or
-embedding model, OCR/scanned path, hybrid retrieval/workflow runs; observability is not
+through `a51545d`, Phase 2D development chain through `c634b25`, and Phase 3 development slice
+through the tip prove the native-to-engine seam, immutable local artifacts, Unix-socket
+PostgreSQL/pgvector persistence, exact runtime capability policy, isolated metadata-only
+OpenTelemetry, strict model/resource boundaries, eight real bounded diagnostics, raw fail-closed
+PDF admission with exact-duplicate and hard-kill recovery, development-qualified Tier-0 parse plus
+inspectable canonical pages under Seatbelt (Docling blocked; not production-promoted), five
+implemented chunking families with frozen intrinsic benchmarks plus chunk-set persistence/inspect
+APIs, development dense/lexical staging indexes with atomic publication activation under fixture
+embeddings, and development hybrid retrieval (dense+lexical+exact RRF, coverage/abstention),
+Document Evidence specialist, assertion/citation/report draft gate, and loopback research APIs.
+This does not complete document intelligence or a full release criterion: no production-promoted
+parser or embedding model, OCR/scanned path, production reranker, LangGraph durability, remaining
+specialists, calibrated judges, or native Research Canvas/Report Studio; observability is not
 end-to-end Swift-to-publication; loopback HTTP remains development-only; and the artifact is
 unsigned.
 
@@ -27,7 +30,7 @@ unsigned.
 | --- | --- | --- | --- | --- |
 | 1. Foundation and local runtime | §§8–11, 25, 27, 29–32 foundation portions | 1–3, 17, 85–93, 99–102, 112–126, 127–134 foundations | Complete (development evidence) | Native Command Center controls and diagnoses a durable, enforced-offline, observable local runtime with immutable artifacts, PostgreSQL/pgvector, resource/model policy, recovery, and no hard-coded health. |
 | 2. Document intelligence | §§12–15 | 10–24 plus Evidence Inspector portion of 6 | Phase 2A–2D complete (dev); production promotion/OCR/interrupt still open | Native PDF import reaches immutable raw evidence, durable fail-closed admission, development-qualified Tier-0 parse, inspectable canonical pages, five development chunkers, fixture dense/lexical indexes, and atomic publication activation. Completion still requires production promotion/OCR, interrupt/resume, and complete offline proof. |
-| 3. Retrieval and research | §§16–18 | 4–8, 25–60 | Phase 3 plan present (`2026-07-19-phase-3-hybrid-retrieval-research.md`); implementation not closed | A frozen material question produces an inspectable plan, hybrid evidence packet, bounded specialist findings, deterministic calculations, exact citations, review, and an editable versioned report. |
+| 3. Retrieval and research | §§16–18 | 4–8, 25–60 | Phase 3 development slice closed (hybrid retrieve / document specialist / cited draft); full criteria open | Development loopback APIs produce an inspectable plan, hybrid evidence packet (or abstention), Document Evidence finding, cited report draft, and immutable review. Production rerankers, LangGraph, remaining specialists, native Report Studio, and criteria 4–8/25–60 remain open. |
 | 4. Multi-chain and quantitative data | §§19–23 | 43–44 and 61–81 | Missing | Bitcoin, EVM, Solana, market, governance, and GitHub fixtures become bitemporal observations/features and support reproducible dossiers and comparison inputs. |
 | 5. Monitoring and comparison | §24 and cross-surface UX | 45, 61, 82–84 plus comparison/timeline UX | Missing | A deterministic material change invalidates affected research, deduplicates an alert, launches targeted research, and appears on the cross-chain timeline/comparison matrix. |
 | 6. Engineering and release maturity | §§25–32 complete | 85–134 | Missing | Frozen evaluations qualify components, Codex produces a gated patch from a sanitized bundle, and a signed/notarized release passes zero-egress, clean install/update/rollback, backup/restore, Safe Mode, and integrity recovery. |

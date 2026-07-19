@@ -84,9 +84,6 @@ def should_abstain(coverage: tuple[CoverageCell, ...]) -> bool:
             and cell.status is CoverageStatus.MISSING
         ):
             return True
-        if (
-            cell.requirement_id == "exact_identifier_hit"
-            and cell.status is CoverageStatus.MISSING
-        ):
+        if cell.requirement_id == "exact_identifier_hit" and cell.status is CoverageStatus.MISSING:
             return True
     return False

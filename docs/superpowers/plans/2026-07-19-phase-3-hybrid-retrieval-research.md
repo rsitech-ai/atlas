@@ -93,10 +93,10 @@ dependency. No LangGraph in this development slice (`ponytail:` upgrade = durabl
 - `SpecialistType` (document_evidence only in this slice), `SpecialistTask`, `SpecialistFinding`
 - `ResearchAssertion`, `CitationRole`, `CitationBinding`, `ReportDraft`, `ReviewDecision`
 
-- [ ] **Step 1: Write RED contract tests**
-- [ ] **Step 2: Run RED**
-- [ ] **Step 3: Implement smallest strict models**
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 1: Write RED contract tests**
+- [x] **Step 2: Run RED**
+- [x] **Step 3: Implement smallest strict models**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 uv run pytest packages/contracts/tests/test_retrieval.py packages/contracts/tests/test_research.py -q
@@ -116,9 +116,9 @@ git commit -m "feat: define hybrid retrieval and research contracts"
 - Create: `packages/retrieval/tests/test_hybrid_search.py`
 - Modify: storage repository — `search_dense_active`, `search_exact_active`
 
-- [ ] **Step 1: RED** — staging invisible; active dense/lexical/exact return ranked candidates
-- [ ] **Step 2: Implement search against `document_retrieval_active` only**
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 1: RED** — staging invisible; active dense/lexical/exact return ranked candidates
+- [x] **Step 2: Implement search against `document_retrieval_active` only**
+- [x] **Step 3: Verify and commit**
 
 ```bash
 RSI_ATLAS_TEST_DATABASE_URL="$(./infra/local/postgres.sh test-url)" \
@@ -137,9 +137,9 @@ git commit -m "feat: search active dense lexical and exact indexes"
 - Create: `packages/retrieval/src/rsi_atlas_retrieval/packet.py`
 - Create: `packages/retrieval/tests/test_fusion_packet.py`
 
-- [ ] **Step 1: RED** — deterministic RRF; inspectable component ranks; abstention; exact replay
-- [ ] **Step 2: Implement fusion + coverage + packet assembly**
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 1: RED** — deterministic RRF; inspectable component ranks; abstention; exact replay
+- [x] **Step 2: Implement fusion + coverage + packet assembly**
+- [x] **Step 3: Verify and commit**
 
 ```bash
 uv run pytest packages/retrieval/tests/test_fusion_packet.py -q
@@ -157,9 +157,9 @@ git commit -m "feat: fuse hybrid candidates into inspectable evidence packets"
 - Create: `packages/research/src/rsi_atlas_research/document_specialist.py`
 - Create: `packages/research/tests/test_document_specialist.py`
 
-- [ ] **Step 1: RED** — invalid plans rejected; specialist returns schema-valid finding
-- [ ] **Step 2: Deterministic extractive specialist (no LLM)**
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 1: RED** — invalid plans rejected; specialist returns schema-valid finding
+- [x] **Step 2: Deterministic extractive specialist (no LLM)**
+- [x] **Step 3: Verify and commit**
 
 ```bash
 uv run pytest packages/research/tests/test_document_specialist.py -q
@@ -177,9 +177,9 @@ git commit -m "feat: validate plans and run document evidence specialist"
 - Create: `packages/research/src/rsi_atlas_research/reports.py`
 - Create: `packages/research/tests/test_cited_reports.py`
 
-- [ ] **Step 1: RED** — unsupported claim blocked; citation hash mismatch fails; review immutable
-- [ ] **Step 2: Assertion → citation bind → report gate → review event**
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 1: RED** — unsupported claim blocked; citation hash mismatch fails; review immutable
+- [x] **Step 2: Assertion → citation bind → report gate → review event**
+- [x] **Step 3: Verify and commit**
 
 ```bash
 uv run pytest packages/research/tests/test_cited_reports.py -q
@@ -203,9 +203,9 @@ Endpoints (development loopback):
 - `POST /v1/workspaces/{id}/research/runs/{run_id}/reports:draft` → ReportDraft
 - `POST /v1/workspaces/{id}/research/reports/{report_id}/review` → ReviewDecision
 
-- [ ] **Step 1: RED API tests**
-- [ ] **Step 2: Migration + repository + routes**
-- [ ] **Step 3: Verify and commit**
+- [x] **Step 1: RED API tests**
+- [x] **Step 2: Migration + repository + routes**
+- [x] **Step 3: Verify and commit**
 
 ```bash
 RSI_ATLAS_TEST_DATABASE_URL="$(./infra/local/postgres.sh test-url)" \
@@ -234,9 +234,9 @@ RSI_ATLAS_TEST_DATABASE_URL="$(./infra/local/postgres.sh test-url)" uv run pytes
 swift test --package-path apps/macos
 ```
 
-- [ ] Full gate green
-- [ ] Docs state development-only evidence; Docling/production embeddings still blocked
-- [ ] Commit: `docs: close Phase 3 hybrid retrieval development slice`
+- [x] Full gate green
+- [x] Docs state development-only evidence; Docling/production embeddings still blocked
+- [x] Commit: `docs: close Phase 3 hybrid retrieval development slice`
 
 ---
 
@@ -252,3 +252,12 @@ publications remain valid without Phase 3 tables.
 - Remaining specialists; calibrated judges
 - Native Research Canvas / Report Studio
 - Phase 4 multi-chain planes feeding structured retrieval
+
+
+## Closure evidence
+
+Development slice closed on branch `feat/andrzej_atlas_foundation`. Proven: contracts, active hybrid
+retrieve, RRF packet/abstention/replay, Document Evidence specialist, cited report draft + review,
+migration `0009`, loopback research APIs. Not proven / blocked: Docling, production embeddings,
+cross-encoder/LLM rerankers, LangGraph interrupt/resume, remaining specialists, calibrated judges,
+native Research Canvas/Report Studio, criteria 4–8 and 25–60 closure.

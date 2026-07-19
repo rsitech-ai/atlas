@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from uuid import UUID
-
 from json import dumps
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 from rsi_atlas_contracts import (
