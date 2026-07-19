@@ -15,6 +15,7 @@ from rsi_atlas_storage.document_processing_repository import (
     DocumentProcessingRepository,
 )
 from rsi_atlas_storage.migrations import MigrationIntegrityError, MigrationRunner
+from rsi_atlas_storage.observation_repository import ObservationRepository
 from rsi_atlas_storage.retrieval_research_repository import RetrievalResearchRepository
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "DocumentProcessingRepository",
     "MigrationIntegrityError",
     "MigrationRunner",
+    "ObservationRepository",
     "PostgresDatabase",
     "RetrievalResearchRepository",
 ]
