@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from hashlib import sha256
+from json import dumps
 
 from rsi_atlas_contracts import (
     DEVELOPMENT_EMBEDDING_DIMENSIONS,
@@ -19,7 +20,7 @@ _POLICY = {
     "normalization": "l2",
 }
 _POLICY_HASH = sha256(
-    __import__("json").dumps(_POLICY, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    dumps(_POLICY, sort_keys=True, separators=(",", ":")).encode("utf-8")
 ).hexdigest()
 
 DEVELOPMENT_EMBEDDING_MODEL = EmbeddingModelIdentity(

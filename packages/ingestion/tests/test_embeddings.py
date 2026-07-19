@@ -18,9 +18,10 @@ from rsi_atlas_ingestion.embedding import (
 
 
 def test_development_model_is_fixture_only() -> None:
-    assert DEVELOPMENT_EMBEDDING_MODEL.promotion_class is EmbeddingPromotionClass.DEVELOPMENT_FIXTURE
-    assert DEVELOPMENT_EMBEDDING_MODEL.dimensions == DEVELOPMENT_EMBEDDING_DIMENSIONS
-    assert DEVELOPMENT_EMBEDDING_MODEL.model_id.startswith("fixture_")
+    model = DEVELOPMENT_EMBEDDING_MODEL
+    assert model.promotion_class is EmbeddingPromotionClass.DEVELOPMENT_FIXTURE
+    assert model.dimensions == DEVELOPMENT_EMBEDDING_DIMENSIONS
+    assert model.model_id.startswith("fixture_")
 
 
 def test_identical_text_yields_identical_vector() -> None:
