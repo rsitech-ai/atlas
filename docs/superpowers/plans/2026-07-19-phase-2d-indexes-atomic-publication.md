@@ -182,9 +182,10 @@ without becoming searchable. Re-running identical inputs is idempotent on conten
 
 Search helper used only in tests: `search_lexical(active_only=True)` must miss staging rows.
 
-- [x] **Step 1: RED atomicity tests (incl. simulated mid-txn failure)**
+- [x] **Step 1: RED atomicity tests (staging invisible; activate; supersede; rollback clears search)**
 - [x] **Step 2: Implement**
 - [x] **Step 3: Commit**
+- [ ] **Deferred:** simulated mid-txn abort injection (prior active retained) — not proven; activate/rollback run in one DB transaction each
 
 ```bash
 git commit -m "feat: atomically publish retrieval index versions"
@@ -266,4 +267,8 @@ git commit -m "docs: close dense/lexical index publication slice"
 - Human interrupt/resume workflow UI (criterion 20) unless already present
 - Claiming full closure of acceptance criteria 10–24
 
-Proven at closure: `uv lock --check`, ruff check/format, mypy, full pytest **989** passed, Swift **44** passed. Tip through `63b0653`; Docling blocked; fixture embeddings only; criterion 15 unclaimed; Phase 3 not started.
+Proven at closure: `uv lock --check`, ruff check/format, mypy; focused indexing/publication/
+embedder/API suite green; full pytest **990** collected (intermittent pre-existing EBADF flake on
+`test_local_postgres_rejects_symlinked_data_root_ancestor` under parallel suite load; passes in
+isolation); Swift **44** passed. Tip through publication rollback API; Docling blocked; fixture
+embeddings only; mid-txn abort injection deferred; criterion 15 unclaimed; Phase 3 plan may start.

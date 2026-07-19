@@ -44,8 +44,8 @@ publication:
 - development fixture embeddings (stdlib hash→vector; production embedding models blocked),
   migration `0008` staging dense pgvector + PostgreSQL FTS lexical + exact-identifier rows,
   atomic publication activate/rollback via an active pointer, and loopback
-  `indexing:start` / index-version list / `publication:activate` APIs. Staging stays
-  non-searchable until activation.
+  `indexing:start` / index-version list / `publication:activate` /
+  `publication:rollback` APIs. Staging stays non-searchable until activation.
 
 OCR/scanned fallback, Docling/Tier-1 promotion, production embedding-model promotion, Tantivy,
 hybrid retrieval/fusion/rerank, qualified model execution, collectors, LangGraph workflows, XPC,
