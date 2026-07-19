@@ -439,7 +439,7 @@ class TargetedResearchLaunch(DocumentContractModel):
     alert_id: str = Field(pattern=_ALERT_ID_PATTERN)
     subject_id: str = Field(pattern=_SUBJECT_PATTERN)
     plan_hash: str = Field(pattern=_SHA256_PATTERN)
-    status: Literal["recorded_stub"] = "recorded_stub"
+    status: Literal["recorded_stub", "queued_workflow"] = "recorded_stub"
     recorded_at: datetime
     note: str = Field(
         default="targeted research launch recorded; LangGraph execution deferred",
