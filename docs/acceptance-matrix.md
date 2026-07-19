@@ -50,6 +50,8 @@ Every reviewed vertical slice updates the relevant row with exact commands, fixt
 uv run python script/run_sealed_promotion.py --component all
 uv run python script/run_sealed_promotion.py --development-package --out dist/sealed_packages
 uv run python script/run_engine.py --release-ipc   # UDS; do not combine with ALLOW_LOOPBACK_TCP
+./script/build_and_run.sh --release-ipc            # engine UDS + native app with token auth
+uv run python script/wait_engine_ipc.py --require-auth
 uv run python script/release_check.py --require-release
 ./script/package_release.sh
 # ./script/sign_and_notarize.sh   # requires Apple secrets
