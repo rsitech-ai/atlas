@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, suppress
+from datetime import datetime
 from json import dumps
 from pathlib import Path
 from typing import Protocol
@@ -13,6 +14,7 @@ from rsi_atlas_contracts import (
     ArtifactCommandContext,
     DocumentAdmissionRecord,
     EvidencePacket,
+    ProviderQualityState,
     ReportDraft,
     ResearchQuery,
     RetrievalAbstention,
@@ -33,6 +35,7 @@ from rsi_atlas_storage import AcquisitionConflictError
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 
+from rsi_atlas_engine.collectors import CollectorPort
 from rsi_atlas_engine.import_staging import ImportStagingArea, ImportStagingError
 from rsi_atlas_engine.ingestion import DocumentIngestionServices
 from rsi_atlas_engine.runtime import RuntimeServices
@@ -153,6 +156,7 @@ def create_app(
     import_staging_area: ImportStagingArea | None = None,
     document_processing_service: DocumentProcessingPort | None = None,
     research_service: ResearchPort | None = None,
+    collector_service: CollectorPort | None = None,
 ) -> FastAPI:
     if (document_admission_service is None) != (import_staging_area is None):
         raise ValueError("document admission service and staging area must be configured together")
@@ -185,6 +189,11 @@ def create_app(
         if research_service is None:
             raise RuntimeError("research service is unavailable")
         return research_service
+
+    def resolve_collectors() -> CollectorPort:
+        if collector_service is None:
+            raise RuntimeError("collector service is unavailable")
+        return collector_service
 
     @asynccontextmanager
     async def lifespan(_application: FastAPI) -> AsyncIterator[None]:
@@ -690,6 +699,75 @@ def create_app(
             raise HTTPException(
                 status_code=503,
                 detail="Report review is temporarily unavailable.",
+            ) from error
+
+    @application.post("/v1/workspaces/{workspace_id}/collectors:import-fixture")
+    async def collectors_import_fixture(
+        request: Request,
+        workspace_id: UUID,
+    ) -> dict[str, object]:
+        context = _workspace_context(request, workspace_id)
+        try:
+            body = await request.json()
+            fixture_name = str(body["fixture_name"])
+            quality_raw = body.get("provider_quality", ProviderQualityState.SINGLE_SOURCE.value)
+            provider_quality = ProviderQualityState(str(quality_raw))
+            collectors = await run_in_threadpool(resolve_collectors)
+            result = await run_in_threadpool(
+                collectors.import_fixture,
+                context=context,
+                fixture_name=fixture_name,
+                provider_quality=provider_quality,
+            )
+            return {
+                "envelope": result.envelope.model_dump(mode="json"),
+                "observation": (
+                    None
+                    if result.observation is None
+                    else result.observation.model_dump(mode="json")
+                ),
+                "quarantine": (
+                    None if result.quarantine is None else result.quarantine.model_dump(mode="json")
+                ),
+            }
+        except HTTPException:
+            raise
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Fixture import is invalid.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Collector import is temporarily unavailable.",
+            ) from error
+
+    @application.get("/v1/workspaces/{workspace_id}/observations")
+    async def list_observations(
+        request: Request,
+        workspace_id: UUID,
+        as_of: str = Query(min_length=1, max_length=64),
+        subject_id: str | None = Query(default=None, max_length=128),
+    ) -> dict[str, object]:
+        context = _workspace_context(request, workspace_id)
+        try:
+            stamped = datetime.fromisoformat(as_of.replace("Z", "+00:00"))
+            collectors = await run_in_threadpool(resolve_collectors)
+            observations = await run_in_threadpool(
+                collectors.list_observations,
+                context=context,
+                as_of=stamped,
+                subject_id=subject_id,
+            )
+            return {
+                "observations": [item.model_dump(mode="json") for item in observations],
+            }
+        except HTTPException:
+            raise
+        except (ValidationError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Observation query is invalid.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Observation listing is temporarily unavailable.",
             ) from error
 
     return application

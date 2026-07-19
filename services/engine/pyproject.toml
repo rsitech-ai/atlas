@@ -9,6 +9,7 @@ description = "Local deterministic control plane for RSI Atlas"
 requires-python = ">=3.11,<3.15"
 dependencies = [
   "fastapi==0.139.2",
+  "rsi-atlas-collectors",
   "rsi-atlas-contracts",
   "rsi-atlas-ingestion",
   "rsi-atlas-models",
@@ -24,6 +25,7 @@ dependencies = [
 atlas = "rsi_atlas_engine.cli:entrypoint"
 
 [tool.uv.sources]
+rsi-atlas-collectors = { workspace = true }
 rsi-atlas-contracts = { workspace = true }
 rsi-atlas-ingestion = { workspace = true }
 rsi-atlas-models = { workspace = true }
