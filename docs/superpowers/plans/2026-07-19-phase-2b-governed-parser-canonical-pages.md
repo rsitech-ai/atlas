@@ -524,30 +524,30 @@ git commit -m "feat: persist canonical PDF pages"
 canonical page by canonical version/page number. Every route is workspace-scoped and loopback-only,
 returns strict contracts, and never accepts or returns arbitrary filesystem paths.
 
-- [ ] **Step 1: Write API/store/presentation RED tests**
+- [x] **Step 1: Write API/store/presentation RED tests**
 
 Cover accepted/review/failed/retry states, latest-run wins, cancellation, response caps, page bounds,
 wrong workspace, unavailable/corrupt canonical bytes, exact retry identity, and no premature
 searchable/published language.
 
-- [ ] **Step 2: Implement processing composition and native client/store**
+- [x] **Step 2: Implement processing composition and native client/store**
 
 Long work runs off the request event loop through the bounded worker runner. The app preserves the
 Phase 2A admission record while showing distinct preflight/parser/canonical state and warnings.
 
-- [ ] **Step 3: Implement canonical page inspection**
+- [x] **Step 3: Implement canonical page inspection**
 
 Show page selector, raw/normalized text toggle, element kind/order, parser identity, source box,
 quality/warnings, and exact raw/canonical hashes. A lightweight overlay may render normalized boxes;
 it must not display generated text as source content.
 
-- [ ] **Step 4: Foreground verification**
+- [x] **Step 4: Foreground verification**
 
 Run supported born-digital, rotated, table, image-only, encrypted, unsafe, disagreement, worker
 failure/retry, and exact replay fixtures. Verify keyboard/VoiceOver order, compact/typical windows,
 Light/Dark, large text, increased contrast, Reduce Motion, multiple windows, and release cfg.
 
-- [ ] **Step 5: Verify and commit Task 8**
+- [x] **Step 5: Verify and commit Task 8**
 
 ```bash
 RSI_ATLAS_TEST_DATABASE_URL="$(./infra/local/postgres.sh test-url)" uv run pytest services/engine/tests/test_document_processing_api.py -q

@@ -7,4 +7,8 @@ enum EvidenceAccessibility {
     static let reasons = "evidence.reasons"
     static let error = "evidence.error"
     static let retry = "evidence.retry"
+    static let processButton = "evidence.process"
+    static let processingProgress = "evidence.processing_progress"
+    static let pagePicker = "evidence.page_picker"
+    static let pageText = "evidence.page_text"
 }

@@ -5,11 +5,15 @@ from datetime import UTC, datetime
 from typing import Literal
 
 from rsi_atlas_ingestion import DocumentAdmissionService
+from rsi_atlas_ingestion.canonical_service import CanonicalizationService
+from rsi_atlas_ingestion.parser_service import ParserService
+from rsi_atlas_ingestion.processing_pipeline import DocumentProcessingService
 from rsi_atlas_storage import (
     AcquisitionRepository,
     ArtifactRepository,
     ContentAddressedArtifactStore,
     DatabaseSettings,
+    DocumentProcessingRepository,
     MigrationRunner,
     PostgresDatabase,
 )
@@ -27,6 +31,7 @@ _DATABASE_TRANSACTION_TIMEOUT_MS = 15_000
 class DocumentIngestionServices:
     admission_service: DocumentAdmissionService
     staging_area: ImportStagingArea
+    processing_service: DocumentProcessingService
 
     @classmethod
     def from_environment(
@@ -63,13 +68,38 @@ class DocumentIngestionServices:
         database = PostgresDatabase(settings)
         MigrationRunner(database, paths.migration_root).apply_all()
         artifact_store = ContentAddressedArtifactStore(paths.artifact_root)
+        artifact_repository = ArtifactRepository(database, artifact_store)
+        acquisition_repository = AcquisitionRepository(database)
+        processing_repository = DocumentProcessingRepository(database)
         admission_service = DocumentAdmissionService(
             artifact_store=artifact_store,
-            artifact_repository=ArtifactRepository(database, artifact_store),
-            acquisition_repository=AcquisitionRepository(database),
+            artifact_repository=artifact_repository,
+            acquisition_repository=acquisition_repository,
             clock=clock,
+        )
+        parser = ParserService(
+            admissions=acquisition_repository,
+            processing=processing_repository,
+        )
+        canonicalizer = CanonicalizationService(
+            admissions=acquisition_repository,
+            processing=processing_repository,
+            artifacts=artifact_repository,
+            store=artifact_store,
+        )
+        processing_root = paths.data_root / "document-processing"
+        RuntimePaths._ensure_owner_private_directory(processing_root)
+        processing_service = DocumentProcessingService(
+            admissions=acquisition_repository,
+            processing=processing_repository,
+            artifacts=artifact_repository,
+            store=artifact_store,
+            parser=parser,
+            canonicalizer=canonicalizer,
+            run_root=processing_root,
         )
         return cls(
             admission_service=admission_service,
             staging_area=ImportStagingArea(staging_root),
+            processing_service=processing_service,
         )

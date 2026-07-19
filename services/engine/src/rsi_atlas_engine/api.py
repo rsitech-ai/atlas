@@ -14,6 +14,10 @@ from rsi_atlas_contracts import (
     SystemStatus,
 )
 from rsi_atlas_ingestion import MAX_PDF_BYTES, StagedPDFEvidence
+from rsi_atlas_ingestion.processing_pipeline import (
+    CanonicalPageEvidence,
+    DocumentProcessingStatus,
+)
 from rsi_atlas_storage import AcquisitionConflictError
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
@@ -34,24 +38,57 @@ class DocumentAdmissionPort(Protocol):
     ) -> DocumentAdmissionRecord: ...
 
 
+class DocumentProcessingPort(Protocol):
+    def start(
+        self, *, context: ArtifactCommandContext, acquisition_id: UUID
+    ) -> DocumentProcessingStatus: ...
+
+    def status(
+        self, *, context: ArtifactCommandContext, acquisition_id: UUID
+    ) -> DocumentProcessingStatus: ...
+
+    def page(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        document_version_id: str,
+        page_number: int,
+    ) -> CanonicalPageEvidence: ...
+
+
 def create_app(
     status_factory: Callable[[], SystemStatus] | None = None,
     *,
     document_admission_service: DocumentAdmissionPort | None = None,
     import_staging_area: ImportStagingArea | None = None,
+    document_processing_service: DocumentProcessingPort | None = None,
 ) -> FastAPI:
     if (document_admission_service is None) != (import_staging_area is None):
         raise ValueError("document admission service and staging area must be configured together")
     factory = status_factory or RuntimeServices.from_environment().status
     configured_ingestion: DocumentIngestionServices | None = None
 
-    def resolve_ingestion() -> tuple[DocumentAdmissionPort, ImportStagingArea]:
+    def resolve_ingestion() -> tuple[
+        DocumentAdmissionPort, ImportStagingArea, DocumentProcessingPort | None
+    ]:
         nonlocal configured_ingestion
         if document_admission_service is not None and import_staging_area is not None:
-            return document_admission_service, import_staging_area
+            return document_admission_service, import_staging_area, document_processing_service
         if configured_ingestion is None:
             configured_ingestion = DocumentIngestionServices.from_environment()
-        return configured_ingestion.admission_service, configured_ingestion.staging_area
+        return (
+            configured_ingestion.admission_service,
+            configured_ingestion.staging_area,
+            configured_ingestion.processing_service,
+        )
+
+    def resolve_processing() -> DocumentProcessingPort:
+        if document_processing_service is not None:
+            return document_processing_service
+        _, _, processing = resolve_ingestion()
+        if processing is None:
+            raise RuntimeError("document processing is unavailable")
+        return processing
 
     @asynccontextmanager
     async def lifespan(_application: FastAPI) -> AsyncIterator[None]:
@@ -117,7 +154,7 @@ def create_app(
             raise HTTPException(status_code=422, detail="Admission metadata is invalid.") from error
 
         try:
-            service, staging_area = await run_in_threadpool(resolve_ingestion)
+            service, staging_area, _processing = await run_in_threadpool(resolve_ingestion)
         except Exception as error:
             raise HTTPException(
                 status_code=503,
@@ -164,7 +201,94 @@ def create_app(
                         detail="Document staging cleanup failed safely.",
                     ) from error
 
+    @application.post(
+        "/v1/workspaces/{workspace_id}/acquisitions/{acquisition_id}/processing:start",
+        response_model=DocumentProcessingStatus,
+    )
+    async def start_processing(
+        request: Request,
+        workspace_id: UUID,
+        acquisition_id: UUID,
+    ) -> DocumentProcessingStatus:
+        context = _workspace_context(request, workspace_id)
+        try:
+            processing = await run_in_threadpool(resolve_processing)
+            return await run_in_threadpool(
+                processing.start, context=context, acquisition_id=acquisition_id
+            )
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail="Acquisition was not found.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Document processing is temporarily unavailable.",
+            ) from error
+
+    @application.get(
+        "/v1/workspaces/{workspace_id}/acquisitions/{acquisition_id}/processing",
+        response_model=DocumentProcessingStatus,
+    )
+    async def processing_status(
+        request: Request,
+        workspace_id: UUID,
+        acquisition_id: UUID,
+    ) -> DocumentProcessingStatus:
+        context = _workspace_context(request, workspace_id)
+        try:
+            processing = await run_in_threadpool(resolve_processing)
+            return await run_in_threadpool(
+                processing.status, context=context, acquisition_id=acquisition_id
+            )
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Document processing is temporarily unavailable.",
+            ) from error
+
+    @application.get(
+        "/v1/workspaces/{workspace_id}/canonical/{document_version_id}/pages/{page_number}",
+        response_model=CanonicalPageEvidence,
+    )
+    async def canonical_page(
+        request: Request,
+        workspace_id: UUID,
+        document_version_id: str,
+        page_number: int,
+    ) -> CanonicalPageEvidence:
+        if page_number < 1 or page_number > 2_000:
+            raise HTTPException(status_code=422, detail="Page number is out of bounds.")
+        if not document_version_id.startswith("canonical:"):
+            raise HTTPException(status_code=422, detail="Canonical version id is invalid.")
+        context = _workspace_context(request, workspace_id)
+        try:
+            processing = await run_in_threadpool(resolve_processing)
+            return await run_in_threadpool(
+                processing.page,
+                context=context,
+                document_version_id=document_version_id,
+                page_number=page_number,
+            )
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail="Canonical page was not found.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Canonical page retrieval is temporarily unavailable.",
+            ) from error
+
     return application
+
+
+def _workspace_context(request: Request, workspace_id: UUID) -> ArtifactCommandContext:
+    try:
+        return ArtifactCommandContext(
+            tenant_id=_required_uuid(_one_header(request, "x-rsi-tenant-id")),
+            workspace_id=workspace_id,
+            actor_id=_required_uuid(_one_header(request, "x-rsi-actor-id")),
+            trace_id=_required_uuid(_one_header(request, "x-rsi-trace-id")),
+        )
+    except (ValidationError, ValueError) as error:
+        raise HTTPException(status_code=422, detail="Workspace identity is invalid.") from error
 
 
 def _content_length(value: str | None) -> int:

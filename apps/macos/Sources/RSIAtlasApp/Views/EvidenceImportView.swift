@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct EvidenceImportView: View {
     @Bindable var store: DocumentImportStore
+    @Bindable var processingStore: DocumentProcessingStore
     @State private var isFileImporterPresented = false
 
     var body: some View {
@@ -78,7 +79,13 @@ struct EvidenceImportView: View {
                 .accessibilityIdentifier(EvidenceAccessibility.progress)
 
         case let .loaded(record):
-            admissionList(record)
+            VStack(spacing: 0) {
+                admissionList(record)
+                Divider()
+                processingControls(for: record)
+                CanonicalPageEvidenceView(store: processingStore)
+                    .frame(minHeight: 220)
+            }
 
         case let .failed(filename, failure):
             VStack(spacing: 12) {
@@ -179,6 +186,24 @@ struct EvidenceImportView: View {
             .accessibilityIdentifier(EvidenceAccessibility.reasons)
         }
         .listStyle(.inset)
+    }
+
+    private func processingControls(for record: DocumentAdmissionRecord) -> some View {
+        HStack {
+            Text("Phase 2B processing inspects canonical pages without publishing search.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Process PDF") {
+                Task { await processingStore.process(acquisitionID: record.request.acquisitionID) }
+            }
+            .disabled({
+                if case .running = processingStore.state { return true }
+                return false
+            }())
+            .accessibilityIdentifier(EvidenceAccessibility.processButton)
+        }
+        .padding(16)
     }
 
     private var isImporting: Bool {

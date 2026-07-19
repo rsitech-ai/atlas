@@ -5,11 +5,15 @@ struct ContentView: View {
     @State private var selection: WorkspaceDestination? = .commandCenter
     @State private var store = CommandCenterStore(loader: EngineClient())
     @State private var documentImportStore: DocumentImportStore
+    @State private var documentProcessingStore: DocumentProcessingStore
 
     init() {
         let identity = LocalWorkspaceIdentity.loadOrCreate()
         documentImportStore = DocumentImportStore(
             client: DocumentImportClient(identity: identity)
+        )
+        documentProcessingStore = DocumentProcessingStore(
+            client: DocumentProcessingClient(identity: identity)
         )
     }
 
@@ -22,7 +26,10 @@ struct ContentView: View {
             case .commandCenter:
                 CommandCenterView(store: store)
             case .evidence:
-                EvidenceImportView(store: documentImportStore)
+                EvidenceImportView(
+                    store: documentImportStore,
+                    processingStore: documentProcessingStore
+                )
             case nil:
                 ContentUnavailableView(
                     "Choose a workspace",
