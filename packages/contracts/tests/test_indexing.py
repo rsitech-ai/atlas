@@ -145,6 +145,7 @@ def test_index_validated_manifest_is_non_searchable() -> None:
         chunk_set_id=CHUNK_SET_ID,
         embedding_set_id=embedding_set.embedding_set_id,
         index_bundle=bundle,
+        lifecycle=DocumentProcessingLifecycle.INDEX_VALIDATED,
     )
     draft = RetrievalPublicationManifestDraft(
         manifest_id=MANIFEST_ID,
@@ -187,6 +188,7 @@ def test_published_lifecycle_requires_searchable_true() -> None:
         chunk_set_id=CHUNK_SET_ID,
         embedding_set_id=embedding_set.embedding_set_id,
         index_bundle=bundle,
+        lifecycle=DocumentProcessingLifecycle.PUBLISHED,
     )
     with pytest.raises(ValidationError):
         RetrievalPublicationManifestDraft(

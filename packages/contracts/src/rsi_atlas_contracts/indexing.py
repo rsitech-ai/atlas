@@ -159,6 +159,7 @@ class RetrievalPublicationManifestDraft(DocumentContractModel):
             chunk_set_id=self.chunk_set_id,
             embedding_set_id=self.embedding_set.embedding_set_id,
             index_bundle=self.index_bundle,
+            lifecycle=self.lifecycle,
         )
         if self.publication_id != expected:
             raise ValueError("publication_id does not match deterministic identity")
@@ -221,12 +222,19 @@ def publication_identifier(
     chunk_set_id: str,
     embedding_set_id: str,
     index_bundle: RetrievalIndexBundle,
+    lifecycle: DocumentProcessingLifecycle | Literal["index_validated", "published"] = (
+        DocumentProcessingLifecycle.INDEX_VALIDATED
+    ),
 ) -> str:
+    lifecycle_value = (
+        lifecycle.value if isinstance(lifecycle, DocumentProcessingLifecycle) else lifecycle
+    )
     payload = {
         "document_version_id": document_version_id,
         "chunk_set_id": chunk_set_id,
         "embedding_set_id": embedding_set_id,
         "index_bundle": index_bundle.model_dump(mode="json"),
+        "lifecycle": lifecycle_value,
     }
     return f"publication:{sha256(_canonical_json(payload)).hexdigest()}"
 
