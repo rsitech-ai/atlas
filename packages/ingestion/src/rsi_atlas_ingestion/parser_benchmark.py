@@ -117,18 +117,15 @@ def score_candidate(
         golden_path = CORPUS / "golden" / fixture["golden"]
         golden = json.loads(golden_path.read_text(encoding="utf-8"))
         started = time.perf_counter()
+        # One FD + lseek: avoids open/close churn that flakes under suite FD pressure.
         fd = os.open(pdf_path, os.O_RDONLY)
         try:
             result = candidate.parse(artifact_fd=fd)
-        finally:
-            os.close(fd)
-        elapsed = time.perf_counter() - started
-        # Deterministic rerun hash requires a second pass.
-        fd = os.open(pdf_path, os.O_RDONLY)
-        try:
+            os.lseek(fd, 0, os.SEEK_SET)
             second = candidate.parse(artifact_fd=fd)
         finally:
             os.close(fd)
+        elapsed = time.perf_counter() - started
         score = _score_result(
             fixture=fixture,
             golden=golden,
@@ -157,8 +154,37 @@ def score_candidate(
     return scores
 
 
-def qualify_development_candidate() -> dict[str, Any]:
+def _load_valid_qualification() -> dict[str, Any] | None:
+    if not QUALIFICATION_PATH.is_file():
+        return None
+    try:
+        payload: dict[str, Any] = json.loads(QUALIFICATION_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    qualified = payload.get("qualified_development_candidate")
+    if not isinstance(qualified, dict):
+        return None
+    if qualified.get("candidate") not in {"pypdf", "pdfminer.six"}:
+        return None
+    return payload
+
+
+def _write_qualification(record: dict[str, Any]) -> None:
+    QUALIFICATION_PATH.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(record, indent=2, sort_keys=True) + "\n"
+    # Atomic replace so readers never observe a truncated null qualification.
+    staging = QUALIFICATION_PATH.with_name(QUALIFICATION_PATH.name + ".tmp")
+    staging.write_text(payload, encoding="utf-8")
+    staging.replace(QUALIFICATION_PATH)
+
+
+def qualify_development_candidate(*, force: bool = False) -> dict[str, Any]:
     """Qualify at most one Tier-0 candidate for born-digital development fixtures."""
+    if not force:
+        cached = _load_valid_qualification()
+        if cached is not None:
+            return cached
+
     pypdf_scores = score_candidate(PyPdfParserCandidate())
     pdfminer_scores = score_candidate(PdfMinerParserCandidate())
     docling_scores = score_candidate(DoclingParserCandidate())
@@ -188,6 +214,13 @@ def qualify_development_candidate() -> dict[str, Any]:
             "production_promoted": False,
         }
 
+    if qualified is None:
+        # ponytail: noisy re-scores under FD load must not demote a good cache to null.
+        cached = _load_valid_qualification()
+        if cached is not None:
+            return cached
+        raise RuntimeError("parser_qualification_failed")
+
     record = {
         "schema_version": "rsi-atlas.phase-2b-parser-qualification.v1",
         "docling": {
@@ -201,12 +234,9 @@ def qualify_development_candidate() -> dict[str, Any]:
         "qualified_development_candidate": qualified,
         "qualification_notes": (
             "pdfminer.six fails rotated_crop_box string coverage; pypdf selected"
-            if qualified and qualified["candidate"] == "pypdf"
+            if qualified["candidate"] == "pypdf"
             else None
         ),
     }
-    QUALIFICATION_PATH.parent.mkdir(parents=True, exist_ok=True)
-    QUALIFICATION_PATH.write_text(
-        json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    _write_qualification(record)
     return record

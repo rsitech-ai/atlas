@@ -237,7 +237,10 @@ def test_start_runs_preflight_then_parse_for_quarantine(
         )
     )
     status = service.start(context=context, acquisition_id=acquisition_id)
-    assert status.state == "canonicalized"
+    assert status.state == "canonicalized", (
+        f"expected canonicalized, got {status.state!r} failure_code={status.failure_code!r} "
+        f"warnings={status.warnings!r}"
+    )
     assert status.document_version_id is not None
     preflight_attempts = postgres_database.fetch_value(
         """

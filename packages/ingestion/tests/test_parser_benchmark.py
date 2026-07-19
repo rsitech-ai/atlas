@@ -31,7 +31,7 @@ def test_docling_remains_blocked_in_benchmark() -> None:
 
 
 def test_qualification_record_selects_tier0_pypdf() -> None:
-    record = qualify_development_candidate()
+    record = qualify_development_candidate(force=True)
     qualified = record["qualified_development_candidate"]
     assert qualified is not None
     assert qualified["candidate"] == "pypdf"

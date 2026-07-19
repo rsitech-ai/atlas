@@ -221,6 +221,22 @@ def _reserve_fd(target: int, source: int) -> int:
     return target
 
 
+def _dup_existing(fd: int) -> int | None:
+    try:
+        return os.dup(fd)
+    except OSError:
+        return None
+
+
+def _restore_fd(target: int, saved: int | None) -> None:
+    if saved is None:
+        with suppress(OSError):
+            os.close(target)
+        return
+    os.dup2(saved, target)
+    os.close(saved)
+
+
 class DocumentWorkerRunner:
     """Launch one sandboxed worker against one read-only artifact and run directory."""
 
@@ -300,6 +316,9 @@ class DocumentWorkerRunner:
         # ponytail: global lock; ceiling is one in-process worker at a time. Upgrade: pass
         # dynamic FDs in the protocol instead of fixed 3/4.
         with _FD_LOCK:
+            # Save/restore 3/4 so Seatbelt staging cannot clobber unrelated descriptors.
+            saved_3 = _dup_existing(3)
+            saved_4 = _dup_existing(4)
             opened_artifact = os.open(artifact, os.O_RDONLY | getattr(os, "O_CLOEXEC", 0))
             opened_run = os.open(
                 run_dir, os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_CLOEXEC", 0)
@@ -384,6 +403,8 @@ class DocumentWorkerRunner:
                     opened_artifact,
                     opened_run,
                 )
+                _restore_fd(3, saved_3)
+                _restore_fd(4, saved_4)
 
         if stderr:
             raise DocumentWorkerRunnerError("worker_stderr_nonempty")
