@@ -26,6 +26,18 @@ struct LocalEngineConfigurationTests {
     }
 
     @Test
+    func releaseIPCForcesUnixEvenWhenTCPFlagSet() {
+        let config = LocalEngineConfiguration.resolve(
+            environment: [
+                "RSI_ATLAS_RELEASE_IPC": "1",
+                "RSI_ATLAS_ALLOW_LOOPBACK_TCP": "1",
+                "RSI_ATLAS_DATA_ROOT": "/tmp/rsi-atlas-release",
+            ]
+        )
+        #expect(config.usesUnixDomain)
+    }
+
+    @Test
     func loopbackTCPRequiresExplicitFlag() {
         let config = LocalEngineConfiguration.resolve(
             environment: [

@@ -45,25 +45,26 @@ public struct LocalEngineConfiguration: Sendable, Equatable {
         let ipcDir = dataRoot.appending(path: "ipc", directoryHint: .isDirectory)
         let tokenPath = ipcDir.appending(path: "engine.token")
         let token = loadToken(at: tokenPath)
+        let releaseMode = isTruthy(environment["RSI_ATLAS_RELEASE_IPC"])
         let allowTCP = isTruthy(environment["RSI_ATLAS_ALLOW_LOOPBACK_TCP"])
-        if allowTCP {
-            let host = (environment["RSI_ATLAS_ENGINE_HOST"] ?? "127.0.0.1").trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-            let allowedHosts: Set<String> = ["127.0.0.1", "::1", "localhost"]
-            let safeHost = allowedHosts.contains(host) ? host : "127.0.0.1"
-            let port = Int(environment["RSI_ATLAS_ENGINE_PORT"] ?? "8765") ?? 8765
-            let clamped = (1 ... 65_535).contains(port) ? port : 8765
-            let base = URL(string: "http://\(safeHost):\(clamped)")!
+        if releaseMode || !allowTCP {
+            let socketPath = ipcDir.appending(path: "engine.sock")
             return LocalEngineConfiguration(
-                mode: .loopbackTCP(baseURL: base),
+                mode: .unixDomain(socketPath: socketPath),
                 tokenPath: tokenPath,
                 token: token
             )
         }
-        let socketPath = ipcDir.appending(path: "engine.sock")
+        let host = (environment["RSI_ATLAS_ENGINE_HOST"] ?? "127.0.0.1").trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        let allowedHosts: Set<String> = ["127.0.0.1", "::1", "localhost"]
+        let safeHost = allowedHosts.contains(host) ? host : "127.0.0.1"
+        let port = Int(environment["RSI_ATLAS_ENGINE_PORT"] ?? "8765") ?? 8765
+        let clamped = (1 ... 65_535).contains(port) ? port : 8765
+        let base = URL(string: "http://\(safeHost):\(clamped)")!
         return LocalEngineConfiguration(
-            mode: .unixDomain(socketPath: socketPath),
+            mode: .loopbackTCP(baseURL: base),
             tokenPath: tokenPath,
             token: token
         )
