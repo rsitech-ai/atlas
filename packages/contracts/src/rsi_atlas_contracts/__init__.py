@@ -112,6 +112,14 @@ from rsi_atlas_contracts.evaluation import (
     experiment_id,
     promotion_decision_id,
 )
+from rsi_atlas_contracts.sealed_promotion import (
+    REQUIRED_SEALED_GATES,
+    SealedComponentKind,
+    SealedGateResult,
+    SealedPromotionEvidence,
+    SealedPromotionStatus,
+    sealed_evidence_id,
+)
 from rsi_atlas_contracts.indexing import (
     DEVELOPMENT_EMBEDDING_DIMENSIONS,
     ChunkEmbedding,
@@ -443,6 +451,12 @@ __all__ = [
     "PatchQualityGateResult",
     "PromotionDecision",
     "PromotionOutcome",
+    "REQUIRED_SEALED_GATES",
+    "SealedComponentKind",
+    "SealedGateResult",
+    "SealedPromotionEvidence",
+    "SealedPromotionStatus",
+    "sealed_evidence_id",
     "ProviderHealthState",
     "ProviderQualityState",
     "QuarantineRecord",

@@ -23,8 +23,18 @@ CRITICAL_FAILURE_CLASSES = frozenset(
 )
 
 
-def decide_promotion(run: EvaluationRun, *, created_at: datetime) -> PromotionDecision:
-    """Fail closed: any critical deterministic failure yields reject."""
+def decide_promotion(
+    run: EvaluationRun,
+    *,
+    created_at: datetime,
+    sealed_promote: bool = False,
+) -> PromotionDecision:
+    """Fail closed: any critical deterministic failure yields reject.
+
+    ``sealed_promote=True`` allows ``PROMOTE`` only when the run completed with
+    zero critical failures. Callers must still attach sealed-holdout evidence
+    before claiming ``EmbeddingPromotionClass.PRODUCTION``.
+    """
     critical = 0
     reasons: list[str] = []
     for result in run.results:
@@ -38,6 +48,9 @@ def decide_promotion(run: EvaluationRun, *, created_at: datetime) -> PromotionDe
     elif run.status.value == "blocked":
         outcome = PromotionOutcome.REQUIRE_HUMAN_REVIEW
         reasons = ["evaluation_blocked"]
+    elif sealed_promote and run.status.value == "completed" and critical == 0:
+        outcome = PromotionOutcome.PROMOTE
+        reasons = ["sealed_holdout_gates_passed"]
     else:
         outcome = PromotionOutcome.REQUIRE_HUMAN_REVIEW
         reasons = ["development_slice_requires_human_review"]

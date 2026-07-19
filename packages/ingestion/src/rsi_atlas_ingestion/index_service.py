@@ -36,6 +36,8 @@ _ALLOWED_PROMOTION = frozenset(
     {
         EmbeddingPromotionClass.DEVELOPMENT_FIXTURE,
         EmbeddingPromotionClass.CANDIDATE,
+        # PRODUCTION only when sealed evidence is supplied to IndexService.
+        EmbeddingPromotionClass.PRODUCTION,
     }
 )
 
@@ -75,11 +77,13 @@ class IndexService:
         artifacts: ArtifactRepository,
         store: ContentAddressedArtifactStore,
         embedder: Embedder | None = None,
+        sealed_promotion_evidence: object | None = None,
     ) -> None:
         self._processing = processing
         self._artifacts = artifacts
         self._store = store
         self._embedder = embedder or DeterministicEmbedder()
+        self._sealed_promotion_evidence = sealed_promotion_evidence
 
     def stage_indexes(
         self,
@@ -94,6 +98,13 @@ class IndexService:
         model = self._embedder.model
         if model.promotion_class not in _ALLOWED_PROMOTION:
             raise IndexStagingError("embedding promotion_class not allowed for staging")
+        if model.promotion_class is EmbeddingPromotionClass.PRODUCTION:
+            evidence = self._sealed_promotion_evidence
+            authorizes = getattr(evidence, "authorizes_production", None)
+            if not callable(authorizes) or not authorizes():
+                raise IndexStagingError(
+                    "PRODUCTION embedding requires sealed-holdout promotion evidence"
+                )
         # Fixture path stays pinned; candidate OSS models may diverge from fixture identity.
         if (
             model.promotion_class is EmbeddingPromotionClass.DEVELOPMENT_FIXTURE

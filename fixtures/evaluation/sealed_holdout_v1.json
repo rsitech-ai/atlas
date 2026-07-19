@@ -1,0 +1,43 @@
+{
+  "dataset_id": "dataset:sealed_holdout",
+  "version": "1.0.0",
+  "purpose": "Synthetic sealed-holdout fixture for promotion-gate machinery (not owner-sealed corpus)",
+  "task_family": "retrieval",
+  "source_snapshot_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "status": "frozen",
+  "examples": [
+    {
+      "example_id": "holdout_cite",
+      "split": "holdout",
+      "input_payload": {"query": "treasury policy citation"},
+      "expected_payload": {
+        "abstain": false,
+        "citation_ids": ["cite_holdout"],
+        "score": 1
+      },
+      "labels": []
+    },
+    {
+      "example_id": "holdout_abstain",
+      "split": "holdout",
+      "input_payload": {"query": "unknown adversarial probe"},
+      "expected_payload": {
+        "abstain": true,
+        "citation_ids": [],
+        "score": 0
+      },
+      "labels": []
+    },
+    {
+      "example_id": "regression_cite",
+      "split": "regression",
+      "input_payload": {"query": "regression cite"},
+      "expected_payload": {
+        "abstain": false,
+        "citation_ids": ["cite_reg"],
+        "score": 1
+      },
+      "labels": []
+    }
+  ]
+}
