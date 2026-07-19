@@ -42,10 +42,11 @@ publication:
   `table_aware`) with frozen intrinsic goldens, CAS-first chunk-set persistence, and loopback
   chunk inspect APIs (`chunking:start`, list, get);
 - development fixture embeddings (stdlib hash→vector) plus governed offline OSS
-  `oss_token_hash_v1` candidate embedder and fail-closed optional ONNX artifact path
-  (`script/install_embedding_model.py`; opt-in `--download` only, pinned MiniLM
-  URL+sha256 in governance; no silent download); lexical overlap post-RRF
-  rerank (stdlib); fixture remains the default for tests;
+  `oss_token_hash_v1` candidate embedder and optional MiniLM ONNX path
+  (`script/install_embedding_model.py`; opt-in `--download` pins ONNX+vocab;
+  runtime needs `rsi-atlas-ingestion[onnx]` + artifact dir; WordPiece→mean-pool,
+  still candidate not sealed PRODUCTION; fail-closed without artifact/runtime);
+  lexical overlap post-RRF rerank (stdlib); fixture remains the default for tests;
   migration `0008` staging dense pgvector + PostgreSQL FTS lexical + exact-identifier rows,
   atomic publication activate/rollback via an active pointer, and loopback
   `indexing:start` / index-version list / `publication:activate` /
@@ -83,9 +84,10 @@ embedded signed Python, and Section 33 criterion closure remain open. Hybrid ret
 cited reports, collectors, monitoring, eval, and backup are production-local OSS
 capabilities with tests—not automatic criterion `Proven` without release-artifact proof.
 Parent-child/table-aware remain development-only. Signing/notarization stay blocked on
-owner certs/secrets. MiniLM ONNX install is opt-in (`script/install_embedding_model.py
---download` with pinned URL+sha256); runtime `OfflineOnnxEmbedder` stays fail-closed and
-string-input-only until tokenizer wiring lands—prefer `oss_token_hash_v1` for production-local dense.
+owner certs/secrets. MiniLM ONNX is opt-in: install artifact+vocab
+(`script/install_embedding_model.py --download`), `uv sync --package rsi-atlas-ingestion
+--extra onnx`, then `RSI_ATLAS_EMBEDDER=onnx` + `RSI_ATLAS_EMBEDDING_ARTIFACT_DIR`. Without
+those, prefer `oss_token_hash_v1` for production-local dense.
 
 ## Requirements
 
