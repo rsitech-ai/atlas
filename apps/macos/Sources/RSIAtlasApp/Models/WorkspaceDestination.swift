@@ -3,6 +3,9 @@ import Foundation
 enum WorkspaceDestination: String, CaseIterable, Identifiable {
     case commandCenter
     case evidence
+    case research
+    case comparison
+    case chunks
 
     var id: Self { self }
 
@@ -12,6 +15,12 @@ enum WorkspaceDestination: String, CaseIterable, Identifiable {
             "Command Center"
         case .evidence:
             "Evidence"
+        case .research:
+            "Research"
+        case .comparison:
+            "Comparison"
+        case .chunks:
+            "Chunks"
         }
     }
 
@@ -21,6 +30,12 @@ enum WorkspaceDestination: String, CaseIterable, Identifiable {
             "gauge.with.dots.needle.67percent"
         case .evidence:
             "doc.badge.plus"
+        case .research:
+            "text.book.closed"
+        case .comparison:
+            "rectangle.split.2x1"
+        case .chunks:
+            "square.stack.3d.up"
         }
     }
 }

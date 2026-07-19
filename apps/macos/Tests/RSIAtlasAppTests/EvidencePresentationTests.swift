@@ -6,9 +6,18 @@ import Testing
 struct EvidencePresentationTests {
     @Test
     func evidenceWorkspaceIsAStableNativeDestination() {
-        #expect(WorkspaceDestination.allCases == [.commandCenter, .evidence])
+        #expect(WorkspaceDestination.allCases == [
+            .commandCenter,
+            .evidence,
+            .research,
+            .comparison,
+            .chunks,
+        ])
         #expect(WorkspaceDestination.evidence.title == "Evidence")
         #expect(WorkspaceDestination.evidence.systemImage == "doc.badge.plus")
+        #expect(WorkspaceDestination.research.title == "Research")
+        #expect(WorkspaceDestination.comparison.title == "Comparison")
+        #expect(WorkspaceDestination.chunks.title == "Chunks")
     }
 
     @Test

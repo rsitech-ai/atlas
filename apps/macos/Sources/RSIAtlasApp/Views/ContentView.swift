@@ -30,11 +30,17 @@ struct ContentView: View {
                     store: documentImportStore,
                     processingStore: documentProcessingStore
                 )
+            case .research:
+                ResearchCanvasView()
+            case .comparison:
+                ComparisonTimelineView()
+            case .chunks:
+                ChunkInspectorView()
             case nil:
                 ContentUnavailableView(
                     "Choose a workspace",
                     systemImage: "sidebar.left",
-                    description: Text("Select Command Center or Evidence from the sidebar.")
+                    description: Text("Select a destination from the sidebar.")
                 )
             }
         }
