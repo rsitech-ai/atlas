@@ -43,7 +43,8 @@ publication:
   chunk inspect APIs (`chunking:start`, list, get);
 - development fixture embeddings (stdlib hash→vector) plus governed offline OSS
   `oss_token_hash_v1` candidate embedder and fail-closed optional ONNX artifact path
-  (`script/install_embedding_model.py`; no silent download); lexical overlap post-RRF
+  (`script/install_embedding_model.py`; opt-in `--download` only, pinned MiniLM
+  URL+sha256 in governance; no silent download); lexical overlap post-RRF
   rerank (stdlib); fixture remains the default for tests;
   migration `0008` staging dense pgvector + PostgreSQL FTS lexical + exact-identifier rows,
   atomic publication activate/rollback via an active pointer, and loopback
@@ -52,9 +53,10 @@ publication:
 - Phase 3 hybrid retrieval: active-only dense/lexical/exact candidate generation,
   intent-weighted RRF + lexical rerank, coverage/abstention,
   Document Evidence specialist (extractive, no LLM), assertion→citation→report draft gate,
-  immutable review events, minimal durable linear workflow interrupt/resume (no LangGraph),
-  migration `0009`, and loopback
-  `research:retrieve` / `specialist:document` / `reports:draft` / review APIs;
+  immutable review events, Postgres-durable linear workflow interrupt/resume
+  (migration `0012`; no LangGraph), migration `0009`, and loopback
+  `research:retrieve` / `specialist:document` / `reports:draft` / review /
+  `research/workflows:*` APIs;
 - Phase 4 multi-chain / quantitative: offline Bitcoin/EVM/Solana/market/governance/GitHub
   fixtures; optional monitored live HTTPS collect behind user-supplied allowlisted origins
   (deny-by-default NetworkPolicy; no baked-in API keys); optional DuckDB/Parquet analytics
@@ -71,8 +73,8 @@ publication:
   blocked); Safe Mode; integrity scrub; SBOM from `uv.lock`; entitlement-matrix draft;
   fail-closed `script/release_check.py`; loopback Phase 6 APIs;
 - native sidebar destinations for Command Center, Evidence, Research Canvas, Comparison,
-  and Chunk Inspector (Research/Comparison/Chunks are honest empty shells pointing at
-  loopback APIs until full clients bind).
+  and Chunk Inspector bound to loopback workflow / timeline / chunk-inspect clients
+  (minimal but real; not Report Studio polish).
 
 Docling stays blocked. System Tesseract OCR is fail-closed when absent. Sealed-holdout
 `PRODUCTION` embedding promotion, neural cross-encoder, calibrated judges/semantic triage,
@@ -81,7 +83,9 @@ embedded signed Python, and Section 33 criterion closure remain open. Hybrid ret
 cited reports, collectors, monitoring, eval, and backup are production-local OSS
 capabilities with tests—not automatic criterion `Proven` without release-artifact proof.
 Parent-child/table-aware remain development-only. Signing/notarization stay blocked on
-owner certs/secrets.
+owner certs/secrets. MiniLM ONNX install is opt-in (`script/install_embedding_model.py
+--download` with pinned URL+sha256); runtime `OfflineOnnxEmbedder` stays fail-closed and
+string-input-only until tokenizer wiring lands—prefer `oss_token_hash_v1` for production-local dense.
 
 ## Requirements
 
