@@ -266,4 +266,4 @@ git commit -m "docs: close dense/lexical index publication slice"
 - Human interrupt/resume workflow UI (criterion 20) unless already present
 - Claiming full closure of acceptance criteria 10–24
 
-Proven at closure: `uv lock --check`, ruff check/format, mypy, full pytest **989** passed, Swift **44** passed. Tip through `88df534`; Docling blocked; fixture embeddings only; criterion 15 unclaimed; Phase 3 not started.
+Proven at closure: `uv lock --check`, ruff check/format, mypy, full pytest **989** passed, Swift **44** passed. Tip through `63b0653`; Docling blocked; fixture embeddings only; criterion 15 unclaimed; Phase 3 not started.
