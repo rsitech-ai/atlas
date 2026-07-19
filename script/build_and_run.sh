@@ -6,8 +6,10 @@ APP_PROCESS="RSIAtlas"
 APP_DISPLAY_NAME="RSI Atlas"
 BUNDLE_ID="ai.rsitech.RSIAtlas"
 MIN_SYSTEM_VERSION="15.0"
-ENGINE_HOST="127.0.0.1"
-ENGINE_PORT="8765"
+# Keep development Swift clients on loopback TCP; release uses Unix domain sockets.
+export RSI_ATLAS_ALLOW_LOOPBACK_TCP="${RSI_ATLAS_ALLOW_LOOPBACK_TCP:-1}"
+ENGINE_HOST="${RSI_ATLAS_ENGINE_HOST:-127.0.0.1}"
+ENGINE_PORT="${RSI_ATLAS_ENGINE_PORT:-8765}"
 ENGINE_SERVICE_LABEL="ai.rsitech.RSIAtlas.engine"
 ENGINE_SERVICE_DOMAIN="gui/$(id -u)"
 
@@ -187,11 +189,17 @@ fi
 cd "$ROOT_DIR"
 uv sync --all-packages
 "$POSTGRES_SCRIPT" start
+# Development path: explicit loopback TCP for Swift URLSession clients.
+# Release IPC: `uv run python script/run_engine.py --release-ipc` (Unix domain socket).
 launchctl submit \
   -l "$ENGINE_SERVICE_LABEL" \
   -o "$ENGINE_LOG" \
   -e "$ENGINE_LOG" \
-  -- /usr/bin/env "RSI_ATLAS_DATA_ROOT=$RSI_ATLAS_DATA_ROOT" \
+  -- /usr/bin/env \
+  "RSI_ATLAS_DATA_ROOT=$RSI_ATLAS_DATA_ROOT" \
+  "RSI_ATLAS_ALLOW_LOOPBACK_TCP=1" \
+  "RSI_ATLAS_ENGINE_HOST=$ENGINE_HOST" \
+  "RSI_ATLAS_ENGINE_PORT=$ENGINE_PORT" \
   "$ROOT_DIR/.venv/bin/uvicorn" rsi_atlas_engine.api:app \
   --host "$ENGINE_HOST" \
   --port "$ENGINE_PORT"

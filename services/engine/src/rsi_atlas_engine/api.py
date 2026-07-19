@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime
@@ -50,6 +51,7 @@ from starlette.requests import ClientDisconnect
 from rsi_atlas_engine.collectors import CollectorPort, CollectorServices
 from rsi_atlas_engine.import_staging import ImportStagingArea, ImportStagingError
 from rsi_atlas_engine.ingestion import DocumentIngestionServices
+from rsi_atlas_engine.ipc_auth import IpcAuthMiddleware
 from rsi_atlas_engine.monitoring import (
     AlertTransitionError,
     InMemoryMonitoringService,
@@ -199,13 +201,9 @@ class ResearchPort(Protocol):
         human_decision: ReviewDecision | None = None,
     ) -> dict[str, object]: ...
 
-    def get_workflow(
-        self, *, context: ArtifactCommandContext, workflow_id: UUID
-    ) -> Any | None: ...
+    def get_workflow(self, *, context: ArtifactCommandContext, workflow_id: UUID) -> Any | None: ...
 
-    def list_workflows(
-        self, *, context: ArtifactCommandContext, limit: int = 50
-    ) -> list[Any]: ...
+    def list_workflows(self, *, context: ArtifactCommandContext, limit: int = 50) -> list[Any]: ...
 
 
 def create_app(
@@ -218,6 +216,8 @@ def create_app(
     collector_service: CollectorPort | None = None,
     monitoring_service: MonitoringPort | None = None,
     phase6_service: Phase6Service | None = None,
+    require_ipc_auth: bool | None = None,
+    ipc_token_path: Path | None = None,
 ) -> FastAPI:
     if (document_admission_service is None) != (import_staging_area is None):
         raise ValueError("document admission service and staging area must be configured together")
@@ -297,6 +297,17 @@ def create_app(
         openapi_url=None,
         lifespan=lifespan,
     )
+
+    auth_enabled = (
+        require_ipc_auth
+        if require_ipc_auth is not None
+        else os.environ.get("RSI_ATLAS_IPC_AUTH", "").strip().lower() in {"1", "true", "yes", "on"}
+    )
+    if auth_enabled:
+        token_path = ipc_token_path or (
+            RuntimePaths.from_environment().data_root / "ipc" / "engine.token"
+        )
+        application.add_middleware(IpcAuthMiddleware, token_path=token_path, enabled=True)
 
     @application.get("/v1/system/status", response_model=SystemStatus)
     def system_status() -> SystemStatus:
@@ -1003,10 +1014,12 @@ def create_app(
             return {
                 "detection": detection.model_dump(mode="json"),  # type: ignore[attr-defined]
                 "matched_rules": [
-                    rule.model_dump(mode="json") for rule in matched_rules  # type: ignore[attr-defined]
+                    rule.model_dump(mode="json")
+                    for rule in matched_rules  # type: ignore[attr-defined]
                 ],
                 "decisions": [
-                    decision.model_dump(mode="json") for decision in decisions  # type: ignore[attr-defined]
+                    decision.model_dump(mode="json")
+                    for decision in decisions  # type: ignore[attr-defined]
                 ],
                 "alerts": [alert.model_dump(mode="json") for alert in alerts],  # type: ignore[attr-defined]
                 "created": list(created),  # type: ignore[call-overload]

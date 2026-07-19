@@ -9,4 +9,5 @@ description = "SBOM generation and fail-closed unsigned release checks"
 requires-python = ">=3.11,<3.15"
 dependencies = [
   "rsi-atlas-contracts==0.1.0",
+  "rsi-atlas-security==0.1.0",
 ]

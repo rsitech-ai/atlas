@@ -1276,10 +1276,14 @@ version = "0.1.0"
 source = { editable = "packages/release" }
 dependencies = [
     { name = "rsi-atlas-contracts" },
+    { name = "rsi-atlas-security" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "rsi-atlas-contracts", editable = "packages/contracts" }]
+requires-dist = [
+    { name = "rsi-atlas-contracts", editable = "packages/contracts" },
+    { name = "rsi-atlas-security", editable = "packages/security" },
+]
 
 [[package]]
 name = "rsi-atlas-research"

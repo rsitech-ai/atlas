@@ -12,6 +12,7 @@ from rsi_atlas_contracts import (
     SigningStatus,
     release_check_id,
 )
+from rsi_atlas_security.ipc import IpcTransportMode, resolve_ipc_bind
 
 from rsi_atlas_release.inventory import inventory_staged_bundle
 from rsi_atlas_release.sbom import build_sbom_from_lock
@@ -22,6 +23,7 @@ def run_release_check(
     repo_root: Path,
     require_release: bool = False,
     created_at: datetime | None = None,
+    data_root: Path | None = None,
 ) -> ReleaseCheckReport:
     """Always report unsigned/notarization_blocked unless secrets exist (they don't in CI)."""
     now = created_at or datetime.now(tz=UTC)
@@ -65,6 +67,51 @@ def run_release_check(
         and "unsigned" not in blockers
     ):
         blockers.append("unsigned")
+
+    # Criterion 114: release must not expose an unintended TCP API.
+    root_for_ipc = data_root or (repo_root / ".local")
+    previous_release = os.environ.get("RSI_ATLAS_RELEASE_IPC")
+    previous_tcp = os.environ.get("RSI_ATLAS_ALLOW_LOOPBACK_TCP")
+    try:
+        if require_release:
+            os.environ["RSI_ATLAS_RELEASE_IPC"] = "1"
+            os.environ.pop("RSI_ATLAS_ALLOW_LOOPBACK_TCP", None)
+        cfg = resolve_ipc_bind(data_root=root_for_ipc)
+        if require_release and cfg.mode is not IpcTransportMode.UNIX_DOMAIN:
+            blockers.append("tcp_release_api")
+        if (
+            require_release
+            and previous_tcp
+            and previous_tcp.strip().lower()
+            in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+        ):
+            blockers.append("loopback_tcp_flag_set_in_release")
+    except Exception as exc:
+        blockers.append(f"ipc_policy_error:{type(exc).__name__}")
+    finally:
+        if previous_release is None:
+            os.environ.pop("RSI_ATLAS_RELEASE_IPC", None)
+        else:
+            os.environ["RSI_ATLAS_RELEASE_IPC"] = previous_release
+        if previous_tcp is None:
+            os.environ.pop("RSI_ATLAS_ALLOW_LOOPBACK_TCP", None)
+        else:
+            os.environ["RSI_ATLAS_ALLOW_LOOPBACK_TCP"] = previous_tcp
+
+    packaging = repo_root / "script" / "run_engine.py"
+    if not packaging.is_file():
+        blockers.append("release_ipc_runner_missing")
+    entitlement_tcp_note = (
+        entitlement_matrix.read_text(encoding="utf-8") if entitlement_present else ""
+    )
+    if entitlement_present and "Unix domain" not in entitlement_tcp_note:
+        blockers.append("entitlement_matrix_missing_uds_ipc")
+
     claim = ReleaseClaim.RELEASE_CANDIDATE if require_release else ReleaseClaim.DEVELOPMENT_ONLY
     release_ready = False
     if require_release:
