@@ -11,3 +11,8 @@ dependencies = [
   "rsi-atlas-contracts==0.1.0",
   "rsi-atlas-document-worker==0.1.0",
 ]
+
+[project.optional-dependencies]
+onnx = [
+    "onnxruntime>=1.20.0,<2",
+]
