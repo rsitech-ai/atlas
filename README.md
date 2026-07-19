@@ -50,15 +50,21 @@ publication:
   intent-weighted RRF fusion with inspectable component ranks, coverage/abstention,
   Document Evidence specialist (extractive, no LLM), assertion→citation→report draft gate,
   immutable review events, migration `0009`, and loopback
-  `research:retrieve` / `specialist:document` / `reports:draft` / review APIs.
+  `research:retrieve` / `specialist:document` / `reports:draft` / review APIs;
+- Phase 4 development multi-chain / quantitative fixtures: strict observation/collector
+  contracts, offline Bitcoin/EVM/Solana/market/governance/GitHub fixture adapters, immutable
+  raw envelopes, bitemporal observation persistence (migration `0010`), quality quarantine,
+  reorg orphan stub, leakage-safe feature eligibility, non-trading research signals,
+  fail-closed live/DuckDB/Parquet stubs, and loopback
+  `collectors:import-fixture` / observations list APIs.
 
 OCR/scanned fallback, Docling/Tier-1 promotion, production embedding-model promotion, Tantivy,
 production cross-encoder/LLM rerankers, LangGraph interrupt/resume, remaining specialists,
-qualified model execution, collectors, XPC, signing, and release qualification are not
-implemented. Hybrid retrieval and cited reports are development evidence only—not criterion
-closure for §§16–18 / 25–60. Parent-child/table-aware remain development-only—not
-production-ready. The development database is project-owned; release data placement remains a
-later packaging gate.
+qualified model execution, live RPC/WebSocket collectors, DuckDB/Parquet writers, XPC, signing,
+and release qualification are not implemented. Hybrid retrieval, cited reports, and fixture
+observations are development evidence only—not criterion closure for §§16–23 / 25–60 / 61–81.
+Parent-child/table-aware remain development-only—not production-ready. The development database
+is project-owned; release data placement remains a later packaging gate.
 
 ## Requirements
 

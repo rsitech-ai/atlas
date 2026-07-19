@@ -104,10 +104,10 @@ Fixture JSON only—no live RPC/HTTP.
 - `FeatureDefinition`, `FeatureValue`, `ResearchSignal` (no trade capability)
 - `AnalyticsBackendStatus` (`blocked_dependency` for duckdb/parquet)
 
-- [ ] **Step 1: Write RED contract tests**
-- [ ] **Step 2: Run RED**
-- [ ] **Step 3: Implement smallest strict models**
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 1: Write RED contract tests**
+- [x] **Step 2: Run RED**
+- [x] **Step 3: Implement smallest strict models**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 uv run pytest packages/contracts/tests/test_observations.py -q
@@ -128,9 +128,9 @@ git commit -m "feat: define structured observation and collector contracts"
 - Create: `packages/collectors/tests/test_*.py`
 - Modify: root `pyproject.toml` workspace members
 
-- [ ] **Step 1: RED** — fixture import yields envelope + observation; live modes raise typed block
-- [ ] **Step 2: Implement offline adapters + shared pipeline**
-- [ ] **Step 3: GREEN + commit**
+- [x] **Step 1: RED** — fixture import yields envelope + observation; live modes raise typed block
+- [x] **Step 2: Implement offline adapters + shared pipeline**
+- [x] **Step 3: GREEN + commit**
 
 ```bash
 uv run pytest packages/collectors/tests -q
@@ -147,9 +147,9 @@ git commit -m "feat: add offline fixture collectors with fail-closed live stubs"
 - Create: `packages/storage/src/rsi_atlas_storage/observation_repository.py`
 - Create: `packages/storage/tests/test_observation_repository.py`
 
-- [ ] **Step 1: RED** — persist envelope/observation; bitemporal as-of read; quarantine row
-- [ ] **Step 2: Migration + repository**
-- [ ] **Step 3: GREEN + commit**
+- [x] **Step 1: RED** — persist envelope/observation; bitemporal as-of read; quarantine row
+- [x] **Step 2: Migration + repository**
+- [x] **Step 3: GREEN + commit**
 
 ```bash
 uv run pytest packages/storage/tests/test_observation_repository.py -q
@@ -167,9 +167,12 @@ git commit -m "feat: persist bitemporal observations and raw envelopes"
 - Create: `packages/collectors/src/rsi_atlas_collectors/reorg.py`
 - Create: `packages/collectors/tests/test_features.py`, `test_signals.py`, `test_reorg.py`
 
-- [ ] **Step 1: RED** — leakage refusal; signal no-trade; orphan preserves history
-- [ ] **Step 2: Implement**
-- [ ] **Step 3: GREEN + commit**
+- [x] **Step 1: RED** — leakage refusal; signal no-trade; orphan preserves history
+- [x] **Step 2: Implement**
+- [x] **Step 3: GREEN + commit**
+
+> Features/signals/reorg landed inside the collectors package commit with Task 2 tests
+> (`test_feature_*`, `test_reorg_*`, `test_analytics_*`).
 
 ```bash
 uv run pytest packages/collectors/tests/test_features.py packages/collectors/tests/test_signals.py packages/collectors/tests/test_reorg.py -q
@@ -185,9 +188,9 @@ git commit -m "feat: add leakage-safe features, non-trading signals, reorg orpha
 - Modify: `services/engine/src/rsi_atlas_engine/api.py`, `runtime.py` (or equivalent wiring)
 - Create: `services/engine/tests/test_collectors_api.py`
 
-- [ ] **Step 1: RED** — import fixture + list observations over loopback
-- [ ] **Step 2: Wire service**
-- [ ] **Step 3: GREEN + commit**
+- [x] **Step 1: RED** — import fixture + list observations over loopback
+- [x] **Step 2: Wire service**
+- [x] **Step 3: GREEN + commit**
 
 ```bash
 uv run pytest services/engine/tests/test_collectors_api.py -q
@@ -204,9 +207,9 @@ git commit -m "feat: expose fixture collector and observation loopback APIs"
   `docs/superpowers/plans/2026-07-18-full-product-delivery-roadmap.md`,
   this plan (checkboxes)
 
-- [ ] **Step 1: Update evidence language (development partial only)**
-- [ ] **Step 2: Full focused verification**
-- [ ] **Step 3: Commit close**
+- [x] **Step 1: Update evidence language (development partial only)**
+- [x] **Step 2: Full focused verification**
+- [x] **Step 3: Commit close**
 
 ```bash
 uv run pytest packages/contracts/tests/test_observations.py packages/collectors/tests packages/storage/tests/test_observation_repository.py services/engine/tests/test_collectors_api.py -q
