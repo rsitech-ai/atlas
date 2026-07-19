@@ -87,11 +87,14 @@ def test_registry_lists_exactly_five_implemented_families() -> None:
     assert len(ChunkStrategyFamily) == 20
 
 
-def test_lifecycle_includes_chunked_not_published() -> None:
+def test_lifecycle_includes_chunked_index_validated_and_published() -> None:
     values = {state.value for state in DocumentProcessingLifecycle}
     assert "chunked" in values
-    assert "published" not in values
+    assert "index_validated" in values
+    assert "published" in values
+    # ChunkSet manifests still bind only to CHUNKED; publication uses INDEX_VALIDATED/PUBLISHED.
     assert "searchable" not in values
+    assert "indexed" not in values
 
 
 def test_chunk_rejects_unknown_fields() -> None:

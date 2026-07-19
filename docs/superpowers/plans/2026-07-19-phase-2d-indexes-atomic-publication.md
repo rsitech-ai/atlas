@@ -43,9 +43,8 @@ raw SQL migration `0008`, existing CAS artifact store, pytest + real test DB.
 
 ## File structure
 
-- `packages/contracts/src/rsi_atlas_contracts/indexing.py` — embedding / index / publication contracts
-- `packages/contracts/tests/test_indexing.py` — strict contract tests
-- `packages/contracts/tests/fixtures/retrieval_publication_v1.json` — golden publication fixture
+- `packages/contracts/src/rsi_atlas_contracts/publication.py` — embedding / publication contracts
+- `packages/contracts/tests/test_publication.py` — strict contract tests
 - `packages/ingestion/src/rsi_atlas_ingestion/embedding/` — development embedding adapter
 - `packages/ingestion/src/rsi_atlas_ingestion/index_service.py` — build staging indexes
 - `packages/ingestion/src/rsi_atlas_ingestion/publication_service.py` — atomic activate/rollback
@@ -62,33 +61,28 @@ raw SQL migration `0008`, existing CAS artifact store, pytest + real test DB.
 
 **Files:**
 
-- Create: `packages/contracts/src/rsi_atlas_contracts/indexing.py`
+- Create: `packages/contracts/src/rsi_atlas_contracts/publication.py`
 - Modify: `packages/contracts/src/rsi_atlas_contracts/document_parsing.py` — add
-  `INDEX_VALIDATED`, `PUBLISHED` to `DocumentProcessingLifecycle` (not `searchable`)
+  `INDEXED`, `PUBLISHED` to `DocumentProcessingLifecycle` (not `searchable`)
 - Modify: `packages/contracts/src/rsi_atlas_contracts/__init__.py`
-- Modify: `packages/contracts/tests/test_chunking.py` — allow `published`; forbid bare `searchable`
-- Create: `packages/contracts/tests/test_indexing.py`
-- Create: `packages/contracts/tests/fixtures/retrieval_publication_v1.json`
+- Modify: `packages/contracts/tests/test_chunking.py` — allow `indexed`/`published`; forbid bare `searchable`
+- Create: `packages/contracts/tests/test_publication.py`
 
 **Interfaces:**
 
-- `EmbeddingModelIdentity` — model_id, version, dimensions, normalization, configuration_hash
-- `ChunkEmbedding` — chunk_id, chunk_text_hash, vector (finite, expected dim, non-zero norm),
-  input_policy_hash, hardware/runtime metadata stub
-- `EmbeddingSet` — bound to chunk_set_id + content hash; deterministic embedding_set_id
-- `LexicalIndexRecord` / `DenseIndexRecord` / `ExactIdentifierRecord`
-- `RetrievalIndexBundle` — counts + content hashes for dense/lexical/exact staging
-- `RetrievalPublicationManifest` — admitted artifact refs, canonical/chunk versions, embedding set,
-  index bundle, lifecycle `index_validated` | `published`, warnings
-- Helpers: `embedding_set_identifier`, `publication_identifier`, `validate_vector`
+- `EmbeddingModelIdentity` — model_id, version, dimensions, normalization, configuration_hash,
+  `promotion_class` (fixture cannot be production)
+- `PublicationManifest` — chunk_set binding, dense/lexical CAS artifacts, cardinality checks,
+  lifecycle `indexed` | `published` with searchable coupling
+- Helper: `build_publication_manifest_id`
 
-- [ ] **Step 1: Write RED contract tests**
-- [ ] **Step 2: Run RED**
-- [ ] **Step 3: Implement smallest strict models**
+- [x] **Step 1: Write RED contract tests**
+- [x] **Step 2: Run RED**
+- [x] **Step 3: Implement smallest strict models**
 - [ ] **Step 4: Verify and commit**
 
 ```bash
-uv run pytest packages/contracts/tests/test_indexing.py packages/contracts/tests/test_chunking.py -q
+uv run pytest packages/contracts/tests/test_publication.py packages/contracts/tests/test_chunking.py -q
 uv run ruff check packages/contracts && uv run ruff format --check packages/contracts
 uv run mypy packages/contracts/src
 git commit -m "feat: define retrieval index publication contracts"

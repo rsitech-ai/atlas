@@ -74,6 +74,19 @@ from rsi_atlas_contracts.document_parsing import (
     parser_span_source_hash,
     sha256_text,
 )
+from rsi_atlas_contracts.indexing import (
+    DEVELOPMENT_EMBEDDING_DIMENSIONS,
+    ChunkEmbedding,
+    EmbeddingModelIdentity,
+    EmbeddingPromotionClass,
+    EmbeddingSet,
+    RetrievalIndexBundle,
+    RetrievalPublicationManifest,
+    RetrievalPublicationManifestDraft,
+    embedding_set_identifier,
+    publication_identifier,
+    validate_vector,
+)
 from rsi_atlas_contracts.models import (
     ModelArtifact,
     ModelCapability,
@@ -91,6 +104,7 @@ from rsi_atlas_contracts.system_status import (
 )
 
 __all__ = [
+    "DEVELOPMENT_EMBEDDING_DIMENSIONS",
     "IMPLEMENTED_CHUNK_FAMILIES",
     "AcquisitionMethod",
     "AcquisitionRequest",
@@ -112,6 +126,7 @@ __all__ = [
     "CanonicalTextElement",
     "CanonicalTextRole",
     "Chunk",
+    "ChunkEmbedding",
     "ChunkEmbeddingState",
     "ChunkEvaluationStatus",
     "ChunkRelationship",
@@ -130,6 +145,9 @@ __all__ = [
     "DocumentPreflightProfile",
     "DocumentProcessingLifecycle",
     "DocumentProfilerIdentity",
+    "EmbeddingModelIdentity",
+    "EmbeddingPromotionClass",
+    "EmbeddingSet",
     "GovernanceApprovalRecord",
     "GovernanceRecordReference",
     "GovernanceSubjectKind",
@@ -152,6 +170,9 @@ __all__ = [
     "ParserSpanProvenance",
     "ProviderHealthState",
     "ResourceClass",
+    "RetrievalIndexBundle",
+    "RetrievalPublicationManifest",
+    "RetrievalPublicationManifestDraft",
     "RuntimeProfile",
     "SafetyCheckState",
     "SystemStatus",
@@ -167,7 +188,10 @@ __all__ = [
     "chunk_set_identifier_from_body",
     "chunk_set_key",
     "document_admission_record_hash",
+    "embedding_set_identifier",
     "measure_chunk_set_quality",
     "parser_span_source_hash",
+    "publication_identifier",
     "sha256_text",
+    "validate_vector",
 ]

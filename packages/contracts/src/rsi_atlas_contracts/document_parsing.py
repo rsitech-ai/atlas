@@ -69,6 +69,8 @@ class DocumentProcessingLifecycle(StrEnum):
     PARSE_VALIDATED = "parse_validated"
     CANONICALIZED = "canonicalized"
     CHUNKED = "chunked"
+    INDEX_VALIDATED = "index_validated"
+    PUBLISHED = "published"
     AWAITING_REVIEW = "awaiting_review"
     AWAITING_PASSWORD = "awaiting_password"
     FAILED_RETRYABLE = "failed_retryable"
