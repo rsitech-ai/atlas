@@ -14,6 +14,10 @@ struct ResearchCanvasView: View {
             if let checkpoint = store.checkpoint {
                 Divider()
                 checkpointPanel(checkpoint)
+                if let reportID = checkpoint.reportID {
+                    Divider()
+                    reportStudioPanel(reportID: reportID, title: store.title)
+                }
             }
             Divider()
             recentList
@@ -26,7 +30,7 @@ struct ResearchCanvasView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Research Canvas")
                 .font(.largeTitle.weight(.semibold))
-            Text("Start a durable linear workflow over loopback research APIs. Interrupt waits for human review.")
+            Text("Start a durable multi-specialist workflow over loopback research APIs. Interrupt waits for human review. Report Studio panel shows the draft id when present.")
                 .foregroundStyle(.secondary)
         }
         .padding(24)
@@ -97,6 +101,23 @@ struct ResearchCanvasView: View {
         .accessibilityIdentifier("research.checkpoint")
     }
 
+    private func reportStudioPanel(reportID: String, title: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Report Studio")
+                .font(.headline)
+            Text("Minimal native draft inspector (assertions/citations remain on the engine report record).")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            LabeledContent("Title", value: title.isEmpty ? "Untitled" : title)
+            LabeledContent("Report ID", value: reportID)
+            Text("Approve or reject from the Research Canvas controls when the workflow is awaiting human review.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(16)
+        .accessibilityIdentifier("research.reportStudio")
+    }
+
     private var recentList: some View {
         List(store.recent, id: \.checkpoint.workflowID) { item in
             VStack(alignment: .leading, spacing: 4) {
@@ -117,9 +138,9 @@ struct ComparisonTimelineView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Comparison Timeline")
+                    Text("Comparison")
                         .font(.largeTitle.weight(.semibold))
-                    Text("Envelope-linked events from local observations via monitoring timeline API.")
+                    Text("Timeline events and a lightweight comparison matrix shell over local observations.")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -135,6 +156,8 @@ struct ComparisonTimelineView: View {
                 .foregroundStyle(.secondary)
                 .padding(16)
                 .accessibilityIdentifier("comparison.status")
+            Divider()
+            matrixShell
             Divider()
             if store.events.isEmpty {
                 ContentUnavailableView(
@@ -162,6 +185,19 @@ struct ComparisonTimelineView: View {
         }
         .task { await store.refresh() }
         .accessibilityIdentifier("comparison.timeline")
+    }
+
+    private var matrixShell: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Comparison Matrix")
+                .font(.headline)
+            Text("Observations loaded: \(store.observationCount). Full cross-axis matrix cells remain engine-backed; this shell surfaces count and timeline linkage.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            LabeledContent("Timeline events", value: "\(store.events.count)")
+        }
+        .padding(16)
+        .accessibilityIdentifier("comparison.matrix")
     }
 }
 

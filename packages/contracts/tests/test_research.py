@@ -48,21 +48,38 @@ def _context() -> ArtifactCommandContext:
     )
 
 
-def test_specialist_task_blocks_tokenomics() -> None:
+def test_specialist_task_blocks_scenario() -> None:
     with pytest.raises(ValidationError, match="blocked"):
         SpecialistTask(
             task_id=specialist_task_id(
                 run_id=RUN_ID,
-                specialist_type=SpecialistType.TOKENOMICS,
+                specialist_type=SpecialistType.SCENARIO,
                 subquestion="supply",
             ),
-            specialist_type=SpecialistType.TOKENOMICS,
+            specialist_type=SpecialistType.SCENARIO,
             run_id=RUN_ID,
             packet_id=PACKET_ID,
             subquestion="What is circulating supply?",
             context_budget_tokens=512,
             repair_limit=1,
         )
+
+
+def test_tokenomics_specialist_task_allowed() -> None:
+    task = SpecialistTask(
+        task_id=specialist_task_id(
+            run_id=RUN_ID,
+            specialist_type=SpecialistType.TOKENOMICS,
+            subquestion="supply",
+        ),
+        specialist_type=SpecialistType.TOKENOMICS,
+        run_id=RUN_ID,
+        packet_id=PACKET_ID,
+        subquestion="What is circulating supply?",
+        context_budget_tokens=512,
+        repair_limit=1,
+    )
+    assert task.specialist_type is SpecialistType.TOKENOMICS
 
 
 def test_supported_finding_requires_evidence() -> None:

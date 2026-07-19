@@ -6,6 +6,7 @@ from rsi_atlas_research.document_specialist import DocumentEvidenceSpecialist, S
 from rsi_atlas_research.planner import PlanValidationError, validate_retrieval_plan
 from rsi_atlas_research.reports import ReportGate, ReportGateError
 from rsi_atlas_research.service import ResearchOrchestrator
+from rsi_atlas_research.specialists import ExtractiveSpecialist
 from rsi_atlas_research.workflow import (
     InMemoryWorkflowStore,
     PostgresWorkflowStore,
@@ -23,6 +24,7 @@ __all__ = [
     "CitationBinder",
     "CitationError",
     "DocumentEvidenceSpecialist",
+    "ExtractiveSpecialist",
     "InMemoryWorkflowStore",
     "PlanValidationError",
     "PostgresWorkflowStore",

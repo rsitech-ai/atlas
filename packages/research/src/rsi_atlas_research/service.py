@@ -24,6 +24,7 @@ from rsi_atlas_research.citations import CitationBinder
 from rsi_atlas_research.document_specialist import DocumentEvidenceSpecialist
 from rsi_atlas_research.planner import validate_retrieval_plan
 from rsi_atlas_research.reports import ReportGate
+from rsi_atlas_research.specialists import ExtractiveSpecialist
 
 
 class ResearchStore(Protocol):
@@ -52,6 +53,18 @@ class ResearchOrchestrator:
         self._retrieval = retrieval
         self._store = store
         self._specialist = DocumentEvidenceSpecialist()
+        self._specialists: dict[SpecialistType, ExtractiveSpecialist] = {
+            kind: ExtractiveSpecialist(kind)
+            for kind in (
+                SpecialistType.TOKENOMICS,
+                SpecialistType.MARKET,
+                SpecialistType.ON_CHAIN,
+                SpecialistType.GOVERNANCE,
+                SpecialistType.TREASURY,
+                SpecialistType.SECURITY,
+                SpecialistType.CONTRADICTION,
+            )
+        }
         self._assertions = AssertionBuilder()
         self._citations = CitationBinder()
         self._reports = ReportGate()
@@ -73,14 +86,31 @@ class ResearchOrchestrator:
         subquestion: str | None = None,
         now: datetime | None = None,
     ) -> SpecialistFinding:
+        return self.run_specialist(
+            query=query,
+            packet=packet,
+            specialist_type=SpecialistType.DOCUMENT_EVIDENCE,
+            subquestion=subquestion,
+            now=now,
+        )
+
+    def run_specialist(
+        self,
+        *,
+        query: ResearchQuery,
+        packet: EvidencePacket,
+        specialist_type: SpecialistType,
+        subquestion: str | None = None,
+        now: datetime | None = None,
+    ) -> SpecialistFinding:
         question = subquestion or query.text
         task = SpecialistTask(
             task_id=specialist_task_id(
                 run_id=packet.run_id,
-                specialist_type=SpecialistType.DOCUMENT_EVIDENCE,
+                specialist_type=specialist_type,
                 subquestion=question,
             ),
-            specialist_type=SpecialistType.DOCUMENT_EVIDENCE,
+            specialist_type=specialist_type,
             run_id=packet.run_id,
             packet_id=packet.packet_id,
             subquestion=question,
@@ -88,7 +118,37 @@ class ResearchOrchestrator:
             context_budget_tokens=min(query.context_budget_tokens, 4_096),
             repair_limit=1,
         )
-        return self._specialist.run(task=task, packet=packet, now=now)
+        if specialist_type is SpecialistType.DOCUMENT_EVIDENCE:
+            return self._specialist.run(task=task, packet=packet, now=now)
+        runner = self._specialists.get(specialist_type)
+        if runner is None:
+            raise ValueError(f"specialist {specialist_type.value} is not enabled")
+        return runner.run(task=task, packet=packet, now=now)
+
+    def run_specialists(
+        self,
+        *,
+        query: ResearchQuery,
+        packet: EvidencePacket,
+        specialist_types: tuple[SpecialistType, ...] | None = None,
+        now: datetime | None = None,
+    ) -> tuple[SpecialistFinding, ...]:
+        """Run multiple extractive specialists sequentially (no LangGraph)."""
+        kinds = specialist_types or (
+            SpecialistType.DOCUMENT_EVIDENCE,
+            SpecialistType.TOKENOMICS,
+            SpecialistType.ON_CHAIN,
+            SpecialistType.MARKET,
+        )
+        return tuple(
+            self.run_specialist(
+                query=query,
+                packet=packet,
+                specialist_type=kind,
+                now=now,
+            )
+            for kind in kinds
+        )
 
     def draft_report(
         self,

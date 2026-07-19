@@ -43,7 +43,21 @@ class SpecialistType(StrEnum):
     SCENARIO = "scenario"
 
 
-DEVELOPMENT_SPECIALISTS = frozenset({SpecialistType.DOCUMENT_EVIDENCE})
+DEVELOPMENT_SPECIALISTS = frozenset(
+    {
+        SpecialistType.DOCUMENT_EVIDENCE,
+        SpecialistType.TOKENOMICS,
+        SpecialistType.MARKET,
+        SpecialistType.ON_CHAIN,
+        SpecialistType.GOVERNANCE,
+        SpecialistType.TREASURY,
+        SpecialistType.SECURITY,
+        SpecialistType.CONTRADICTION,
+    }
+)
+
+# Still blocked until later slices (scenario planning / development analytics).
+BLOCKED_SPECIALISTS = frozenset(SpecialistType) - DEVELOPMENT_SPECIALISTS
 
 
 class FindingCompletionStatus(StrEnum):
@@ -107,8 +121,8 @@ class SpecialistTask(DocumentContractModel):
     def specialist_is_development_allowed(self) -> Self:
         if self.specialist_type not in DEVELOPMENT_SPECIALISTS:
             raise ValueError(
-                f"specialist {self.specialist_type} is blocked in the development slice "
-                "(document_evidence only)"
+                f"specialist {self.specialist_type} is blocked "
+                f"(allowed: {sorted(s.value for s in DEVELOPMENT_SPECIALISTS)})"
             )
         for subject in self.permitted_subjects:
             if not re.fullmatch(_SUBJECT_PATTERN, subject):
