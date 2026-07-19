@@ -1090,6 +1090,85 @@ class DocumentProcessingRepository:
             )
             connection.commit()
 
+    def rollback_retrieval_publication(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        document_version_id: str,
+        chunk_set_id: str,
+        recorded_at: datetime,
+    ) -> bool:
+        """Clear the active pointer and supersede the previously active version."""
+        command = ArtifactCommandContext.model_validate(context)
+        with self._database.connect() as connection:
+            prior = connection.execute(
+                """
+                SELECT index_version_id, publication_id
+                FROM atlas_ingestion.document_retrieval_active
+                WHERE tenant_id = %s AND workspace_id = %s
+                  AND document_version_id = %s AND chunk_set_id = %s
+                FOR UPDATE
+                """,
+                (
+                    command.tenant_id,
+                    command.workspace_id,
+                    document_version_id,
+                    chunk_set_id,
+                ),
+            ).fetchone()
+            if prior is None:
+                return False
+            connection.execute(
+                """
+                UPDATE atlas_ingestion.retrieval_index_versions
+                SET status = 'superseded'
+                WHERE tenant_id = %s AND workspace_id = %s AND index_version_id = %s
+                """,
+                (command.tenant_id, command.workspace_id, prior[0]),
+            )
+            connection.execute(
+                """
+                DELETE FROM atlas_ingestion.document_retrieval_active
+                WHERE tenant_id = %s AND workspace_id = %s
+                  AND document_version_id = %s AND chunk_set_id = %s
+                """,
+                (
+                    command.tenant_id,
+                    command.workspace_id,
+                    document_version_id,
+                    chunk_set_id,
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO atlas_ingestion.retrieval_lifecycle_events (
+                    tenant_id, workspace_id, event_id, acquisition_id,
+                    index_version_id, event_type, payload, recorded_at
+                )
+                SELECT
+                    tenant_id, workspace_id, %s, acquisition_id,
+                    index_version_id, 'DocumentSuperseded', %s, %s
+                FROM atlas_ingestion.retrieval_index_versions
+                WHERE tenant_id = %s AND workspace_id = %s AND index_version_id = %s
+                """,
+                (
+                    uuid4(),
+                    Jsonb(
+                        {
+                            "reason": "rollback",
+                            "publication_id": prior[1],
+                            "searchable": False,
+                        }
+                    ),
+                    recorded_at,
+                    command.tenant_id,
+                    command.workspace_id,
+                    prior[0],
+                ),
+            )
+            connection.commit()
+        return True
+
     def search_lexical_active(
         self,
         *,
@@ -1149,58 +1228,45 @@ class DocumentProcessingRepository:
             ).fetchall()
         return [str(row[0]) for row in rows]
 
-    def rollback_retrieval_publication(
+    def list_retrieval_index_versions(
         self,
         *,
         context: ArtifactCommandContext,
-        document_version_id: str,
         chunk_set_id: str,
-        recorded_at: datetime,
-    ) -> bool:
-        del recorded_at
+    ) -> list[dict[str, Any]]:
         command = ArtifactCommandContext.model_validate(context)
-        with self._database.connect() as connection:
-            active = connection.execute(
+        with self._database.connect(autocommit=True) as connection:
+            rows = connection.execute(
                 """
-                SELECT index_version_id
-                FROM atlas_ingestion.document_retrieval_active
-                WHERE tenant_id = %s AND workspace_id = %s
-                  AND document_version_id = %s AND chunk_set_id = %s
-                FOR UPDATE
+                SELECT v.index_version_id, v.document_version_id, v.chunk_set_id, v.status,
+                       v.dense_cardinality, v.lexical_cardinality,
+                       v.exact_identifier_cardinality, v.recorded_at,
+                       EXISTS (
+                         SELECT 1 FROM atlas_ingestion.document_retrieval_active a
+                         WHERE a.tenant_id = v.tenant_id
+                           AND a.workspace_id = v.workspace_id
+                           AND a.index_version_id = v.index_version_id
+                       ) AS is_active
+                FROM atlas_ingestion.retrieval_index_versions v
+                WHERE v.tenant_id = %s AND v.workspace_id = %s AND v.chunk_set_id = %s
+                ORDER BY v.recorded_at ASC
                 """,
-                (
-                    command.tenant_id,
-                    command.workspace_id,
-                    document_version_id,
-                    chunk_set_id,
-                ),
-            ).fetchone()
-            if active is None:
-                connection.commit()
-                return False
-            connection.execute(
-                """
-                UPDATE atlas_ingestion.retrieval_index_versions
-                SET status = 'superseded'
-                WHERE tenant_id = %s AND workspace_id = %s AND index_version_id = %s
-                """,
-                (command.tenant_id, command.workspace_id, active[0]),
-            )
-            connection.execute(
-                """
-                DELETE FROM atlas_ingestion.document_retrieval_active
-                WHERE tenant_id = %s AND workspace_id = %s
-                  AND document_version_id = %s AND chunk_set_id = %s
-                """,
-                (
-                    command.tenant_id,
-                    command.workspace_id,
-                    document_version_id,
-                    chunk_set_id,
-                ),
-            )
-            connection.commit()
-            return True
+                (command.tenant_id, command.workspace_id, chunk_set_id),
+            ).fetchall()
+        return [
+            {
+                "index_version_id": row[0],
+                "document_version_id": row[1],
+                "chunk_set_id": row[2],
+                "status": row[3],
+                "dense_cardinality": row[4],
+                "lexical_cardinality": row[5],
+                "exact_identifier_cardinality": row[6],
+                "recorded_at": row[7],
+                "searchable": bool(row[8]),
+            }
+            for row in rows
+        ]
 
 
 def _row_to_attempt(row: Row) -> DocumentParserAttempt:
