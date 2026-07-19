@@ -30,6 +30,7 @@ from rsi_atlas_storage.document_processing_repository import DocumentProcessingR
 
 from rsi_atlas_retrieval.coverage import evaluate_coverage, should_abstain
 from rsi_atlas_retrieval.fusion import FUSION_CONFIGURATION_HASH, fuse_candidates_rrf
+from rsi_atlas_retrieval.rerank import rerank_fused_lexical
 from rsi_atlas_retrieval.search import HybridCandidateGenerator, vector_literal
 
 EmbedFn = Callable[[str], tuple[float, ...]]
@@ -40,7 +41,7 @@ class RetrievalServiceError(ValueError):
 
 
 class HybridRetrievalService:
-    """Run development hybrid retrieval against active publications."""
+    """Run hybrid retrieval against active publications (RRF + lexical rerank)."""
 
     def __init__(
         self,
@@ -48,10 +49,12 @@ class HybridRetrievalService:
         processing: DocumentProcessingRepository,
         embed_text: EmbedFn,
         generator: HybridCandidateGenerator | None = None,
+        lexical_rerank: bool = True,
     ) -> None:
         self._processing = processing
         self._embed_text = embed_text
         self._generator = generator or HybridCandidateGenerator(processing=processing)
+        self._lexical_rerank = lexical_rerank
 
     def build_default_plan(self, *, query: ResearchQuery) -> RetrievalPlan:
         steps = (
@@ -164,6 +167,8 @@ class HybridRetrievalService:
             query_family=query.query_family,
             final_k=20,
         )
+        if self._lexical_rerank and fused:
+            fused = rerank_fused_lexical(query=query.text, items=fused, final_k=20)
         coverage = evaluate_coverage(query_family=query.query_family, items=fused)
         if should_abstain(coverage) or not fused:
             return RetrievalAbstention(

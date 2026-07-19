@@ -13,7 +13,7 @@ from rsi_atlas_contracts import (
     RetrievalDataPlane,
 )
 
-# ponytail: ceiling=fixed RRF weights (no cross-encoder); upgrade=governed reranker policy
+# ponytail: ceiling=fixed RRF + lexical overlap rerank; upgrade=governed ONNX cross-encoder
 _DEFAULT_WEIGHTS: dict[RetrievalDataPlane, float] = {
     RetrievalDataPlane.DENSE_DOCUMENT: 1.0,
     RetrievalDataPlane.LEXICAL: 1.0,
@@ -38,6 +38,7 @@ _RRF_K = 60
 FUSION_CONFIGURATION = {
     "method": "intent_weighted_rrf_v1",
     "k": _RRF_K,
+    "post_rrf_rerank": "lexical_overlap_rerank_v1",
     "default_weights": {plane.value: weight for plane, weight in _DEFAULT_WEIGHTS.items()},
     "family_overrides": {
         family.value: {plane.value: weight for plane, weight in weights.items()}

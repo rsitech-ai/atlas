@@ -142,7 +142,7 @@ class RetrievalIndexSummary(StrictModel):
     lexical_cardinality: int = Field(ge=1, le=1_000_000)
     exact_identifier_cardinality: int = Field(ge=0, le=1_000_000)
     searchable: bool
-    development_fixture_embeddings: Literal[True] = True
+    development_fixture_embeddings: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -404,6 +404,9 @@ class DocumentProcessingService:
         staged = indexer.stage_indexes(
             context=context, acquisition_id=acquisition_id, chunk_set_id=chunk_set_id
         )
+        fixture_embeddings = str(staged.get("embedding_model_id", "fixture_hash_v1")).startswith(
+            "fixture_"
+        )
         return RetrievalIndexSummary(
             index_version_id=UUID(str(staged["index_version_id"])),
             document_version_id=str(staged["document_version_id"]),
@@ -418,6 +421,7 @@ class DocumentProcessingService:
                 field="exact_identifier_cardinality",
             ),
             searchable=False,
+            development_fixture_embeddings=fixture_embeddings,
         )
 
     def list_index_versions(

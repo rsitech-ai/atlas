@@ -15,6 +15,7 @@ from rsi_atlas_contracts import (
     ChunkEmbedding,
     ChunkSet,
     DocumentProcessingLifecycle,
+    EmbeddingPromotionClass,
     EmbeddingSet,
     RetrievalIndexBundle,
     RetrievalPublicationManifestDraft,
@@ -26,10 +27,17 @@ from rsi_atlas_storage.artifact_repository import ArtifactRepository
 from rsi_atlas_storage.document_processing_repository import DocumentProcessingRepository
 
 from rsi_atlas_ingestion.embedding import DEVELOPMENT_EMBEDDING_MODEL, DeterministicEmbedder
+from rsi_atlas_ingestion.embedding.resolve import Embedder
 
 _EVM_ADDRESS = re.compile(r"\b0x[a-fA-F0-9]{40}\b")
 _DENSE_MEDIA = "application/vnd.rsi-atlas.dense-index+json"
 _LEXICAL_MEDIA = "application/vnd.rsi-atlas.lexical-index+json"
+_ALLOWED_PROMOTION = frozenset(
+    {
+        EmbeddingPromotionClass.DEVELOPMENT_FIXTURE,
+        EmbeddingPromotionClass.CANDIDATE,
+    }
+)
 
 
 class IndexStagingError(ValueError):
@@ -66,7 +74,7 @@ class IndexService:
         processing: DocumentProcessingRepository,
         artifacts: ArtifactRepository,
         store: ContentAddressedArtifactStore,
-        embedder: DeterministicEmbedder | None = None,
+        embedder: Embedder | None = None,
     ) -> None:
         self._processing = processing
         self._artifacts = artifacts
@@ -84,7 +92,13 @@ class IndexService:
         recorded_at = now or datetime.now(UTC)
         chunk_set = self._load_chunk_set(context=context, chunk_set_id=chunk_set_id)
         model = self._embedder.model
-        if model != DEVELOPMENT_EMBEDDING_MODEL:
+        if model.promotion_class not in _ALLOWED_PROMOTION:
+            raise IndexStagingError("embedding promotion_class not allowed for staging")
+        # Fixture path stays pinned; candidate OSS models may diverge from fixture identity.
+        if (
+            model.promotion_class is EmbeddingPromotionClass.DEVELOPMENT_FIXTURE
+            and model != DEVELOPMENT_EMBEDDING_MODEL
+        ):
             raise IndexStagingError("unexpected embedding model identity")
 
         dense_rows: list[dict[str, object]] = []
@@ -234,6 +248,7 @@ class IndexService:
             "dense_cardinality": bundle.dense_cardinality,
             "lexical_cardinality": bundle.lexical_cardinality,
             "exact_identifier_cardinality": bundle.exact_identifier_cardinality,
+            "embedding_model_id": model.model_id,
         }
 
     def _load_chunk_set(self, *, context: ArtifactCommandContext, chunk_set_id: str) -> ChunkSet:
