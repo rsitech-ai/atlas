@@ -6,8 +6,9 @@ The approved product and system design is in [`docs/superpowers/specs/2026-07-18
 
 ## Current slice
 
-The repository completes the reviewed Phase 1 durable local-runtime seam and Phase 2A secure
-document-admission checkpoint:
+The repository completes the reviewed Phase 1 durable local-runtime seam, Phase 2A secure
+document-admission checkpoint, and Phase 2B development-qualified Tier-0 canonical PDF evidence
+slice:
 
 - strict, versioned Python runtime-status contracts;
 - an immutable, content-addressed artifact store with integrity verification;
@@ -25,20 +26,21 @@ document-admission checkpoint:
 - bounded raw PDF streaming into owner-private staging and immutable content-addressed storage,
   followed by append-only PostgreSQL acquisition, decision, duplicate-link, and outbox evidence;
 - a conservative admission policy that can quarantine, reject unsafe input, or link an exact
-  same-workspace duplicate, but can never silently promote a document; the versioned contract can
-  represent a password request once Phase 2B supplies authoritative encryption evidence;
+  same-workspace duplicate, but can never silently promote a document;
 - native and CLI import boundaries with stable acquisition/trace identity, idempotent retry,
   hard-kill orphan recovery, strict response binding, and no remote fallback;
 - a native Evidence destination showing truthful empty, progress, review, rejected, duplicate,
-  failure, and retry states with accessible identifiers; its password presentation is contract-tested
-  but runtime-unreachable in Phase 2A, where encrypted markers remain unknown and quarantined;
-- a reproducible SwiftPM `.app` build and local engine/app launcher.
+  failure, and retry states with accessible identifiers;
+- governed Tier-0 PDF parser dependency approval (`pypdf` / `pdfminer.six`); Docling stays blocked;
+- an isolated Seatbelt document worker for preflight and development-qualified parse;
+- append-only parser-attempt journals, CAS-first canonical JSON, and canonical page inspection via
+  loopback processing APIs plus the native Evidence inspector.
 
-Parser execution, OCR/scanned fallback, canonical page/layout provenance, chunking, indexes,
-retrieval, qualified model execution, collectors, LangGraph workflows, XPC, signing, and release
-qualification are not implemented yet. Every imported PDF therefore remains raw immutable evidence
-with a fail-closed admission outcome; it is not parsed or searchable. The development database is
-project-owned; release data placement remains a later packaging gate.
+OCR/scanned fallback, Docling/Tier-1 promotion, chunking, indexes, retrieval, qualified model
+execution, collectors, LangGraph workflows, XPC, signing, and release qualification are not
+implemented yet. Canonical pages are inspectable development evidence only: they are not searchable,
+published, or production-promoted. The development database is project-owned; release data placement
+remains a later packaging gate.
 
 ## Requirements
 

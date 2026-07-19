@@ -571,7 +571,7 @@ git commit -m "feat: inspect canonical PDF evidence"
 - Modify: `docs/superpowers/plans/2026-07-18-full-product-delivery-roadmap.md`
 - Create: `.superpowers/sdd/phase-2b-report.md` (ignored evidence)
 
-- [ ] **Step 1: Run the all-up gate**
+- [x] **Step 1: Run the all-up gate**
 
 ```bash
 uv lock --check
@@ -588,14 +588,14 @@ bash -n script/build_and_run.sh infra/local/postgres.sh
 git diff --check
 ```
 
-- [ ] **Step 2: Run fault, resource, and zero-egress matrices**
+- [x] **Step 2: Run fault, resource, and zero-egress matrices**
 
 Kill worker at request/read/candidate/output/CAS/DB boundaries; retry and verify retained started and
 terminal attempt evidence, one visible accepted run, and no unsafe residue. Exercise time, RSS,
 decoded-byte, page, span, output, disk, and cancellation limits. Record child descriptors/environment/
 process tree plus OS-enforced arbitrary-file/Keychain/fork/exec/descendant/network denial.
 
-- [ ] **Step 3: Run parser/canonical acceptance corpus**
+- [x] **Step 3: Run parser/canonical acceptance corpus**
 
 Prove exact supported born-digital pages and coordinates across development/calibration/validation/
 adversarial partitions, crypto/numeric preservation, deterministic
@@ -603,7 +603,7 @@ rerun hashes, image-only/encrypted/unsafe/review routes, parser disagreement, co
 history across parser/config changes, raw/canonical restart persistence, and the frozen warm/cold
 performance protocol.
 
-- [ ] **Step 4: Reconcile acceptance claims**
+- [x] **Step 4: Reconcile acceptance claims**
 
 Update criteria 10–13, 17, 19, 23, and 24 only to the degree directly proven. Keep scanned/OCR,
 five chunkers, parent-child/table production chunking, indexes/publication, human LangGraph
@@ -617,7 +617,7 @@ artifact versions/hashes/licenses, fixture hashes, metrics, test counts, runtime
 remaining boundaries in the ignored Phase 2B report. Re-run dependency manifest/SBOM/advisory
 verification against the final lock and fail if it differs from the explicit approval.
 
-- [ ] **Step 6: Commit Phase 2B closure**
+- [x] **Step 6: Commit Phase 2B closure**
 
 ```bash
 git add README.md docs
