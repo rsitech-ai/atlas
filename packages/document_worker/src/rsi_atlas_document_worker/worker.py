@@ -1,11 +1,13 @@
-"""Document-worker entrypoint. Task 4 ships echo_hash only; PDF libraries stay out."""
+"""Document-worker entrypoint: echo_hash and governed PDF preflight."""
 
 from __future__ import annotations
 
 import hashlib
 import os
 import sys
+from typing import assert_never
 
+from rsi_atlas_document_worker.preflight import run_preflight, write_preflight_output
 from rsi_atlas_document_worker.protocol import (
     DocumentWorkerRequest,
     DocumentWorkerResponse,
@@ -70,21 +72,9 @@ def _write_run_file(run_dir_fd: int, name: str, payload: bytes, max_output_bytes
         os.close(out_fd)
 
 
-def handle_request(request: DocumentWorkerRequest) -> DocumentWorkerResponse:
-    # Task 4 only ships echo_hash; future operations extend WorkerOperation first.
-    try:
-        digest, size = _hash_artifact_fd(ARTIFACT_FD, request.artifact_size_bytes)
-    except (OSError, ValueError):
-        return _fail(request, code=WorkerFailureCode.ARTIFACT_MISMATCH)
-
-    if digest != request.artifact_sha256 or size != request.artifact_size_bytes:
-        return _fail(
-            request,
-            code=WorkerFailureCode.ARTIFACT_MISMATCH,
-            artifact_sha256=digest,
-            artifact_size_bytes=size,
-        )
-
+def _handle_echo_hash(
+    request: DocumentWorkerRequest, digest: str, size: int
+) -> DocumentWorkerResponse:
     evidence = (
         '{"artifact_sha256":"'
         + digest
@@ -103,7 +93,6 @@ def handle_request(request: DocumentWorkerRequest) -> DocumentWorkerResponse:
             artifact_sha256=digest,
             artifact_size_bytes=size,
         )
-
     return DocumentWorkerResponse(
         operation=WorkerOperation.ECHO_HASH,
         run_id=request.run_id,
@@ -116,8 +105,56 @@ def handle_request(request: DocumentWorkerRequest) -> DocumentWorkerResponse:
     )
 
 
+def _handle_preflight(
+    request: DocumentWorkerRequest, digest: str, size: int
+) -> DocumentWorkerResponse:
+    # Re-open artifact from FD start for pypdf after hashing consumed the stream.
+    os.lseek(ARTIFACT_FD, 0, os.SEEK_SET)
+    try:
+        evidence = run_preflight(artifact_fd=ARTIFACT_FD)
+        name = write_preflight_output(RUN_DIRECTORY_FD, evidence, request.max_output_bytes)
+    except (OSError, ValueError):
+        return _fail(
+            request,
+            code=WorkerFailureCode.OUTPUT_LIMIT,
+            artifact_sha256=digest,
+            artifact_size_bytes=size,
+        )
+    return DocumentWorkerResponse(
+        operation=WorkerOperation.PREFLIGHT,
+        run_id=request.run_id,
+        status=WorkerResponseStatus.SUCCEEDED,
+        artifact_sha256=digest,
+        artifact_size_bytes=size,
+        worker=worker_identity(),
+        failure_code=None,
+        output_files=(name,),
+    )
+
+
+def handle_request(request: DocumentWorkerRequest) -> DocumentWorkerResponse:
+    try:
+        digest, size = _hash_artifact_fd(ARTIFACT_FD, request.artifact_size_bytes)
+    except (OSError, ValueError):
+        return _fail(request, code=WorkerFailureCode.ARTIFACT_MISMATCH)
+
+    if digest != request.artifact_sha256 or size != request.artifact_size_bytes:
+        return _fail(
+            request,
+            code=WorkerFailureCode.ARTIFACT_MISMATCH,
+            artifact_sha256=digest,
+            artifact_size_bytes=size,
+        )
+
+    if request.operation is WorkerOperation.ECHO_HASH:
+        return _handle_echo_hash(request, digest, size)
+    if request.operation is WorkerOperation.PREFLIGHT:
+        return _handle_preflight(request, digest, size)
+    assert_never(request.operation)
+
+
 def main(argv: list[str] | None = None) -> int:
-    del argv  # argv is unused; FDs and stdin carry the contract
+    del argv
     request: DocumentWorkerRequest | None = None
     try:
         payload = sys.stdin.buffer.read()

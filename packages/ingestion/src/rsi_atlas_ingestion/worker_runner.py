@@ -296,8 +296,9 @@ class DocumentWorkerRunner:
         profile_path.write_text(profile_text, encoding="utf-8")
         os.chmod(profile_path, 0o600)
 
-        # Serialize reserved FD 3/4 across concurrent runners in one engine process.
-        # Hold the lock only through child spawn + parent FD release, then wait unlocked.
+        # Serialize reserved FD 3/4 for the full child lifetime in one engine process.
+        # ponytail: global lock; ceiling is one in-process worker at a time. Upgrade: pass
+        # dynamic FDs in the protocol instead of fixed 3/4.
         with _FD_LOCK:
             opened_artifact = os.open(artifact, os.O_RDONLY | getattr(os, "O_CLOEXEC", 0))
             opened_run = os.open(
@@ -306,6 +307,7 @@ class DocumentWorkerRunner:
             artifact_fd = run_dir_fd = -1
             stdout_r = stdout_w = stderr_r = stderr_w = -1
             process: subprocess.Popen[bytes] | None = None
+            started = time.monotonic()
             try:
                 artifact_fd = _reserve_fd(3, opened_artifact)
                 opened_artifact = -1
@@ -334,8 +336,31 @@ class DocumentWorkerRunner:
                     start_new_session=True,
                     close_fds=True,
                 )
+                assert process.stdin is not None
                 _close_quietly(stdout_w, stderr_w, 3, 4)
                 stdout_w = stderr_w = artifact_fd = run_dir_fd = -1
+                try:
+                    process.stdin.write(encode_request(request))
+                    process.stdin.close()
+                except BrokenPipeError as error:
+                    raise DocumentWorkerRunnerError("worker_stdin_failed") from error
+
+                deadline = started + self.timeout_seconds
+                while process.poll() is None:
+                    if time.monotonic() > deadline:
+                        self._kill_process_group(process)
+                        raise DocumentWorkerRunnerError("worker_timeout")
+                    time.sleep(0.01)
+
+                stdout = _bounded_read(stdout_r, self.max_stdout_bytes)
+                stderr = _bounded_read(stderr_r, self.max_stderr_bytes)
+                duration = time.monotonic() - started
+                exit_code = int(process.returncode)
+            except DocumentWorkerRunnerError:
+                if process is not None and process.poll() is None:
+                    self._kill_process_group(process)
+                self._cleanup_partial_outputs(run_dir)
+                raise
             except Exception:
                 _close_quietly(
                     stdout_r,
@@ -348,35 +373,17 @@ class DocumentWorkerRunner:
                     opened_run,
                 )
                 raise
-
-        assert process is not None
-        assert process.stdin is not None
-        started = time.monotonic()
-        try:
-            try:
-                process.stdin.write(encode_request(request))
-                process.stdin.close()
-            except BrokenPipeError as error:
-                raise DocumentWorkerRunnerError("worker_stdin_failed") from error
-
-            deadline = started + self.timeout_seconds
-            while process.poll() is None:
-                if time.monotonic() > deadline:
-                    self._kill_process_group(process)
-                    raise DocumentWorkerRunnerError("worker_timeout")
-                time.sleep(0.01)
-
-            stdout = _bounded_read(stdout_r, self.max_stdout_bytes)
-            stderr = _bounded_read(stderr_r, self.max_stderr_bytes)
-            duration = time.monotonic() - started
-            exit_code = int(process.returncode)
-        except DocumentWorkerRunnerError:
-            if process.poll() is None:
-                self._kill_process_group(process)
-            self._cleanup_partial_outputs(run_dir)
-            raise
-        finally:
-            _close_quietly(stdout_r, stderr_r)
+            finally:
+                _close_quietly(
+                    stdout_r,
+                    stderr_r,
+                    stdout_w,
+                    stderr_w,
+                    artifact_fd,
+                    run_dir_fd,
+                    opened_artifact,
+                    opened_run,
+                )
 
         if stderr:
             raise DocumentWorkerRunnerError("worker_stderr_nonempty")

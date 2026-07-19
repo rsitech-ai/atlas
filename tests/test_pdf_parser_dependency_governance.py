@@ -46,7 +46,7 @@ def test_manifest_is_bound_to_the_unchanged_accepted_workspace() -> None:
     assert manifest["schema_version"] == "rsi-atlas.pdf-parser-governance.v1"
     assert SHA256_RE.fullmatch(manifest["manifest_sha256"])
     assert manifest["baseline"] == {
-        "package_count": 43,
+        "package_count": 44,
         "pyproject_sha256": _sha256(ROOT / "pyproject.toml"),
         "uv_lock_sha256": _sha256(ROOT / "uv.lock"),
         "uv_lock_version": 1,
