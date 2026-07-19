@@ -63,16 +63,26 @@ publication:
   orphaned/quarantined inputs, targeted research launch stubs (plan validation only;
   no LangGraph), comparison matrix / cross-chain timeline payloads with envelope links,
   migration `0011`, and loopback monitoring APIs. Semantic triage stays
-  `blocked_semantic_triage`; native timeline/matrix UI deferred.
+  `blocked_semantic_triage`; native timeline/matrix UI deferred;
+- Phase 6 engineering / release maturity (development): offline evaluation harness over a
+  frozen fixture dataset with deterministic evaluators before fail-closed uncalibrated judges;
+  Codex sanitized reproduction bundles + approval policy + candidate patch gate with automatic
+  merge/push/deploy/promote denied; filesystem workspace backup/restore verify, Safe Mode
+  capability mask, and integrity scrub; CycloneDX-ish SBOM from `uv.lock`; unsigned package
+  inventory honesty; fail-closed `script/release_check.py`; loopback
+  `evaluation:run` / `engineering/codex:gate` / recovery backup+Safe Mode / `release:check`
+  APIs.
 
 OCR/scanned fallback, Docling/Tier-1 promotion, production embedding-model promotion, Tantivy,
 production cross-encoder/LLM rerankers, LangGraph interrupt/resume, remaining specialists,
 qualified model execution, live RPC/WebSocket collectors, DuckDB/Parquet writers, calibrated
-semantic triage, native comparison/timeline UI, XPC, signing, and release qualification are not
-implemented. Hybrid retrieval, cited reports, fixture observations, and monitoring are
-development evidence only—not criterion closure for §§16–24 / 25–60 / 45 / 61–84.
-Parent-child/table-aware remain development-only—not production-ready. The development database
-is project-owned; release data placement remains a later packaging gate.
+semantic triage / judges, native comparison/timeline/Evaluation/Codex UI, XPC, Apple Developer
+ID signing, notarization, stapling, embedded signed Python, and release qualification are not
+implemented. Hybrid retrieval, cited reports, fixture observations, monitoring, offline eval,
+Codex product-plane gates, and development backup/Safe Mode are development evidence only—not
+criterion closure for §§16–32 / 25–60 / 45 / 61–134. Parent-child/table-aware remain
+development-only—not production-ready. The development database is project-owned; release data
+placement and signed distribution remain packaging gates blocked on signing secrets.
 
 ## Requirements
 

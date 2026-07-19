@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
 > (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use
-> checkbox (`- [ ]`) syntax for tracking.
+> checkbox (`- [x]`) syntax for tracking.
 >
 > **Execution:** Follow repository TDD and review gates task by task. Do not claim Section 33
 > criteria 85–134 closed. Do not redo Phases 2–5. Hard-block only on true Apple Developer
@@ -134,10 +134,10 @@ secrets. No automatic git push/merge.
 - `PromotionDecision` (outcome, critical_failure_count, reasons)
 - `JudgeCalibrationStatus` / gate → always blocked in development (`blocked_judge_uncalibrated`)
 
-- [ ] **Step 1: Write RED contract tests**
-- [ ] **Step 2: Run RED**
-- [ ] **Step 3: Implement smallest strict models**
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 1: Write RED contract tests**
+- [x] **Step 2: Run RED**
+- [x] **Step 3: Implement smallest strict models**
+- [x] **Step 4: Verify and commit**
 
 ```bash
 uv run pytest packages/contracts/tests/test_evaluation.py -q
@@ -158,9 +158,9 @@ git commit -m "feat: define evaluation plane contracts"
 - Create: `fixtures/evaluation/retrieval_regression_v1.json`
 - Modify: root `pyproject.toml` workspace members
 
-- [ ] **Step 1: RED** — fixture run executes schema+deterministic; judge blocked; critical fail → reject
-- [ ] **Step 2: Implement harness + gate**
-- [ ] **Step 3: GREEN + commit**
+- [x] **Step 1: RED** — fixture run executes schema+deterministic; judge blocked; critical fail → reject
+- [x] **Step 2: Implement harness + gate**
+- [x] **Step 3: GREEN + commit**
 
 ```bash
 uv run pytest packages/evaluation/tests -q
@@ -186,9 +186,9 @@ git commit -m "feat: add offline evaluation harness and promotion gate"
 - `PatchQualityGateResult` (checks, passed, blocking_failures)
 - Network/credential denial markers for strict mode
 
-- [ ] **Step 1: RED**
-- [ ] **Step 2: Implement**
-- [ ] **Step 3: Commit**
+- [x] **Step 1: RED**
+- [x] **Step 2: Implement**
+- [x] **Step 3: Commit**
 
 ```bash
 uv run pytest packages/contracts/tests/test_codex.py -q
@@ -205,9 +205,9 @@ git commit -m "feat: define Codex engineering plane contracts"
 - Create: `packages/engineering/src/rsi_atlas_engineering/{sanitize,approval,gate,authority}.py`
 - Create: `packages/engineering/tests/test_sanitize.py`, `test_approval.py`, `test_gate.py`, `test_authority.py`
 
-- [ ] **Step 1: RED** — secret paths redacted; merge blocked; gate records fail without auto-apply
-- [ ] **Step 2: Implement**
-- [ ] **Step 3: GREEN + commit**
+- [x] **Step 1: RED** — secret paths redacted; merge blocked; gate records fail without auto-apply
+- [x] **Step 2: Implement**
+- [x] **Step 3: GREEN + commit**
 
 ```bash
 uv run pytest packages/engineering/tests -q
@@ -233,7 +233,7 @@ git commit -m "feat: add Codex sanitized bundle and fail-closed patch gate"
 - `IntegrityScrubFinding` / `IntegrityScrubReport`
 - `DoctorHealthState` reuse-compatible statuses where needed
 
-- [ ] **Step 1–4: RED → implement → commit**
+- [x] **Step 1–4: RED → implement → commit**
 
 ```bash
 uv run pytest packages/contracts/tests/test_recovery.py -q
@@ -250,9 +250,9 @@ git commit -m "feat: define backup, Safe Mode, and integrity contracts"
 - Create: `packages/recovery/src/rsi_atlas_recovery/{backup,restore,safe_mode,scrub}.py`
 - Create: `packages/recovery/tests/test_backup.py`, `test_restore.py`, `test_safe_mode.py`, `test_scrub.py`
 
-- [ ] **Step 1: RED** — round-trip backup; tamper fails; Safe Mode disables caps; scrub finds missing file
-- [ ] **Step 2: Implement filesystem development paths**
-- [ ] **Step 3: GREEN + commit**
+- [x] **Step 1: RED** — round-trip backup; tamper fails; Safe Mode disables caps; scrub finds missing file
+- [x] **Step 2: Implement filesystem development paths**
+- [x] **Step 3: GREEN + commit**
 
 ```bash
 uv run pytest packages/recovery/tests -q
@@ -280,9 +280,9 @@ git commit -m "feat: add development backup, restore, Safe Mode, and integrity s
 - `SbomDocument` (bom_format, components from lock)
 - Release check exits non-zero if caller requests `--require-release` without secrets
 
-- [ ] **Step 1: RED**
-- [ ] **Step 2: Implement without secrets; hard-block notarization paths**
-- [ ] **Step 3: GREEN + commit**
+- [x] **Step 1: RED**
+- [x] **Step 2: Implement without secrets; hard-block notarization paths**
+- [x] **Step 3: GREEN + commit**
 
 ```bash
 uv run pytest packages/contracts/tests/test_release.py packages/release/tests -q
@@ -310,9 +310,9 @@ git commit -m "feat: add SBOM generation and fail-closed unsigned release checks
 - `POST /v1/recovery/safe-mode:enter`, `GET /v1/recovery/safe-mode`
 - `POST /v1/release:check` — honesty report (never claims notarized)
 
-- [ ] **Step 1: RED**
-- [ ] **Step 2: Wire**
-- [ ] **Step 3: GREEN + commit**
+- [x] **Step 1: RED**
+- [x] **Step 2: Wire**
+- [x] **Step 3: GREEN + commit**
 
 ```bash
 uv run pytest services/engine/tests/test_phase6_api.py -q
@@ -329,9 +329,9 @@ git commit -m "feat: expose Phase 6 evaluation, Codex gate, and recovery loopbac
   `docs/superpowers/plans/2026-07-18-full-product-delivery-roadmap.md`, this plan (checkboxes)
 - Delete: `docs/superpowers/plans/2026-07-19-phase-6-engineering-release-stub.md`
 
-- [ ] **Step 1: Update evidence language (development partial only; list signing blockers)**
-- [ ] **Step 2: Full focused verification**
-- [ ] **Step 3: Commit close — do NOT push**
+- [x] **Step 1: Update evidence language (development partial only; list signing blockers)**
+- [x] **Step 2: Full focused verification**
+- [x] **Step 3: Commit close — do NOT push**
 
 ```bash
 uv run pytest packages/contracts/tests/test_evaluation.py packages/contracts/tests/test_codex.py \
