@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager, suppress
 from datetime import datetime
 from json import dumps
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -37,20 +37,49 @@ from rsi_atlas_ingestion.processing_pipeline import (
     DocumentProcessingStatus,
     RetrievalIndexSummary,
 )
-from rsi_atlas_storage import AcquisitionConflictError
+from rsi_atlas_research.workflow import workflow_id_for_query
+from rsi_atlas_storage import (
+    AcquisitionConflictError,
+    DatabaseSettings,
+    MigrationRunner,
+    PostgresDatabase,
+)
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import ClientDisconnect
 
-from rsi_atlas_engine.collectors import CollectorPort
+from rsi_atlas_engine.collectors import CollectorPort, CollectorServices
 from rsi_atlas_engine.import_staging import ImportStagingArea, ImportStagingError
 from rsi_atlas_engine.ingestion import DocumentIngestionServices
 from rsi_atlas_engine.monitoring import (
     AlertTransitionError,
+    InMemoryMonitoringService,
     MonitoringPort,
     SemanticTriageBlocked,
 )
 from rsi_atlas_engine.phase6 import Phase6Service
-from rsi_atlas_engine.runtime import RuntimeServices
+from rsi_atlas_engine.research import ResearchFacade, ResearchServices
+from rsi_atlas_engine.runtime import RuntimePaths, RuntimeServices
+
+_DATABASE_CONNECT_TIMEOUT_SECONDS = 1
+_DATABASE_STATEMENT_TIMEOUT_MS = 10_000
+_DATABASE_LOCK_TIMEOUT_MS = 5_000
+_DATABASE_TRANSACTION_TIMEOUT_MS = 15_000
+
+
+def _database_from_environment() -> PostgresDatabase:
+    paths = RuntimePaths.from_environment()
+    socket_directory = paths.data_root / "postgres" / "socket"
+    conninfo = f"host='{socket_directory}' port=5432 user='atlas' dbname='atlas'"
+    settings = DatabaseSettings.from_conninfo(
+        conninfo,
+        connect_timeout_seconds=_DATABASE_CONNECT_TIMEOUT_SECONDS,
+        statement_timeout_ms=_DATABASE_STATEMENT_TIMEOUT_MS,
+        lock_timeout_ms=_DATABASE_LOCK_TIMEOUT_MS,
+        transaction_timeout_ms=_DATABASE_TRANSACTION_TIMEOUT_MS,
+    )
+    database = PostgresDatabase(settings)
+    MigrationRunner(database, paths.migration_root).apply_all()
+    return database
 
 
 class DocumentAdmissionPort(Protocol):
@@ -160,6 +189,24 @@ class ResearchPort(Protocol):
         rationale: str,
     ) -> ReviewDecision: ...
 
+    def start_workflow(self, *, query: ResearchQuery, title: str) -> dict[str, object]: ...
+
+    def resume_workflow(
+        self,
+        *,
+        query: ResearchQuery,
+        title: str,
+        human_decision: ReviewDecision | None = None,
+    ) -> dict[str, object]: ...
+
+    def get_workflow(
+        self, *, context: ArtifactCommandContext, workflow_id: UUID
+    ) -> Any | None: ...
+
+    def list_workflows(
+        self, *, context: ArtifactCommandContext, limit: int = 50
+    ) -> list[Any]: ...
+
 
 def create_app(
     status_factory: Callable[[], SystemStatus] | None = None,
@@ -176,6 +223,16 @@ def create_app(
         raise ValueError("document admission service and staging area must be configured together")
     factory = status_factory or RuntimeServices.from_environment().status
     configured_ingestion: DocumentIngestionServices | None = None
+    configured_research: ResearchFacade | None = None
+    configured_collectors: CollectorServices | None = None
+    configured_monitoring: InMemoryMonitoringService | None = None
+    shared_database: PostgresDatabase | None = None
+
+    def resolve_database() -> PostgresDatabase:
+        nonlocal shared_database
+        if shared_database is None:
+            shared_database = _database_from_environment()
+        return shared_database
 
     def resolve_ingestion() -> tuple[
         DocumentAdmissionPort, ImportStagingArea, DocumentProcessingPort | None
@@ -200,19 +257,28 @@ def create_app(
         return processing
 
     def resolve_research() -> ResearchPort:
-        if research_service is None:
-            raise RuntimeError("research service is unavailable")
-        return research_service
+        nonlocal configured_research
+        if research_service is not None:
+            return research_service
+        if configured_research is None:
+            configured_research = ResearchFacade(ResearchServices.from_environment())
+        return configured_research
 
     def resolve_collectors() -> CollectorPort:
-        if collector_service is None:
-            raise RuntimeError("collector service is unavailable")
-        return collector_service
+        nonlocal configured_collectors
+        if collector_service is not None:
+            return collector_service
+        if configured_collectors is None:
+            configured_collectors = CollectorServices.from_database(resolve_database())
+        return configured_collectors
 
     def resolve_monitoring() -> MonitoringPort:
-        if monitoring_service is None:
-            raise RuntimeError("monitoring service is unavailable")
-        return monitoring_service
+        nonlocal configured_monitoring
+        if monitoring_service is not None:
+            return monitoring_service
+        if configured_monitoring is None:
+            configured_monitoring = InMemoryMonitoringService.from_database(resolve_database())
+        return configured_monitoring
 
     def resolve_phase6() -> Phase6Service:
         return phase6_service or Phase6Service()
@@ -723,6 +789,115 @@ def create_app(
                 detail="Report review is temporarily unavailable.",
             ) from error
 
+    @application.post("/v1/workspaces/{workspace_id}/research/workflows:start")
+    async def research_workflow_start(
+        request: Request,
+        workspace_id: UUID,
+    ) -> dict[str, object]:
+        context = _workspace_context(request, workspace_id)
+        try:
+            body = await request.json()
+            query = ResearchQuery.model_validate_json(dumps(body["query"]))
+            title = str(body.get("title") or "Research draft")
+            if query.context.workspace_id != context.workspace_id:
+                raise HTTPException(status_code=422, detail="Workspace identity is invalid.")
+            research = await run_in_threadpool(resolve_research)
+            return await run_in_threadpool(research.start_workflow, query=query, title=title)
+        except HTTPException:
+            raise
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Workflow start is invalid.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Research workflow is temporarily unavailable.",
+            ) from error
+
+    @application.post(
+        "/v1/workspaces/{workspace_id}/research/workflows/{workflow_id}:resume",
+    )
+    async def research_workflow_resume(
+        request: Request,
+        workspace_id: UUID,
+        workflow_id: UUID,
+    ) -> dict[str, object]:
+        context = _workspace_context(request, workspace_id)
+        try:
+            body = await request.json()
+            query = ResearchQuery.model_validate_json(dumps(body["query"]))
+            title = str(body.get("title") or "Research draft")
+            human_decision = None
+            if "human_decision" in body and body["human_decision"] is not None:
+                human_decision = ReviewDecision.model_validate_json(dumps(body["human_decision"]))
+            if query.context.workspace_id != context.workspace_id:
+                raise HTTPException(status_code=422, detail="Workspace identity is invalid.")
+            if workflow_id_for_query(query_id=query.query_id) != workflow_id:
+                raise HTTPException(status_code=422, detail="Workflow identity is invalid.")
+            research = await run_in_threadpool(resolve_research)
+            return await run_in_threadpool(
+                research.resume_workflow,
+                query=query,
+                title=title,
+                human_decision=human_decision,
+            )
+        except HTTPException:
+            raise
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Workflow resume is invalid.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Research workflow is temporarily unavailable.",
+            ) from error
+
+    @application.get("/v1/workspaces/{workspace_id}/research/workflows")
+    async def research_workflow_list(
+        request: Request,
+        workspace_id: UUID,
+        limit: int = Query(default=50, ge=1, le=200),
+    ) -> dict[str, object]:
+        context = _workspace_context(request, workspace_id)
+        try:
+            research = await run_in_threadpool(resolve_research)
+            attempts = await run_in_threadpool(
+                research.list_workflows, context=context, limit=limit
+            )
+            return {
+                "workflows": [
+                    item.model_dump(mode="json") if hasattr(item, "model_dump") else item
+                    for item in attempts
+                ]
+            }
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Research workflow listing is temporarily unavailable.",
+            ) from error
+
+    @application.get("/v1/workspaces/{workspace_id}/research/workflows/{workflow_id}")
+    async def research_workflow_get(
+        request: Request,
+        workspace_id: UUID,
+        workflow_id: UUID,
+    ) -> dict[str, object]:
+        context = _workspace_context(request, workspace_id)
+        try:
+            research = await run_in_threadpool(resolve_research)
+            attempt = await run_in_threadpool(
+                research.get_workflow, context=context, workflow_id=workflow_id
+            )
+            if attempt is None:
+                raise HTTPException(status_code=404, detail="Workflow was not found.")
+            payload = attempt.model_dump(mode="json") if hasattr(attempt, "model_dump") else attempt
+            return {"workflow": payload}
+        except HTTPException:
+            raise
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Research workflow retrieval is temporarily unavailable.",
+            ) from error
+
     @application.post("/v1/workspaces/{workspace_id}/collectors:import-fixture")
     async def collectors_import_fixture(
         request: Request,
@@ -821,21 +996,20 @@ def create_app(
                 affected_report_ids=affected,
             )
             detection = result["detection"]
+            matched_rules = result["matched_rules"]
+            decisions = result["decisions"]
+            alerts = result["alerts"]
+            created = result["created"]
             return {
-                "detection": detection.model_dump(mode="json"),  # type: ignore[union-attr]
+                "detection": detection.model_dump(mode="json"),  # type: ignore[attr-defined]
                 "matched_rules": [
-                    rule.model_dump(mode="json")
-                    for rule in result["matched_rules"]  # type: ignore[union-attr]
+                    rule.model_dump(mode="json") for rule in matched_rules  # type: ignore[attr-defined]
                 ],
                 "decisions": [
-                    decision.model_dump(mode="json")
-                    for decision in result["decisions"]  # type: ignore[union-attr]
+                    decision.model_dump(mode="json") for decision in decisions  # type: ignore[attr-defined]
                 ],
-                "alerts": [
-                    alert.model_dump(mode="json")
-                    for alert in result["alerts"]  # type: ignore[union-attr]
-                ],
-                "created": list(result["created"]),  # type: ignore[arg-type]
+                "alerts": [alert.model_dump(mode="json") for alert in alerts],  # type: ignore[attr-defined]
+                "created": list(created),  # type: ignore[call-overload]
             }
         except HTTPException:
             raise
@@ -875,8 +1049,8 @@ def create_app(
                 note=note,
             )
             return {
-                "alert": result["alert"].model_dump(mode="json"),  # type: ignore[union-attr]
-                "event": result["event"].model_dump(mode="json"),  # type: ignore[union-attr]
+                "alert": result["alert"].model_dump(mode="json"),  # type: ignore[attr-defined]
+                "event": result["event"].model_dump(mode="json"),  # type: ignore[attr-defined]
             }
         except HTTPException:
             raise

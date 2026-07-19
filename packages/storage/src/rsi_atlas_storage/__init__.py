@@ -18,6 +18,7 @@ from rsi_atlas_storage.migrations import MigrationIntegrityError, MigrationRunne
 from rsi_atlas_storage.monitoring_repository import MonitoringRepository
 from rsi_atlas_storage.observation_repository import ObservationRepository
 from rsi_atlas_storage.retrieval_research_repository import RetrievalResearchRepository
+from rsi_atlas_storage.workflow_repository import WorkflowRepository
 
 __all__ = [
     "AcquisitionConflictError",
@@ -38,4 +39,5 @@ __all__ = [
     "ObservationRepository",
     "PostgresDatabase",
     "RetrievalResearchRepository",
+    "WorkflowRepository",
 ]

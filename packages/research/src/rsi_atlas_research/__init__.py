@@ -8,10 +8,13 @@ from rsi_atlas_research.reports import ReportGate, ReportGateError
 from rsi_atlas_research.service import ResearchOrchestrator
 from rsi_atlas_research.workflow import (
     InMemoryWorkflowStore,
+    PostgresWorkflowStore,
     ResearchWorkflow,
+    WorkflowAttempt,
     WorkflowCheckpoint,
     WorkflowInterrupted,
     WorkflowStep,
+    WorkflowStore,
 )
 
 __all__ = [
@@ -22,13 +25,16 @@ __all__ = [
     "DocumentEvidenceSpecialist",
     "InMemoryWorkflowStore",
     "PlanValidationError",
+    "PostgresWorkflowStore",
     "ReportGate",
     "ReportGateError",
     "ResearchOrchestrator",
     "ResearchWorkflow",
     "SpecialistError",
+    "WorkflowAttempt",
     "WorkflowCheckpoint",
     "WorkflowInterrupted",
     "WorkflowStep",
+    "WorkflowStore",
     "validate_retrieval_plan",
 ]

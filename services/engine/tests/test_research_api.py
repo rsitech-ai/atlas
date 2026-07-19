@@ -39,6 +39,7 @@ from rsi_atlas_contracts import (
     specialist_finding_id,
 )
 from rsi_atlas_engine.api import create_app
+from rsi_atlas_research.workflow import WorkflowCheckpoint, WorkflowStep, workflow_id_for_query
 
 TENANT_ID = UUID("00000000-0000-4000-8000-000000000001")
 WORKSPACE_ID = UUID("00000000-0000-4000-8000-000000000002")
@@ -51,6 +52,7 @@ DOCUMENT_VERSION = "canonical:" + ("a" * 64)
 CHUNK_SET_ID = "chunkset:" + ("b" * 64)
 CHUNK_ID = "chunk:" + ("c" * 64)
 PUBLICATION_ID = "publication:" + ("d" * 64)
+REPORT_ID = "report:" + ("a" * 64)
 EXCERPT_HASH = "e" * 64
 NOW = datetime(2026, 7, 19, 12, 0, tzinfo=UTC)
 
@@ -269,6 +271,46 @@ class FakeResearchService:
             recorded_at=NOW,
         )
 
+    def start_workflow(self, *, query: ResearchQuery, title: str) -> dict[str, object]:
+        checkpoint = WorkflowCheckpoint(
+            workflow_id=workflow_id_for_query(query_id=query.query_id),
+            query_id=query.query_id,
+            step=WorkflowStep.AWAITING_HUMAN,
+            report_id=REPORT_ID,
+            updated_at=NOW,
+            detail=title,
+        )
+        return {"checkpoint": checkpoint.model_dump(mode="json"), "interrupted": True}
+
+    def resume_workflow(
+        self,
+        *,
+        query: ResearchQuery,
+        title: str,
+        human_decision: ReviewDecision | None = None,
+    ) -> dict[str, object]:
+        del title
+        step = WorkflowStep.COMPLETED if human_decision is not None else WorkflowStep.AWAITING_HUMAN
+        checkpoint = WorkflowCheckpoint(
+            workflow_id=workflow_id_for_query(query_id=query.query_id),
+            query_id=query.query_id,
+            step=step,
+            report_id=REPORT_ID,
+            updated_at=NOW,
+        )
+        return {
+            "checkpoint": checkpoint.model_dump(mode="json"),
+            "interrupted": human_decision is None,
+        }
+
+    def get_workflow(self, *, context: ArtifactCommandContext, workflow_id: UUID) -> object | None:
+        del context, workflow_id
+        return None
+
+    def list_workflows(self, *, context: ArtifactCommandContext, limit: int = 50) -> list[object]:
+        del context, limit
+        return []
+
 
 def test_research_retrieve_and_report_routes() -> None:
     client = TestClient(create_app(research_service=FakeResearchService()))
@@ -347,3 +389,55 @@ def test_research_retrieve_can_abstain() -> None:
     )
     assert response.status_code == 200
     assert response.json()["outcome"] == "abstain"
+
+
+def test_research_workflow_start_and_resume_routes() -> None:
+    client = TestClient(create_app(research_service=FakeResearchService()))
+    query = ResearchQuery(
+        context=_context(),
+        query_id=QUERY_ID,
+        text="Bitcoin unlock schedule",
+        document_version_ids=(DOCUMENT_VERSION,),
+        chunk_set_ids=(CHUNK_SET_ID,),
+        as_of=NOW,
+        query_family=QueryFamily.NARRATIVE_EXPLANATION,
+        latency_budget_ms=5_000,
+        context_budget_tokens=2_048,
+    )
+    started = client.post(
+        f"/v1/workspaces/{WORKSPACE_ID}/research/workflows:start",
+        headers=_headers(),
+        json={"query": query.model_dump(mode="json"), "title": "Unlock note"},
+    )
+    assert started.status_code == 200
+    body = started.json()
+    assert body["interrupted"] is True
+    assert body["checkpoint"]["step"] == "awaiting_human"
+    workflow_id = body["checkpoint"]["workflow_id"]
+
+    listed = client.get(
+        f"/v1/workspaces/{WORKSPACE_ID}/research/workflows",
+        headers=_headers(),
+    )
+    assert listed.status_code == 200
+
+    decision = ReviewDecision(
+        decision_id=DECISION_ID,
+        report_id=REPORT_ID,
+        context=_context(),
+        action=ReviewAction.APPROVE,
+        rationale="Citations resolve.",
+        recorded_at=NOW,
+    )
+    resumed = client.post(
+        f"/v1/workspaces/{WORKSPACE_ID}/research/workflows/{workflow_id}:resume",
+        headers=_headers(),
+        json={
+            "query": query.model_dump(mode="json"),
+            "title": "Unlock note",
+            "human_decision": decision.model_dump(mode="json"),
+        },
+    )
+    assert resumed.status_code == 200
+    assert resumed.json()["checkpoint"]["step"] == "completed"
+    assert resumed.json()["interrupted"] is False
