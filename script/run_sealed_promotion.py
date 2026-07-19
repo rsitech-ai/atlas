@@ -10,7 +10,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from rsi_atlas_contracts import SealedComponentKind
-from rsi_atlas_evaluation.sealed_promotion import run_sealed_promotion
+from rsi_atlas_evaluation.sealed_promotion import (
+    run_sealed_promotion,
+    write_development_sealed_package,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENTS = tuple(SealedComponentKind)
@@ -26,17 +29,50 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--allow-synthetic-promote",
         action="store_true",
-        help="Exercise promote_production path on synthetic fixture (machinery only).",
+        help=(
+            "Emit development_sealed_package on synthetic fixtures "
+            "(never PRODUCTION Proven)."
+        ),
+    )
+    parser.add_argument(
+        "--development-package",
+        action="store_true",
+        help="Write a full development sealed package directory (all components).",
     )
     parser.add_argument(
         "--out",
         type=Path,
         default=None,
-        help="Optional directory for evidence JSON dumps",
+        help="Directory for evidence JSON dumps or development package root",
     )
     args = parser.parse_args(argv)
     now = datetime.now(tz=UTC)
-    selected = list(COMPONENTS) if args.component == "all" else [SealedComponentKind(args.component)]
+
+    if args.development_package:
+        out_root = args.out or (ROOT / "dist" / "sealed_packages")
+        package_dir = write_development_sealed_package(
+            out_dir=out_root,
+            repo_root=ROOT,
+            created_at=now,
+        )
+        print(
+            json.dumps(
+                {
+                    "package_label": "development_sealed_package",
+                    "package_dir": str(package_dir),
+                    "authorizes_production": False,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 0
+
+    selected = (
+        list(COMPONENTS)
+        if args.component == "all"
+        else [SealedComponentKind(args.component)]
+    )
     candidates = {
         SealedComponentKind.EMBEDDING: ("oss_token_hash_v1", "1.0.0"),
         SealedComponentKind.RERANKER: ("lexical_overlap_rerank_v1", "1.0.0"),
@@ -60,6 +96,7 @@ def main(argv: list[str] | None = None) -> int:
             "status": evidence.status.value,
             "outcome": evidence.outcome.value,
             "authorizes_production": evidence.authorizes_production(),
+            "is_development_sealed_package": evidence.is_development_sealed_package(),
             "critical_failure_count": evidence.critical_failure_count,
             "honesty_note": evidence.honesty_note,
             "evidence_id": evidence.evidence_id,

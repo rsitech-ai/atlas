@@ -7,13 +7,13 @@ This is the live completion ledger for the normative criteria in Section 33 and 
 | Criteria | Area | Current status | Current evidence | Closing evidence |
 | --- | --- | --- | --- | --- |
 | 1–9 | Product and UX | Not proven | Command Center + Evidence; Research Canvas with Report Studio panel; Comparison timeline + matrix shell; Chunk Inspector bound to loopback. Release-artifact accessibility incomplete. | Presets; polished Report Studio; labs; release accessibility acceptance. |
-| 10–24 | Ingestion | Not proven | Phase 2A–2D unchanged. Tesseract OCR fail-closed when absent; Docling blocked. Sealed-holdout **promotion machinery** exists (`script/run_sealed_promotion.py`) but synthetic fixtures do **not** authorize Proven PRODUCTION parser/embedding. | Owner-sealed holdout corpus; born-digital/scanned production parsing; Docling if offline+license. |
-| 25–40 | Retrieval | Not proven | Hybrid RRF + lexical rerank; OSS token-hash + MiniLM ONNX candidate; sealed promotion gates fail-closed without owner evidence; injection suite self-check (`run_injection_suite`). No neural cross-encoder PRODUCTION. | Sealed holdout PRODUCTION; neural rerank if governable; full injection containment under live retrieve. |
+| 10–24 | Ingestion | Not proven | Phase 2A–2D unchanged. Tesseract OCR fail-closed when absent; Docling blocked. Sealed-holdout **promotion machinery** + expanded synthetic fixture (`sealed_holdout_v1` v1.1) can emit **development_sealed_package** evidence offline — still **not** owner-sealed PRODUCTION Proven. | Owner-sealed holdout corpus; born-digital/scanned production parsing; Docling if offline+license. |
+| 25–40 | Retrieval | Not proven | Hybrid RRF + lexical rerank; OSS token-hash + MiniLM ONNX candidate; sealed promotion gates fail-closed without owner evidence; development sealed packages are labeled distinctly from PRODUCTION; injection suite self-check. No neural cross-encoder PRODUCTION. | Sealed holdout PRODUCTION; neural rerank if governable; full injection containment under live retrieve. |
 | 41–60 | Research, agents, and reports | Not proven | Multi-specialist extractive orchestration (document/tokenomics/market/on_chain/governance/treasury/security/contradiction); Postgres-durable linear interrupt/resume; Report Studio minimal native panel. LangGraph deferred (ponytail). Calibrated judges remain open. | LangGraph or equivalent if license OK; calibrated judges; full Report Studio. |
 | 61–84 | Structured data and monitoring | Not proven | Live HTTPS allowlist collectors; reorg `apply_reorg`; WebSocket fail-closed; DuckDB optional; heuristic triage with frozen calibration fixture (`run_heuristic_triage`); comparison matrix shell. | Live WebSocket under egress policy; human-labelled triage calibration Proven; full matrix cells UI. |
 | 85–102 | Models, evaluation, and observability | Not proven | Sealed promotion machinery; local model load/unload/OOM recovery; Apple Foundation Models honest unavailable; offline eval harness; Swift→publication local JSONL bridge (`record_swift_to_publication_trace`) — not full native Swift join. | Owner-sealed PRODUCTION models; calibrated judges/CIs; Swift process OTel join. |
 | 103–111 | Codex | Not proven | Product-plane sanitize/gate + `qualify_codex_app_server` fail-closed without binary / deny-network. Live App Server suite not executed. | Live Codex App Server under isolated worktree + deny-network proof. |
-| 112–134 | Security, packaging, and recovery | Not proven | Authenticated Unix-domain release IPC (`script/run_engine.py --release-ipc`); loopback TCP only behind explicit flag; SBOM; entitlement matrix with UDS policy; fail-closed signing/notarization scripts; file-key backup + recovery harness. No Developer ID/notarization/Gatekeeper/Keychain wrap Proven. | Apple secrets + nested sign/staple/Gatekeeper clean-user; Keychain wrap; embedded signed Python. |
+| 112–134 | Security, packaging, and recovery | Not proven | Authenticated Unix-domain release IPC + **native Swift UDS client** (TCP only behind `RSI_ATLAS_ALLOW_LOOPBACK_TCP=1`); SBOM; entitlement matrix with UDS policy; fail-closed signing/notarization scripts; file-key backup + recovery harness. No Developer ID/notarization/Gatekeeper/Keychain wrap Proven. | Apple secrets + nested sign/staple/Gatekeeper clean-user; Keychain wrap; embedded signed Python. |
 
 ## Appendix D
 
@@ -31,12 +31,12 @@ This is the live completion ledger for the normative criteria in Section 33 and 
 | Market data | Not proven | Fixture ticks + sequence-gap; live streams remain. |
 | Monitoring | Not proven | Deterministic detectors + calibrated heuristic triage (synthetic calibration); matrix shell. |
 | Local models | Not proven | Candidate OSS embedders + load/unload/OOM; AFM unavailable honesty; sealed PRODUCTION remain. |
-| Evaluation | Not proven | Offline harness + sealed promotion gates; synthetic promote path is machinery-only. |
+| Evaluation | Not proven | Offline harness + sealed promotion gates; synthetic path emits `development_sealed_package` only. |
 | Observability | Not proven | Metadata-only local spans + Swift→publication JSONL bridge (not native Swift join). |
-| Native application | Not proven | Command Center + Evidence + Research/Report Studio panel + Comparison matrix shell + Chunks. |
+| Native application | Not proven | Command Center + Evidence + Research/Report Studio + Comparison + Chunks over authenticated local IPC (UDS default). |
 | Zero egress | Not proven | Deny-by-default + optional collector allowlist; signed release proof remain. |
 | Codex | Not proven | Product-plane + qualification probe; live App Server remain. |
-| Security | Not proven | UDS release IPC + token auth; signed peers/notarization remain. |
+| Security | Not proven | UDS release IPC + token auth + Swift UDS client; signed peers/notarization remain. |
 | Release | Not proven | SBOM + entitlement matrix + fail-closed unsigned/notarization scripts. |
 | Recovery | Not proven | Filesystem backup/restore/Safe Mode + file-key AES-GCM + recovery harness; Keychain wrap blocked. |
 
@@ -48,9 +48,11 @@ Every reviewed vertical slice updates the relevant row with exact commands, fixt
 
 ```bash
 uv run python script/run_sealed_promotion.py --component all
+uv run python script/run_sealed_promotion.py --development-package --out dist/sealed_packages
 uv run python script/run_engine.py --release-ipc   # UDS; do not combine with ALLOW_LOOPBACK_TCP
 uv run python script/release_check.py --require-release
 ./script/package_release.sh
 # ./script/sign_and_notarize.sh   # requires Apple secrets
 uv run pytest packages/evaluation/tests/test_sealed_promotion.py packages/security/tests/test_ipc.py packages/monitoring/tests/test_triage.py packages/retrieval/tests/test_injection_suite.py -q
+cd apps/macos && swift test --filter LocalEngine
 ```

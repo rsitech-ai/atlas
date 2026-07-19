@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -20,7 +21,6 @@ from rsi_atlas_contracts import (
 
 from rsi_atlas_evaluation.errors import EvaluationError
 from rsi_atlas_evaluation.harness import dataset_content_hash, load_dataset, run_offline_evaluation
-from rsi_atlas_evaluation.promotion import decide_promotion
 
 # Governance docs that must exist before a component can leave fail-closed.
 _GOVERNANCE_FILES: dict[SealedComponentKind, str] = {
@@ -30,13 +30,15 @@ _GOVERNANCE_FILES: dict[SealedComponentKind, str] = {
     SealedComponentKind.CHUNK_POLICY: "packages/ingestion/benchmarks/chunking/README.md",
 }
 
+_SYNTHETIC_FIXTURE_NAMES = frozenset({"sealed_holdout_v1.json"})
+
 
 class SealedPromotionBlocked(EvaluationError):
     """Raised when PRODUCTION claim is requested without sealed evidence."""
 
 
 def default_sealed_fixture_path() -> Path:
-    """Synthetic sealed-holdout fixture (machinery proof only; not owner-sealed corpus)."""
+    """Synthetic sealed-holdout fixture (machinery / development package only)."""
     return (
         Path(__file__).resolve().parents[4] / "fixtures" / "evaluation" / "sealed_holdout_v1.json"
     )
@@ -94,9 +96,8 @@ def run_sealed_promotion(
 ) -> SealedPromotionEvidence:
     """Run sealed holdout suite and emit immutable evidence.
 
-    ``allow_synthetic_promote=True`` permits ``promote_production`` only for the
-    repository synthetic fixture self-check. Owner-sealed corpora remain required
-    before acceptance-matrix Proven claims.
+    ``allow_synthetic_promote=True`` permits a **development sealed package** status
+    for repository synthetic fixtures only. It never authorizes PRODUCTION Proven.
     """
     now = created_at or datetime.now(tz=UTC)
     root = repo_root or Path(__file__).resolve().parents[4]
@@ -129,23 +130,15 @@ def run_sealed_promotion(
         status = SealedPromotionStatus.FAIL_CLOSED
         outcome = PromotionOutcome.REJECT
         reasons_note = "evaluation_rejected"
-    elif allow_synthetic_promote and path.name == "sealed_holdout_v1.json":
-        # Machinery self-check: synthetic fixture may exercise promote_production path.
-        # Honesty note on evidence forbids treating this as acceptance Proven.
-        status = SealedPromotionStatus.PROMOTE_PRODUCTION
-        outcome = PromotionOutcome.PROMOTE
-        reasons_note = "synthetic_fixture_machinery_only"
+    elif allow_synthetic_promote and path.name in _SYNTHETIC_FIXTURE_NAMES:
+        # Development sealed package: exercises the offline package path honestly.
+        status = SealedPromotionStatus.DEVELOPMENT_SEALED_PACKAGE
+        outcome = PromotionOutcome.CONTINUE_SHADOW_EVALUATION
+        reasons_note = "development_sealed_package_synthetic_fixture"
     else:
         status = SealedPromotionStatus.CANDIDATE_ONLY
         outcome = PromotionOutcome.CONTINUE_SHADOW_EVALUATION
         reasons_note = "owner_sealed_corpus_required_for_production"
-
-    # Re-decide with sealed-aware outcome when promoting.
-    if status is SealedPromotionStatus.PROMOTE_PRODUCTION:
-        sealed_decision = decide_promotion(run, created_at=now, sealed_promote=True)
-        outcome = sealed_decision.outcome
-        if outcome is not PromotionOutcome.PROMOTE:
-            status = SealedPromotionStatus.FAIL_CLOSED
 
     return SealedPromotionEvidence(
         evidence_id=sealed_evidence_id(
@@ -168,11 +161,76 @@ def run_sealed_promotion(
         critical_failure_count=run.critical_failure_count,
         created_at=now,
         honesty_note=(
-            "synthetic fixtures authorize machinery only; owner-sealed corpus required for Proven"
-            if reasons_note.startswith("synthetic") or "owner_sealed" in reasons_note
+            "development sealed package only; owner-sealed corpus required for Section 33 Proven"
+            if status is SealedPromotionStatus.DEVELOPMENT_SEALED_PACKAGE
+            or "owner_sealed" in reasons_note
             else reasons_note
         ),
     )
+
+
+def write_development_sealed_package(
+    *,
+    out_dir: Path,
+    repo_root: Path | None = None,
+    created_at: datetime | None = None,
+) -> Path:
+    """Write an offline development sealed package for all §35 components.
+
+    Label is ``development_sealed_package`` — never PRODUCTION Proven.
+    """
+    now = created_at or datetime.now(tz=UTC)
+    root = repo_root or resolve_repo_root()
+    package_dir = out_dir / f"development_sealed_package_{now.strftime('%Y%m%dT%H%M%SZ')}"
+    package_dir.mkdir(parents=True, exist_ok=True)
+    candidates = {
+        SealedComponentKind.EMBEDDING: ("oss_token_hash_v1", "1.0.0"),
+        SealedComponentKind.RERANKER: ("lexical_overlap_rerank_v1", "1.0.0"),
+        SealedComponentKind.PARSER: ("tier0_pypdf", "1.0.0"),
+        SealedComponentKind.CHUNK_POLICY: ("fixed_token", "1.0.0"),
+    }
+    manifest: dict[str, object] = {
+        "package_label": "development_sealed_package",
+        "schema_version": "rsi-atlas.development-sealed-package.v1",
+        "created_at": now.isoformat().replace("+00:00", "Z"),
+        "authorizes_production": False,
+        "honesty_note": (
+            "Synthetic fixture package for offline promotion E2E; "
+            "does not authorize Section 33 PRODUCTION Proven"
+        ),
+        "components": [],
+    }
+    components_out: list[dict[str, object]] = []
+    for component, (candidate_id, version) in candidates.items():
+        evidence = run_sealed_promotion(
+            component=component,
+            candidate_id=candidate_id,
+            candidate_version=version,
+            repo_root=root,
+            created_at=now,
+            allow_synthetic_promote=True,
+        )
+        if not evidence.is_development_sealed_package():
+            raise SealedPromotionBlocked(
+                f"development package incomplete for {component.value}: {evidence.status.value}"
+            )
+        evidence_path = package_dir / f"{component.value}_evidence.json"
+        evidence_path.write_bytes(evidence.model_dump_json(indent=2).encode("utf-8"))
+        components_out.append(
+            {
+                "component": component.value,
+                "candidate_id": candidate_id,
+                "status": evidence.status.value,
+                "evidence_id": evidence.evidence_id,
+                "evidence_file": evidence_path.name,
+                "authorizes_production": evidence.authorizes_production(),
+            }
+        )
+    manifest["components"] = components_out
+    manifest_path = package_dir / "MANIFEST.json"
+    payload = json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+    manifest_path.write_text(payload, encoding="utf-8")
+    return package_dir
 
 
 def require_production_authorization(evidence: SealedPromotionEvidence | None) -> None:
@@ -194,4 +252,5 @@ __all__ = [
     "require_production_authorization",
     "resolve_repo_root",
     "run_sealed_promotion",
+    "write_development_sealed_package",
 ]

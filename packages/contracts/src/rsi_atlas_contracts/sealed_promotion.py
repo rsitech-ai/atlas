@@ -42,6 +42,7 @@ class SealedPromotionStatus(StrEnum):
     FAIL_CLOSED = "fail_closed"
     CANDIDATE_ONLY = "candidate_only"
     PROMOTE_SHADOW = "promote_shadow"
+    DEVELOPMENT_SEALED_PACKAGE = "development_sealed_package"
     PROMOTE_PRODUCTION = "promote_production"
 
 
@@ -84,7 +85,10 @@ class SealedPromotionEvidence(DocumentContractModel):
     critical_failure_count: StrictInt = Field(ge=0)
     created_at: datetime
     honesty_note: str = Field(
-        default="synthetic fixtures authorize machinery only; owner-sealed corpus required for Proven",
+        default=(
+            "synthetic fixtures authorize machinery only; "
+            "owner-sealed corpus required for Proven"
+        ),
         min_length=1,
         max_length=512,
     )
@@ -108,6 +112,16 @@ class SealedPromotionEvidence(DocumentContractModel):
                 raise ValueError("promote_production requires zero critical failures")
             if self.outcome is not PromotionOutcome.PROMOTE:
                 raise ValueError("promote_production requires outcome=promote")
+        if self.status is SealedPromotionStatus.DEVELOPMENT_SEALED_PACKAGE:
+            if failed:
+                raise ValueError("development_sealed_package requires all recorded gates to pass")
+            if self.critical_failure_count != 0:
+                raise ValueError("development_sealed_package requires zero critical failures")
+            if self.outcome is PromotionOutcome.PROMOTE:
+                raise ValueError(
+                    "development_sealed_package must not claim outcome=promote "
+                    "(owner-sealed corpus required for PRODUCTION)"
+                )
         if self.critical_failure_count > 0 and self.outcome in {
             PromotionOutcome.PROMOTE,
             PromotionOutcome.PROMOTE_FOR_SELECTED_TASK_ONLY,
@@ -119,6 +133,13 @@ class SealedPromotionEvidence(DocumentContractModel):
         return (
             self.status is SealedPromotionStatus.PROMOTE_PRODUCTION
             and self.outcome is PromotionOutcome.PROMOTE
+            and self.critical_failure_count == 0
+            and all(gate.passed for gate in self.gates)
+        )
+
+    def is_development_sealed_package(self) -> bool:
+        return (
+            self.status is SealedPromotionStatus.DEVELOPMENT_SEALED_PACKAGE
             and self.critical_failure_count == 0
             and all(gate.passed for gate in self.gates)
         )

@@ -10,6 +10,7 @@ from rsi_atlas_evaluation.sealed_promotion import (
     default_sealed_fixture_path,
     require_production_authorization,
     run_sealed_promotion,
+    write_development_sealed_package,
 )
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "run_deterministic_evaluators",
     "run_offline_evaluation",
     "run_sealed_promotion",
+    "write_development_sealed_package",
 ]
