@@ -15,6 +15,7 @@ members = [
     "rsi-atlas-monitoring",
     "rsi-atlas-observability",
     "rsi-atlas-recovery",
+    "rsi-atlas-release",
     "rsi-atlas-research",
     "rsi-atlas-retrieval",
     "rsi-atlas-security",
@@ -1003,6 +1004,17 @@ dependencies = [
 requires-dist = [{ name = "rsi-atlas-contracts", editable = "packages/contracts" }]
 
 [[package]]
+name = "rsi-atlas-release"
+version = "0.1.0"
+source = { editable = "packages/release" }
+dependencies = [
+    { name = "rsi-atlas-contracts" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "rsi-atlas-contracts", editable = "packages/contracts" }]
+
+[[package]]
 name = "rsi-atlas-research"
 version = "0.1.0"
 source = { editable = "packages/research" }
@@ -1068,6 +1080,7 @@ dependencies = [
     { name = "rsi-atlas-monitoring" },
     { name = "rsi-atlas-observability" },
     { name = "rsi-atlas-recovery" },
+    { name = "rsi-atlas-release" },
     { name = "rsi-atlas-research" },
     { name = "rsi-atlas-retrieval" },
     { name = "rsi-atlas-security" },
@@ -1095,6 +1108,7 @@ requires-dist = [
     { name = "rsi-atlas-monitoring", editable = "packages/monitoring" },
     { name = "rsi-atlas-observability", editable = "packages/observability" },
     { name = "rsi-atlas-recovery", editable = "packages/recovery" },
+    { name = "rsi-atlas-release", editable = "packages/release" },
     { name = "rsi-atlas-research", editable = "packages/research" },
     { name = "rsi-atlas-retrieval", editable = "packages/retrieval" },
     { name = "rsi-atlas-security", editable = "packages/security" },
