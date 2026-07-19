@@ -1,0 +1,12 @@
+[build-system]
+requires = ["hatchling==1.31.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rsi-atlas-engineering"
+version = "0.1.0"
+description = "Codex product-plane sanitize, approval, and patch gate"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+  "rsi-atlas-contracts==0.1.0",
+]
