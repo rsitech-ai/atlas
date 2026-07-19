@@ -1246,8 +1246,8 @@ def create_app(
             monitoring = await run_in_threadpool(resolve_monitoring)
             body = await request.json()
             triage_request = SemanticTriageRequest.model_validate_json(dumps(body))
-            await run_in_threadpool(monitoring.triage, request=triage_request)
-            raise HTTPException(status_code=503, detail="Semantic triage is unavailable.")
+            decision = await run_in_threadpool(monitoring.triage, request=triage_request)
+            return decision.model_dump(mode="json")
         except SemanticTriageBlocked as error:
             raise HTTPException(
                 status_code=422,

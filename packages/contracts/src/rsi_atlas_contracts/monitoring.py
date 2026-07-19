@@ -10,7 +10,7 @@ from hashlib import sha256
 from json import dumps
 from typing import Literal, Self
 
-from pydantic import Field, StrictInt, field_validator, model_validator
+from pydantic import Field, StrictFloat, StrictInt, field_validator, model_validator
 
 from rsi_atlas_contracts.artifact import ArtifactCommandContext
 from rsi_atlas_contracts.document_parsing import DocumentContractModel
@@ -28,8 +28,8 @@ _ENVELOPE_ID_PATTERN = r"^envelope:[0-9a-f]{64}$"
 _REPORT_ID_PATTERN = r"^report:[0-9a-f]{64}$"
 _ASSERTION_ID_PATTERN = r"^assertion:[0-9a-f]{64}$"
 _SUBJECT_PATTERN = r"^[a-z0-9][a-z0-9:_./-]{0,127}$"
-_FIXED_DECIMAL_PATTERN = r"^-?(?:0|[1-9][0-9]{0,38})(?:\.[0-9]{1,18})?$"
 _IDENTIFIER_PATTERN = r"^[a-z][a-z0-9_]{0,63}$"
+_FIXED_DECIMAL_PATTERN = r"^-?(?:0|[1-9][0-9]{0,38})(?:\.[0-9]{1,18})?$"
 
 
 def _require_utc(value: datetime, *, field_name: str) -> datetime:
@@ -182,6 +182,15 @@ class TimelineEventKind(StrEnum):
 
 class SemanticTriageStatus(StrEnum):
     BLOCKED_SEMANTIC_TRIAGE = "blocked_semantic_triage"
+    HEURISTIC_UNCALIBRATED = "heuristic_uncalibrated"
+    HEURISTIC_CALIBRATED = "heuristic_calibrated"
+
+
+class TriageSeverity(StrEnum):
+    IGNORE = "ignore"
+    WATCH = "watch"
+    INVESTIGATE = "investigate"
+    ESCALATE = "escalate"
 
 
 class ComparisonAxis(StrEnum):
@@ -578,7 +587,28 @@ class SemanticTriageGate(DocumentContractModel):
     )
 
     @model_validator(mode="after")
-    def always_blocked(self) -> Self:
-        if self.status is not SemanticTriageStatus.BLOCKED_SEMANTIC_TRIAGE:
-            raise ValueError("semantic triage remains blocked_semantic_triage")
+    def blocked_or_uncalibrated_only(self) -> Self:
+        if self.status is SemanticTriageStatus.HEURISTIC_CALIBRATED:
+            raise ValueError("use SemanticTriageDecision for calibrated heuristic outcomes")
+        if self.status is SemanticTriageStatus.BLOCKED_SEMANTIC_TRIAGE and not self.reason:
+            raise ValueError("blocked triage requires reason")
+        return self
+
+
+class SemanticTriageDecision(DocumentContractModel):
+    """Calibrated heuristic triage outcome (OSS/keyword; fail-closed when uncalibrated)."""
+
+    schema_version: Literal["1.0.0"] = "1.0.0"
+    alert_id: str = Field(pattern=_ALERT_ID_PATTERN)
+    status: SemanticTriageStatus = SemanticTriageStatus.HEURISTIC_CALIBRATED
+    severity: TriageSeverity
+    score: StrictFloat = Field(ge=0.0, le=1.0)
+    matched_terms: tuple[str, ...] = ()
+    calibration_id: str = Field(pattern=_IDENTIFIER_PATTERN)
+    reason: str = Field(min_length=1, max_length=256)
+
+    @model_validator(mode="after")
+    def calibrated_only(self) -> Self:
+        if self.status is not SemanticTriageStatus.HEURISTIC_CALIBRATED:
+            raise ValueError("SemanticTriageDecision requires heuristic_calibrated status")
         return self

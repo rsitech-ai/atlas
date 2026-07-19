@@ -19,7 +19,7 @@ from rsi_atlas_monitoring.invalidation import invalidate_from_detection, invalid
 from rsi_atlas_monitoring.launch import launch_targeted_research
 from rsi_atlas_monitoring.materiality import screen_materiality
 from rsi_atlas_monitoring.rules import match_rules
-from rsi_atlas_monitoring.triage import refuse_semantic_triage
+from rsi_atlas_monitoring.triage import refuse_semantic_triage, run_heuristic_triage
 
 __all__ = [
     "AlertTransitionError",
@@ -38,6 +38,7 @@ __all__ = [
     "launch_targeted_research",
     "match_rules",
     "refuse_semantic_triage",
+    "run_heuristic_triage",
     "screen_materiality",
     "transition_alert",
 ]

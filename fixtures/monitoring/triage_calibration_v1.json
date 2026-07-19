@@ -1,0 +1,8 @@
+{
+  "calibration_id": "triage_heuristic_v1",
+  "agreement": 0.86,
+  "false_acceptance": 0.05,
+  "false_rejection": 0.12,
+  "frozen": true,
+  "notes": "Synthetic calibration for offline heuristic triage machinery; not human-labelled production proof."
+}

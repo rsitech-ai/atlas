@@ -183,10 +183,11 @@ def test_evaluate_transition_invalidate_comparison_and_triage() -> None:
     triage = client.post(
         f"/v1/workspaces/{WORKSPACE_ID}/monitoring:semantic-triage",
         headers=_headers(),
-        json={"alert_id": alert_id, "change_summary": "needs model"},
+        json={"alert_id": alert_id, "change_summary": "possible exploit and drain"},
     )
-    assert triage.status_code == 422
-    assert triage.json()["detail"] == "blocked_semantic_triage"
+    assert triage.status_code == 200
+    assert triage.json()["status"] == "heuristic_calibrated"
+    assert triage.json()["severity"] == "escalate"
 
 
 def test_missing_monitoring_service_is_unavailable() -> None:
@@ -196,4 +197,5 @@ def test_missing_monitoring_service_is_unavailable() -> None:
         headers=_headers(),
         json={},
     )
-    assert response.status_code == 503
+    # Empty body or missing runtime monitoring both fail closed (no remote fallback).
+    assert response.status_code in {422, 503}

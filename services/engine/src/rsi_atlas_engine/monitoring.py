@@ -19,6 +19,7 @@ from rsi_atlas_contracts import (
     Observation,
     ResearchInvalidation,
     RetrievalPlan,
+    SemanticTriageDecision,
     SemanticTriageRequest,
     TargetedResearchLaunch,
 )
@@ -34,7 +35,7 @@ from rsi_atlas_monitoring import (
     invalidate_from_detection,
     launch_targeted_research,
     match_rules,
-    refuse_semantic_triage,
+    run_heuristic_triage,
     screen_materiality,
     transition_alert,
 )
@@ -96,7 +97,7 @@ class MonitoringPort(Protocol):
         as_of: datetime,
     ) -> CrossChainTimeline: ...
 
-    def triage(self, *, request: SemanticTriageRequest) -> None: ...
+    def triage(self, *, request: SemanticTriageRequest) -> SemanticTriageDecision: ...
 
 
 @dataclass
@@ -278,8 +279,8 @@ class InMemoryMonitoringService:
             as_of=as_of,
         )
 
-    def triage(self, *, request: SemanticTriageRequest) -> None:
-        refuse_semantic_triage(request)
+    def triage(self, *, request: SemanticTriageRequest) -> SemanticTriageDecision:
+        return run_heuristic_triage(request)
 
 
 __all__ = [
