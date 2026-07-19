@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "rsi-atlas-storage"
 version = "0.1.0"
 description = "Immutable local artifact storage for RSI Atlas"
+license = "Apache-2.0"
 requires-python = ">=3.11,<3.15"
 dependencies = [
   "psycopg[binary]==3.3.4",

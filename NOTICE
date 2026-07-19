@@ -1,0 +1,28 @@
+RSI Atlas
+Copyright 2026 RSI Atlas contributors
+
+This product includes software developed by RSI Atlas contributors.
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+-------------------------------------------------------------------------------
+Third-party components (selected; full lockfile SBOM via `script/generate_sbom.py`)
+
+Governed Tier-0 PDF parsing (document worker):
+  - pypdf — BSD-3-Clause
+  - pdfminer.six — MIT
+  - charset-normalizer, cryptography, cffi, pycparser — see their upstream licenses
+    (captured in docs/dependency-governance/pdf-parser-approval.md)
+
+Optional / opt-in:
+  - onnxruntime — MIT (extra: rsi-atlas-ingestion[onnx])
+  - sentence-transformers all-MiniLM-L6-v2 ONNX weights — Apache-2.0
+    (install via script/install_embedding_model.py --download; not bundled by default)
+  - duckdb — MIT (extra: rsi-atlas-collectors[duckdb]; gated by RSI_ATLAS_ENABLE_DUCKDB=1)
+
+Core runtime (representative):
+  - pydantic, packaging, psycopg, httpx — see PyPI / uv.lock
+  - PostgreSQL 17 + pgvector — PostgreSQL License / their upstream terms
+  - Swift / SwiftUI / Apple SDKs — Apple license terms (macOS build only)
+
+Docling remains blocked and is not a runtime dependency.
+A CycloneDX SBOM can be generated from the pinned lockfile without Apple signing secrets.

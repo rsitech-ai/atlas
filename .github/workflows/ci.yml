@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, "feat/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-lint:
+    name: Python lint & types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Sync workspace
+        run: uv sync --frozen
+      - name: Lock check
+        run: uv lock --check
+      - name: Ruff
+        run: |
+          uv run ruff check packages services infra
+          uv run ruff format --check packages services infra
+      - name: Mypy
+        run: uv run mypy packages services infra
+
+  python-unit:
+    name: Python unit (no Postgres)
+    runs-on: ubuntu-latest
+    needs: python-lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Sync workspace
+        run: uv sync --frozen
+      - name: Unit tests (Unix-socket Postgres integration excluded)
+        # RSI Atlas rejects TCP libpq hosts; full suite needs local Homebrew PG 17.10.
+        # See CONTRIBUTING.md. Engine/storage integration tests KeyError without the socket URL.
+        run: >
+          uv run pytest -q
+          packages/contracts/tests
+          packages/security/tests
+          packages/models/tests
+          packages/engineering/tests
+          packages/evaluation/tests
+          packages/release/tests
+          packages/observability/tests
+          packages/document_worker/tests
+          packages/collectors/tests
+          packages/research/tests
+          packages/monitoring/tests
+          packages/recovery/tests
+          packages/storage/tests/test_database_policy.py
+          packages/storage/tests/test_artifact_store.py
+          tests
+          --ignore=infra/security/tests
+
+  swift-macos:
+    name: Swift package tests
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift test
+        run: swift test --package-path apps/macos
+      - name: Swift build product
+        run: swift build --package-path apps/macos --product RSIAtlas
+
+  # Release signing/notarization is intentionally not CI-gated: it needs owner Apple secrets.
+  # Optional future job: run script/release_check.py (unsigned; always release_ready=false).

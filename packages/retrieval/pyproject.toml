@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "rsi-atlas-retrieval"
 version = "0.1.0"
 description = "Hybrid retrieval, fusion, and evidence packet assembly"
+license = "Apache-2.0"
 requires-python = ">=3.11,<3.15"
 dependencies = [
   "rsi-atlas-contracts==0.1.0",

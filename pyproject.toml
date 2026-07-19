@@ -1,7 +1,10 @@
 [project]
 name = "rsi-atlas-workspace"
 version = "0.1.0"
+description = "Local-first crypto research OS for Apple Silicon (workspace)"
+license = "Apache-2.0"
 requires-python = ">=3.11,<3.15"
+readme = "README.md"
 dependencies = [
   "rsi-atlas-collectors",
   "rsi-atlas-contracts",
@@ -20,6 +23,12 @@ dependencies = [
   "rsi-atlas-security",
   "rsi-atlas-storage",
 ]
+
+[project.urls]
+Homepage = "https://github.com/s1korrrr/atlas"
+Repository = "https://github.com/s1korrrr/atlas"
+Issues = "https://github.com/s1korrrr/atlas/issues"
+Documentation = "https://github.com/s1korrrr/atlas#readme"
 
 [dependency-groups]
 dev = [

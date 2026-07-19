@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "rsi-atlas-observability"
 version = "0.1.0"
 description = "Privacy-safe local tracing for RSI Atlas"
+license = "Apache-2.0"
 requires-python = ">=3.11,<3.15"
 dependencies = [
   "opentelemetry-api==1.44.0",

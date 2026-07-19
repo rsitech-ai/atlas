@@ -6,5 +6,6 @@ build-backend = "hatchling.build"
 name = "rsi-atlas-security"
 version = "0.1.0"
 description = "Deterministic runtime policy and process capabilities for RSI Atlas"
+license = "Apache-2.0"
 requires-python = ">=3.11,<3.15"
 dependencies = []

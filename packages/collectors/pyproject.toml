@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "rsi-atlas-collectors"
 version = "0.1.0"
 description = "Offline fixture collectors, observation pipeline, and optional monitored live HTTPS"
+license = "Apache-2.0"
 requires-python = ">=3.11,<3.15"
 dependencies = [
   "rsi-atlas-contracts==0.1.0",

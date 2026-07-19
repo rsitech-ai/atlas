@@ -14,7 +14,7 @@
   },
   "baseline": {
     "package_count": 52,
-    "pyproject_sha256": "5c58f108ca3a87560d37432e0b39a8fffd4c8486fcdcb7dbfab81971e1242f45",
+    "pyproject_sha256": "65027bc832c3d6eac7daeb8ff152da0d6f691420b6bbb1f9c9945fff1ae95f33",
     "uv_lock_sha256": "4c9aa03667f186fec1de14539564dcd0697907393762ef326e557b71bb90afb1",
     "uv_lock_version": 1,
     "uv_version": "0.5.23"
@@ -21048,7 +21048,7 @@
     }
   ],
   "generated_at": "2026-07-19T07:09:58Z",
-  "manifest_sha256": "96f9f4278320f0ac09d08335fb53e3561831e198f413d40ee5c116bbe91f9b45",
+  "manifest_sha256": "b05c0fd0bc387ea5621e44a0e235793f94a8414038cda7acc3be7f669768eb96",
   "policy": {
     "accepted_registry_prefixes": [
       "https://pypi.org/simple",

@@ -1,13 +1,43 @@
+# Local runtime / secrets
 .DS_Store
+.env
+.env.*
+!.env.example
+*.pem
+*.p8
+*.p12
+AuthKey_*.p8
+.notary/
+*.notary.log
+
+# Python
 .venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.superpowers/
+*.egg-info/
+.coverage
+htmlcov/
+
+# Local data roots, model artifacts, signing outputs
 .local/
 /.artifacts/
+**/embedding_artifacts/
+*.onnx
+dist/
+
+# Swift / Xcode
 apps/macos/.build/
 apps/macos/.swiftpm/
-dist/
+**/DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Editor / agent local state (keep shared project config if added later)
+.idea/
+.cursor/
+.vscode/
+.superpowers/
+tmp/

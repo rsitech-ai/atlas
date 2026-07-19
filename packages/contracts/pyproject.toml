@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "rsi-atlas-contracts"
 version = "0.1.0"
 description = "Versioned contracts for RSI Atlas process boundaries"
+license = "Apache-2.0"
 requires-python = ">=3.11,<3.15"
 dependencies = [
   "packaging==26.2",
