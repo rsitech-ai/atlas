@@ -28,10 +28,8 @@ def main() -> int:
         require_release=args.require_release,
     )
     print(json.dumps(report.model_dump(mode="json"), indent=2, sort_keys=True))
-    if args.require_release or not report.release_ready:
-        # Development checks also exit 1 to avoid false green in CI release lanes.
-        if args.require_release:
-            return 1
+    if args.require_release:
+        return 1
     return 0 if report.claim.value == "development_only" else 1
 
 

@@ -49,6 +49,7 @@ from rsi_atlas_engine.monitoring import (
     MonitoringPort,
     SemanticTriageBlocked,
 )
+from rsi_atlas_engine.phase6 import Phase6Service
 from rsi_atlas_engine.runtime import RuntimeServices
 
 
@@ -169,6 +170,7 @@ def create_app(
     research_service: ResearchPort | None = None,
     collector_service: CollectorPort | None = None,
     monitoring_service: MonitoringPort | None = None,
+    phase6_service: Phase6Service | None = None,
 ) -> FastAPI:
     if (document_admission_service is None) != (import_staging_area is None):
         raise ValueError("document admission service and staging area must be configured together")
@@ -211,6 +213,9 @@ def create_app(
         if monitoring_service is None:
             raise RuntimeError("monitoring service is unavailable")
         return monitoring_service
+
+    def resolve_phase6() -> Phase6Service:
+        return phase6_service or Phase6Service()
 
     @asynccontextmanager
     async def lifespan(_application: FastAPI) -> AsyncIterator[None]:
@@ -1075,6 +1080,105 @@ def create_app(
                 status_code=503,
                 detail="Semantic triage is temporarily unavailable.",
             ) from error
+
+    @application.post("/v1/evaluation:run")
+    async def evaluation_run(request: Request) -> dict[str, object]:
+        try:
+            service = await run_in_threadpool(resolve_phase6)
+            body = await request.json()
+            return await run_in_threadpool(
+                service.run_evaluation,
+                include_judge=bool(body.get("include_judge", False)),
+                actuals=body.get("actuals"),
+            )
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Evaluation request is invalid.") from error
+        except Exception as error:
+            raise HTTPException(status_code=503, detail="Evaluation is unavailable.") from error
+
+    @application.post("/v1/engineering/codex:gate")
+    async def codex_gate(request: Request) -> dict[str, object]:
+        try:
+            service = await run_in_threadpool(resolve_phase6)
+            body = await request.json()
+            return await run_in_threadpool(
+                service.codex_gate,
+                failure_summary=str(body.get("failure_summary", "loopback failure")),
+                raw_inputs=body.get("raw_inputs") or {},
+                expected_behavior=str(body.get("expected_behavior", "pass")),
+                actual_behavior=str(body.get("actual_behavior", "fail")),
+                diff_text=str(body.get("diff_text", "")),
+            )
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Codex gate request is invalid.") from error
+        except Exception as error:
+            raise HTTPException(status_code=503, detail="Codex gate is unavailable.") from error
+
+    @application.post("/v1/recovery/backup:create")
+    async def backup_create(request: Request) -> dict[str, object]:
+        try:
+            service = await run_in_threadpool(resolve_phase6)
+            body = await request.json()
+            return await run_in_threadpool(
+                service.create_backup,
+                source_root=Path(str(body["source_root"])),
+                destination_root=Path(str(body["destination_root"])),
+            )
+        except (ValidationError, KeyError, TypeError, ValueError, FileNotFoundError) as error:
+            raise HTTPException(status_code=422, detail="Backup request is invalid.") from error
+        except Exception as error:
+            raise HTTPException(status_code=503, detail="Backup is unavailable.") from error
+
+    @application.post("/v1/recovery/backup:restore-verify")
+    async def backup_restore_verify(request: Request) -> dict[str, object]:
+        try:
+            service = await run_in_threadpool(resolve_phase6)
+            body = await request.json()
+            destination = body.get("destination")
+            return await run_in_threadpool(
+                service.restore_verify,
+                backup_root=Path(str(body["backup_root"])),
+                destination=Path(str(destination)) if destination else None,
+            )
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Restore verify is invalid.") from error
+        except Exception as error:
+            raise HTTPException(status_code=503, detail="Restore verify is unavailable.") from error
+
+    @application.post("/v1/recovery/safe-mode:enter")
+    async def safe_mode_enter(request: Request) -> dict[str, object]:
+        try:
+            service = await run_in_threadpool(resolve_phase6)
+            body = await request.json()
+            state = await run_in_threadpool(
+                service.enter_safe_mode,
+                reason=str(body.get("reason", "operator")),
+            )
+            return state.model_dump(mode="json")
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Safe Mode request is invalid.") from error
+        except Exception as error:
+            raise HTTPException(status_code=503, detail="Safe Mode is unavailable.") from error
+
+    @application.get("/v1/recovery/safe-mode")
+    async def safe_mode_get() -> dict[str, object]:
+        service = await run_in_threadpool(resolve_phase6)
+        return (await run_in_threadpool(service.safe_mode_state)).model_dump(mode="json")
+
+    @application.post("/v1/release:check")
+    async def release_check(request: Request) -> dict[str, object]:
+        try:
+            service = await run_in_threadpool(resolve_phase6)
+            body = await request.json()
+            report = await run_in_threadpool(
+                service.release_check,
+                require_release=bool(body.get("require_release", False)),
+            )
+            return report.model_dump(mode="json")
+        except (ValidationError, KeyError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Release check is invalid.") from error
+        except Exception as error:
+            raise HTTPException(status_code=503, detail="Release check is unavailable.") from error
 
     return application
 

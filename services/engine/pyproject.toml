@@ -11,10 +11,14 @@ dependencies = [
   "fastapi==0.139.2",
   "rsi-atlas-collectors",
   "rsi-atlas-contracts",
+  "rsi-atlas-engineering",
+  "rsi-atlas-evaluation",
   "rsi-atlas-ingestion",
   "rsi-atlas-models",
   "rsi-atlas-monitoring",
   "rsi-atlas-observability",
+  "rsi-atlas-recovery",
+  "rsi-atlas-release",
   "rsi-atlas-research",
   "rsi-atlas-retrieval",
   "rsi-atlas-security",
@@ -28,10 +32,14 @@ atlas = "rsi_atlas_engine.cli:entrypoint"
 [tool.uv.sources]
 rsi-atlas-collectors = { workspace = true }
 rsi-atlas-contracts = { workspace = true }
+rsi-atlas-engineering = { workspace = true }
+rsi-atlas-evaluation = { workspace = true }
 rsi-atlas-ingestion = { workspace = true }
 rsi-atlas-models = { workspace = true }
 rsi-atlas-monitoring = { workspace = true }
 rsi-atlas-observability = { workspace = true }
+rsi-atlas-recovery = { workspace = true }
+rsi-atlas-release = { workspace = true }
 rsi-atlas-research = { workspace = true }
 rsi-atlas-retrieval = { workspace = true }
 rsi-atlas-security = { workspace = true }
