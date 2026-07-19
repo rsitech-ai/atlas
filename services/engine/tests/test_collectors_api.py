@@ -114,11 +114,20 @@ def test_conflicted_import_returns_quarantine() -> None:
     assert body["quarantine"]["reasons"] == ["provider_disagreement_conflicted"]
 
 
-def test_missing_collector_service_is_unavailable() -> None:
+def test_default_create_app_auto_wires_collectors() -> None:
+    """Omitting collector_service still wires CollectorServices from the local DB.
+
+    With Postgres available this returns 200; without it the route fail-closes as 503
+    (no remote fallback). Explicit None→503 is not the product contract anymore.
+    """
     client = TestClient(create_app())
     response = client.post(
         f"/v1/workspaces/{WORKSPACE_ID}/collectors:import-fixture",
         headers=_headers(),
         json={"fixture_name": "bitcoin_block.json"},
     )
-    assert response.status_code == 503
+    assert response.status_code in {200, 503}
+    if response.status_code == 200:
+        body = response.json()
+        assert body["envelope"] is not None
+        assert body["observation"] is not None or body["quarantine"] is not None

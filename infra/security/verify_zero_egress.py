@@ -22,7 +22,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, NoReturn, TextIO
+from typing import Any, ClassVar, NoReturn, TextIO
 
 from rsi_atlas_security import NetworkPolicy, ProcessRole
 
@@ -69,7 +69,7 @@ class ProcessIdentity:
 
 
 class _ProcBSDInfo(ctypes.Structure):
-    _fields_ = [
+    _fields_: ClassVar[list[tuple[str, type]]] = [
         ("pbi_flags", ctypes.c_uint32),
         ("pbi_status", ctypes.c_uint32),
         ("pbi_xstatus", ctypes.c_uint32),

@@ -86,8 +86,7 @@ class SealedPromotionEvidence(DocumentContractModel):
     created_at: datetime
     honesty_note: str = Field(
         default=(
-            "synthetic fixtures authorize machinery only; "
-            "owner-sealed corpus required for Proven"
+            "synthetic fixtures authorize machinery only; owner-sealed corpus required for Proven"
         ),
         min_length=1,
         max_length=512,

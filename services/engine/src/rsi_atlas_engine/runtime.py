@@ -11,7 +11,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Protocol
+from typing import ClassVar, Protocol
 from uuid import UUID
 
 from rsi_atlas_contracts import (
@@ -207,7 +207,7 @@ class RuntimePaths:
 
 
 class _SwapUsage(ctypes.Structure):
-    _fields_ = [
+    _fields_: ClassVar[list[tuple[str, type]]] = [
         ("total", ctypes.c_uint64),
         ("available", ctypes.c_uint64),
         ("used", ctypes.c_uint64),

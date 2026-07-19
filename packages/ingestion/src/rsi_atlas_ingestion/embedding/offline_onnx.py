@@ -138,9 +138,7 @@ def _infer_mode(input_names: set[str]) -> str:
     )
 
 
-def _load_tokenizer(
-    artifact_dir: Path, manifest: dict[str, Any]
-) -> BertWordPieceTokenizer:
+def _load_tokenizer(artifact_dir: Path, manifest: dict[str, Any]) -> BertWordPieceTokenizer:
     tokenizer_kind = str(manifest.get("tokenizer", "none"))
     if tokenizer_kind in {"none", ""}:
         raise OfflineArtifactUnavailable(

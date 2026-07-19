@@ -182,9 +182,7 @@ def _install_from_source(
             "oss_token_hash remains the no-artifact dense default."
         )
     else:
-        print(
-            "note: ONNX+vocab ready for OfflineOnnxEmbedder (candidate, not sealed PRODUCTION)."
-        )
+        print("note: ONNX+vocab ready for OfflineOnnxEmbedder (candidate, not sealed PRODUCTION).")
     return 0
 
 

@@ -29,10 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--allow-synthetic-promote",
         action="store_true",
-        help=(
-            "Emit development_sealed_package on synthetic fixtures "
-            "(never PRODUCTION Proven)."
-        ),
+        help=("Emit development_sealed_package on synthetic fixtures (never PRODUCTION Proven)."),
     )
     parser.add_argument(
         "--development-package",
@@ -69,9 +66,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     selected = (
-        list(COMPONENTS)
-        if args.component == "all"
-        else [SealedComponentKind(args.component)]
+        list(COMPONENTS) if args.component == "all" else [SealedComponentKind(args.component)]
     )
     candidates = {
         SealedComponentKind.EMBEDDING: ("oss_token_hash_v1", "1.0.0"),

@@ -135,12 +135,7 @@ def _is_control(char: str) -> bool:
 
 def _is_punctuation(char: str) -> bool:
     code = ord(char)
-    if (
-        33 <= code <= 47
-        or 58 <= code <= 64
-        or 91 <= code <= 96
-        or 123 <= code <= 126
-    ):
+    if 33 <= code <= 47 or 58 <= code <= 64 or 91 <= code <= 96 or 123 <= code <= 126:
         return True
     return unicodedata.category(char).startswith("P")
 

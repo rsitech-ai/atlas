@@ -38,7 +38,7 @@ The JSON below is authoritative; prose is explanatory.
 {
   "accepted_exceptions": [],
   "actor_id": "andrzej:continue-development-instruction",
-  "approval_sha256": "0564c5e60c13879bf4b215b6333b80ed409e610e557ed3809ba64ed9da60fcda",
+  "approval_sha256": "a3ec8086fe3287fafe0eb23f9e648dc01f7af66bb6ca43be1abe6ac1701b35f4",
   "authority": {
     "allows_commit_or_push": false,
     "allows_dependency_lock_change": true,
@@ -56,7 +56,7 @@ The JSON below is authoritative; prose is explanatory.
   ],
   "decided_at": "2026-07-19T08:18:00Z",
   "decision": "approved",
-  "manifest_sha256": "62c8ab9a66d13189b5788d2f57269685c49e38c932dafca68a232cc6e9305472",
+  "manifest_sha256": "96f9f4278320f0ac09d08335fb53e3561831e198f413d40ee5c116bbe91f9b45",
   "model_artifacts": [],
   "proposed_candidates": [
     {
