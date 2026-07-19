@@ -33,6 +33,8 @@ slice:
   failure, and retry states with accessible identifiers;
 - governed Tier-0 PDF parser dependency approval (`pypdf` / `pdfminer.six`); Docling stays blocked;
 - an isolated Seatbelt document worker for preflight and development-qualified parse;
+- preflight assessment before parse, with Process PDF / `processing:start` gated off
+  encrypted, rejected, duplicate, and embedded-file paths;
 - append-only parser-attempt journals, CAS-first canonical JSON, and canonical page inspection via
   loopback processing APIs plus the native Evidence inspector.
 

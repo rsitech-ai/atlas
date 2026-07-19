@@ -190,14 +190,19 @@ struct EvidenceImportView: View {
 
     private func processingControls(for record: DocumentAdmissionRecord) -> some View {
         HStack {
-            Text("Phase 2B processing inspects canonical pages without publishing search.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            Text(
+                record.outcome.allowsDevelopmentProcessing
+                    ? "Phase 2B processing inspects canonical pages without publishing search."
+                    : "Processing is unavailable for this admission outcome."
+            )
+            .font(.callout)
+            .foregroundStyle(.secondary)
             Spacer()
             Button("Process PDF") {
                 Task { await processingStore.process(acquisitionID: record.request.acquisitionID) }
             }
             .disabled({
+                if !record.outcome.allowsDevelopmentProcessing { return true }
                 if case .running = processingStore.state { return true }
                 return false
             }())

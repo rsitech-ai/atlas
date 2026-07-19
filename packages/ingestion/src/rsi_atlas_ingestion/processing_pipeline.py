@@ -1,4 +1,4 @@
-"""Acquisition-bound parse + canonicalize processing composition."""
+"""Acquisition-bound preflight + parse + canonicalize processing composition."""
 
 from __future__ import annotations
 
@@ -11,10 +11,12 @@ from uuid import UUID
 
 from pydantic import Field
 from rsi_atlas_contracts import (
+    AdmissionOutcome,
     ArtifactCommandContext,
     CanonicalTextElement,
     DocumentAdmissionRecord,
 )
+from rsi_atlas_contracts.document_parsing import AdmissionAssessmentDraft
 from rsi_atlas_contracts.system_status import StrictModel
 from rsi_atlas_storage import ContentAddressedArtifactStore
 from rsi_atlas_storage.artifact_repository import ArtifactRepository
@@ -24,7 +26,25 @@ from rsi_atlas_ingestion.canonical_service import CanonicalizationService
 from rsi_atlas_ingestion.canonicalization import CanonicalizationError
 from rsi_atlas_ingestion.parser_benchmark import QUALIFICATION_PATH, qualify_development_candidate
 from rsi_atlas_ingestion.parser_service import ParserService
+from rsi_atlas_ingestion.preflight_service import PreflightService
 from rsi_atlas_ingestion.worker_runner import DocumentWorkerRunnerError
+
+# Phase 2A quarantine-for-review is the only admitted raw path that may start development parse.
+_PROCESSABLE_ADMISSION_OUTCOMES = frozenset(
+    {
+        AdmissionOutcome.QUARANTINE_FOR_REVIEW,
+        AdmissionOutcome.ACCEPT,
+        AdmissionOutcome.ACCEPT_WITH_RESTRICTIONS,
+    }
+)
+_BLOCKED_ASSESSMENT_OUTCOMES = frozenset(
+    {
+        AdmissionOutcome.REQUEST_PASSWORD,
+        AdmissionOutcome.REJECT_UNSAFE,
+        AdmissionOutcome.REJECT_POLICY_VIOLATION,
+        AdmissionOutcome.MARK_EXACT_DUPLICATE,
+    }
+)
 
 
 class AdmissionLookup(Protocol):
@@ -40,6 +60,20 @@ ProcessingState = Literal[
     "review_required",
     "failed",
 ]
+
+
+def admission_allows_development_processing(outcome: AdmissionOutcome) -> bool:
+    """Return whether Phase 2A admission may offer Process PDF / processing:start."""
+    return outcome in _PROCESSABLE_ADMISSION_OUTCOMES
+
+
+def assessment_allows_development_parse(draft: AdmissionAssessmentDraft) -> bool:
+    """Return whether a Phase 2B preflight assessment may continue into parse."""
+    if draft.outcome in _BLOCKED_ASSESSMENT_OUTCOMES:
+        return False
+    if "embedded_files_present" in draft.reason_codes:
+        return False
+    return draft.outcome in _PROCESSABLE_ADMISSION_OUTCOMES
 
 
 class DocumentProcessingStatus(StrictModel):
@@ -76,6 +110,7 @@ class DocumentProcessingService:
     processing: DocumentProcessingRepository
     artifacts: ArtifactRepository
     store: ContentAddressedArtifactStore
+    preflight: PreflightService
     parser: ParserService
     canonicalizer: CanonicalizationService
     run_root: Path
@@ -89,6 +124,10 @@ class DocumentProcessingService:
         admission = self.admissions.find(context=context, acquisition_id=acquisition_id)
         if admission is None:
             raise LookupError("acquisition_not_found")
+        if not admission_allows_development_processing(admission.outcome):
+            return _blocked_admission_status(
+                acquisition_id=acquisition_id, outcome=admission.outcome
+            )
         existing = self.status(context=context, acquisition_id=acquisition_id)
         if existing.state == "canonicalized" and existing.document_version_id is not None:
             return existing
@@ -98,6 +137,16 @@ class DocumentProcessingService:
         payload = self.store.read_bytes(admission.artifact.artifact_id, context=context)
         staged.write_bytes(payload)
         try:
+            assessment = self.preflight.run(
+                context=context,
+                acquisition_id=acquisition_id,
+                artifact_path=staged,
+                run_root=self.run_root / "preflight-runs",
+            )
+            if not assessment_allows_development_parse(assessment):
+                return _blocked_assessment_status(
+                    acquisition_id=acquisition_id, assessment=assessment
+                )
             if not QUALIFICATION_PATH.is_file():
                 qualify_development_candidate()
             benchmark_hash = hashlib.sha256(QUALIFICATION_PATH.read_bytes()).hexdigest()
@@ -206,6 +255,46 @@ class DocumentProcessingService:
             parser_name=document.candidate.name,
             parser_version=document.candidate.version,
         )
+
+
+def _blocked_admission_status(
+    *, acquisition_id: UUID, outcome: AdmissionOutcome
+) -> DocumentProcessingStatus:
+    if outcome is AdmissionOutcome.REQUEST_PASSWORD:
+        state: ProcessingState = "review_required"
+        code = "admission_password_required"
+    else:
+        state = "failed"
+        code = "admission_not_processable"
+    return DocumentProcessingStatus(
+        acquisition_id=acquisition_id,
+        state=state,
+        warnings=(f"admission_outcome:{outcome.value}",),
+        failure_code=code,
+    )
+
+
+def _blocked_assessment_status(
+    *, acquisition_id: UUID, assessment: AdmissionAssessmentDraft
+) -> DocumentProcessingStatus:
+    if assessment.outcome is AdmissionOutcome.REQUEST_PASSWORD:
+        state: ProcessingState = "review_required"
+        code = "preflight_password_required"
+    elif assessment.outcome in {
+        AdmissionOutcome.REJECT_UNSAFE,
+        AdmissionOutcome.REJECT_POLICY_VIOLATION,
+    }:
+        state = "failed"
+        code = "preflight_rejected"
+    else:
+        state = "review_required"
+        code = "preflight_review_required"
+    return DocumentProcessingStatus(
+        acquisition_id=acquisition_id,
+        state=state,
+        warnings=tuple(assessment.reason_codes),
+        failure_code=code,
+    )
 
 
 def clear_directory(path: Path) -> None:

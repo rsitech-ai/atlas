@@ -108,6 +108,49 @@ def test_sandbox_profile_denies_fork_and_exec(sandboxed_profile: Path) -> None:
     assert "execed" not in result.stdout
 
 
+def test_sandbox_profile_denies_keychain_mach_lookup(sandboxed_profile: Path) -> None:
+    """Prove Seatbelt denies Keychain Mach services named in document-worker.sb."""
+    code = r"""
+import ctypes
+from ctypes import POINTER, c_char_p, c_int, c_uint32, byref
+
+mach_port_t = c_uint32
+kern_return_t = c_int
+lib = ctypes.CDLL(None)
+bootstrap_port = mach_port_t.in_dll(lib, "bootstrap_port")
+bootstrap_look_up = lib.bootstrap_look_up
+bootstrap_look_up.restype = kern_return_t
+bootstrap_look_up.argtypes = [mach_port_t, c_char_p, POINTER(mach_port_t)]
+
+denied = (
+    b"com.apple.securityd",
+    b"com.apple.SecurityServer",
+    b"com.apple.keychain.xpc",
+)
+for name in denied:
+    port = mach_port_t(0)
+    kr = bootstrap_look_up(bootstrap_port, name, byref(port))
+    if kr == 0 or port.value != 0:
+        print("keychain-allowed", name.decode(), kr, port.value)
+        raise SystemExit(0)
+
+# Control: a non-Keychain com.apple.* lookup still succeeds under the allow regex.
+allowed_port = mach_port_t(0)
+allowed_kr = bootstrap_look_up(
+    bootstrap_port, b"com.apple.system.logger", byref(allowed_port)
+)
+if allowed_kr != 0 or allowed_port.value == 0:
+    print("control-failed", allowed_kr, allowed_port.value)
+    raise SystemExit(2)
+print("keychain-denied")
+raise SystemExit(1)
+"""
+    result = _run_canary(sandboxed_profile, code)
+    assert result.returncode != 0
+    assert "keychain-denied" in result.stdout
+    assert "keychain-allowed" not in result.stdout
+
+
 def test_render_fails_closed_when_template_missing(tmp_path: Path) -> None:
     with pytest.raises(DocumentWorkerRunnerError) as raised:
         render_document_worker_profile(

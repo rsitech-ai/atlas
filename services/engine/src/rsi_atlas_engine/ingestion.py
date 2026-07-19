@@ -7,6 +7,7 @@ from typing import Literal
 from rsi_atlas_ingestion import DocumentAdmissionService
 from rsi_atlas_ingestion.canonical_service import CanonicalizationService
 from rsi_atlas_ingestion.parser_service import ParserService
+from rsi_atlas_ingestion.preflight_service import PreflightService
 from rsi_atlas_ingestion.processing_pipeline import DocumentProcessingService
 from rsi_atlas_storage import (
     AcquisitionRepository,
@@ -77,6 +78,10 @@ class DocumentIngestionServices:
             acquisition_repository=acquisition_repository,
             clock=clock,
         )
+        preflight = PreflightService(
+            admissions=acquisition_repository,
+            processing=processing_repository,
+        )
         parser = ParserService(
             admissions=acquisition_repository,
             processing=processing_repository,
@@ -94,6 +99,7 @@ class DocumentIngestionServices:
             processing=processing_repository,
             artifacts=artifact_repository,
             store=artifact_store,
+            preflight=preflight,
             parser=parser,
             canonicalizer=canonicalizer,
             run_root=processing_root,

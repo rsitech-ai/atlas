@@ -30,6 +30,8 @@ __ARTIFACT_READ_RULES__
 )
 
 ; Owner-private run directory is the only intentional writable surface.
+; ponytail: /tmp and /var/folders writes remain allowed for CPython/tempfile during
+; development Seatbelt qualification; narrow to run-directory-only in Phase 6 XPC.
 (allow file-write* (subpath "__RUN_DIRECTORY__") (regex #"^/var/folders/") (subpath "/private/tmp") (subpath "/tmp"))
 (allow file-ioctl (subpath "__RUN_DIRECTORY__"))
 

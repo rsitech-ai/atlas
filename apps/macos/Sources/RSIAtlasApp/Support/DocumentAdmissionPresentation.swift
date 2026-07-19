@@ -65,6 +65,18 @@ extension AdmissionOutcome {
             .secondary
         }
     }
+
+    /// Phase 2B development Process PDF is only offered for quarantine-for-review
+    /// (or later accept outcomes). Password / reject / duplicate stay blocked.
+    var allowsDevelopmentProcessing: Bool {
+        switch self {
+        case .quarantineForReview, .accept, .acceptWithRestrictions:
+            true
+        case .requestPassword, .rejectPolicyViolation, .rejectUnsafe,
+             .markExactDuplicate, .registerNewVersion:
+            false
+        }
+    }
 }
 
 extension SafetyCheckState {

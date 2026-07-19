@@ -33,5 +33,9 @@ struct EvidencePresentationTests {
             AdmissionOutcome.quarantineForReview.boundaryMessage
                 == "Quarantined — not admitted, parsed, or searchable."
         )
+        #expect(AdmissionOutcome.quarantineForReview.allowsDevelopmentProcessing)
+        #expect(!AdmissionOutcome.requestPassword.allowsDevelopmentProcessing)
+        #expect(!AdmissionOutcome.rejectUnsafe.allowsDevelopmentProcessing)
+        #expect(!AdmissionOutcome.markExactDuplicate.allowsDevelopmentProcessing)
     }
 }

@@ -541,11 +541,13 @@ Show page selector, raw/normalized text toggle, element kind/order, parser ident
 quality/warnings, and exact raw/canonical hashes. A lightweight overlay may render normalized boxes;
 it must not display generated text as source content.
 
-- [x] **Step 4: Foreground verification**
+- [x] **Step 4: Foreground verification (honest scope)**
 
-Run supported born-digital, rotated, table, image-only, encrypted, unsafe, disagreement, worker
-failure/retry, and exact replay fixtures. Verify keyboard/VoiceOver order, compact/typical windows,
-Light/Dark, large text, increased contrast, Reduce Motion, multiple windows, and release cfg.
+Automated evidence only: processing API contract tests, Swift decode/presentation tests,
+debug + release `RSIAtlas` builds. Manual/interactive VoiceOver order, compact/typical windows,
+Light/Dark, large text, increased contrast, Reduce Motion, and multi-window Process PDF passes
+were **not** re-run as a complete matrix in this slice — do not treat them as proven here.
+Encrypted/unsafe paths are gated off Process PDF rather than exercised as happy-path process.
 
 - [x] **Step 5: Verify and commit Task 8**
 
@@ -588,20 +590,22 @@ bash -n script/build_and_run.sh infra/local/postgres.sh
 git diff --check
 ```
 
-- [x] **Step 2: Run fault, resource, and zero-egress matrices**
+- [ ] **Step 2: Run fault, resource, and zero-egress matrices (partial)**
 
-Kill worker at request/read/candidate/output/CAS/DB boundaries; retry and verify retained started and
-terminal attempt evidence, one visible accepted run, and no unsafe residue. Exercise time, RSS,
-decoded-byte, page, span, output, disk, and cancellation limits. Record child descriptors/environment/
-process tree plus OS-enforced arbitrary-file/Keychain/fork/exec/descendant/network denial.
+Proven: Seatbelt canaries for DNS, external TCP, arbitrary `$HOME` file read, write-outside-run,
+fork/exec, and Keychain Mach lookup denial (`infra/security/tests/test_document_worker_sandbox.py`);
+worker-runner timeout/cancel/kill coverage in unit tests. **Not proven as a complete matrix:**
+RSS, decoded-byte, page, span, output, disk limit sweeps; full kill-at-every-boundary recovery
+table; child descriptor/environment inventory beyond runner unit tests. Keep unchecked until
+those matrices exist.
 
-- [x] **Step 3: Run parser/canonical acceptance corpus**
+- [ ] **Step 3: Run parser/canonical acceptance corpus (partial)**
 
-Prove exact supported born-digital pages and coordinates across development/calibration/validation/
-adversarial partitions, crypto/numeric preservation, deterministic
-rerun hashes, image-only/encrypted/unsafe/review routes, parser disagreement, corruption detection,
-history across parser/config changes, raw/canonical restart persistence, and the frozen warm/cold
-performance protocol.
+Proven via automated tests/fixtures: development-qualified born-digital parse + canonical
+persistence/idempotency; encrypted fixture blocked at preflight before parse; qualification
+JSON for the frozen corpus. **Not proven:** full calibration/validation/adversarial partition
+sign-off as an acceptance protocol, warm/cold performance protocol numbers, or interactive
+Evidence inspector a11y matrix. Keep unchecked until those exist.
 
 - [x] **Step 4: Reconcile acceptance claims**
 
