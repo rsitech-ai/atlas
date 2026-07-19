@@ -24,6 +24,7 @@ from rsi_atlas_storage.document_processing_repository import DocumentProcessingR
 
 from rsi_atlas_ingestion.canonical_service import CanonicalizationService
 from rsi_atlas_ingestion.canonicalization import CanonicalizationError
+from rsi_atlas_ingestion.chunk_service import ChunkService
 from rsi_atlas_ingestion.parser_benchmark import QUALIFICATION_PATH, qualify_development_candidate
 from rsi_atlas_ingestion.parser_service import ParserService
 from rsi_atlas_ingestion.preflight_service import PreflightService
@@ -102,6 +103,29 @@ class CanonicalPageEvidence(StrictModel):
     canonical_content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     parser_name: str
     parser_version: str
+
+
+class ChunkSetSummary(StrictModel):
+    schema_version: Literal["rsi-atlas.chunk-set-summary.v1"] = "rsi-atlas.chunk-set-summary.v1"
+    document_version_id: str = Field(pattern=r"^canonical:[0-9a-f]{64}$")
+    chunk_set_id: str = Field(pattern=r"^chunkset:[0-9a-f]{64}$")
+    strategy_id: str = Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")
+    configuration_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    chunk_set_content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    chunk_count: int = Field(ge=1, le=1_000_000)
+    searchable: Literal[False] = False
+
+
+class ChunkSetEvidence(StrictModel):
+    schema_version: Literal["rsi-atlas.chunk-set.v1"] = "rsi-atlas.chunk-set.v1"
+    document_version_id: str = Field(pattern=r"^canonical:[0-9a-f]{64}$")
+    chunk_set_id: str = Field(pattern=r"^chunkset:[0-9a-f]{64}$")
+    strategy_id: str = Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")
+    configuration_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    chunk_set_content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    chunk_count: int = Field(ge=1, le=1_000_000)
+    searchable: Literal[False] = False
+    chunks: tuple[dict[str, Any], ...] = Field(max_length=10_000)
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,6 +278,97 @@ class DocumentProcessingService:
             canonical_content_hash=hashlib.sha256(document.canonical_json_bytes()).hexdigest(),
             parser_name=document.candidate.name,
             parser_version=document.candidate.version,
+        )
+
+    def chunk(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        document_version_id: str,
+    ) -> tuple[ChunkSetSummary, ...]:
+        row = self.processing.get_canonical_manifest(
+            context=context, document_version_id=document_version_id
+        )
+        if row is None:
+            raise LookupError("canonical_version_not_found")
+        acquisition_id = UUID(str(row["acquisition_id"]))
+        content_hash = str(row["canonical_content_hash"])
+        document = self.canonicalizer.load_canonical_document(
+            context=context, document_version_id=document_version_id
+        )
+        chunker = ChunkService(
+            processing=self.processing,
+            artifacts=self.artifacts,
+            store=self.store,
+        )
+        chunker.chunk_all_implemented(
+            context=context,
+            acquisition_id=acquisition_id,
+            document_version_id=document_version_id,
+            document=document,
+            canonical_content_hash=content_hash,
+        )
+        return self.list_chunk_sets(context=context, document_version_id=document_version_id)
+
+    def list_chunk_sets(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        document_version_id: str,
+    ) -> tuple[ChunkSetSummary, ...]:
+        rows = self.processing.list_chunk_sets(
+            context=context, document_version_id=document_version_id
+        )
+        summaries: list[ChunkSetSummary] = []
+        for row in rows:
+            manifest = row["manifest"]
+            chunk_set = manifest["chunk_set"]
+            summaries.append(
+                ChunkSetSummary(
+                    document_version_id=document_version_id,
+                    chunk_set_id=row["chunk_set_id"],
+                    strategy_id=row["strategy_id"],
+                    configuration_hash=row["configuration_hash"],
+                    chunk_set_content_hash=row["chunk_set_content_hash"],
+                    chunk_count=int(chunk_set["quality"]["chunk_count"]),
+                    searchable=False,
+                )
+            )
+        return tuple(summaries)
+
+    def chunk_set(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        chunk_set_id: str,
+    ) -> ChunkSetEvidence:
+        chunker = ChunkService(
+            processing=self.processing,
+            artifacts=self.artifacts,
+            store=self.store,
+        )
+        loaded = chunker.load_chunk_set(context=context, chunk_set_id=chunk_set_id)
+        chunks = tuple(
+            {
+                "chunk_id": chunk.chunk_id,
+                "ordinal": chunk.ordinal,
+                "text": chunk.text,
+                "token_count": chunk.token_count,
+                "page_numbers": list(chunk.page_numbers),
+                "source_element_ids": list(chunk.source_element_ids),
+                "metadata": dict(chunk.metadata),
+            }
+            for chunk in loaded.chunks[:10_000]
+        )
+        return ChunkSetEvidence(
+            document_version_id=loaded.document_version_id,
+            chunk_set_id=loaded.chunk_set_id,
+            strategy_id=loaded.strategy.strategy_id,
+            configuration_hash=loaded.strategy.configuration_hash,
+            chunk_set_content_hash=loaded.content_hash(),
+            chunk_count=loaded.quality.chunk_count,
+            searchable=False,
+            chunks=chunks,
         )
 
 

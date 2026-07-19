@@ -16,6 +16,8 @@ from rsi_atlas_contracts import (
 from rsi_atlas_ingestion import MAX_PDF_BYTES, StagedPDFEvidence
 from rsi_atlas_ingestion.processing_pipeline import (
     CanonicalPageEvidence,
+    ChunkSetEvidence,
+    ChunkSetSummary,
     DocumentProcessingStatus,
 )
 from rsi_atlas_storage import AcquisitionConflictError
@@ -54,6 +56,27 @@ class DocumentProcessingPort(Protocol):
         document_version_id: str,
         page_number: int,
     ) -> CanonicalPageEvidence: ...
+
+    def chunk(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        document_version_id: str,
+    ) -> tuple[ChunkSetSummary, ...]: ...
+
+    def list_chunk_sets(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        document_version_id: str,
+    ) -> tuple[ChunkSetSummary, ...]: ...
+
+    def chunk_set(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        chunk_set_id: str,
+    ) -> ChunkSetEvidence: ...
 
 
 def create_app(
@@ -274,6 +297,91 @@ def create_app(
             raise HTTPException(
                 status_code=503,
                 detail="Canonical page retrieval is temporarily unavailable.",
+            ) from error
+
+    @application.post(
+        "/v1/workspaces/{workspace_id}/canonical/{document_version_id}/chunking:start",
+        response_model=list[ChunkSetSummary],
+    )
+    async def start_chunking(
+        request: Request,
+        workspace_id: UUID,
+        document_version_id: str,
+    ) -> list[ChunkSetSummary]:
+        if not document_version_id.startswith("canonical:"):
+            raise HTTPException(status_code=422, detail="Canonical version id is invalid.")
+        context = _workspace_context(request, workspace_id)
+        try:
+            processing = await run_in_threadpool(resolve_processing)
+            return list(
+                await run_in_threadpool(
+                    processing.chunk,
+                    context=context,
+                    document_version_id=document_version_id,
+                )
+            )
+        except LookupError as error:
+            raise HTTPException(
+                status_code=404, detail="Canonical document was not found."
+            ) from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Document chunking is temporarily unavailable.",
+            ) from error
+
+    @application.get(
+        "/v1/workspaces/{workspace_id}/canonical/{document_version_id}/chunk-sets",
+        response_model=list[ChunkSetSummary],
+    )
+    async def list_chunk_sets(
+        request: Request,
+        workspace_id: UUID,
+        document_version_id: str,
+    ) -> list[ChunkSetSummary]:
+        if not document_version_id.startswith("canonical:"):
+            raise HTTPException(status_code=422, detail="Canonical version id is invalid.")
+        context = _workspace_context(request, workspace_id)
+        try:
+            processing = await run_in_threadpool(resolve_processing)
+            return list(
+                await run_in_threadpool(
+                    processing.list_chunk_sets,
+                    context=context,
+                    document_version_id=document_version_id,
+                )
+            )
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Chunk set listing is temporarily unavailable.",
+            ) from error
+
+    @application.get(
+        "/v1/workspaces/{workspace_id}/chunk-sets/{chunk_set_id}",
+        response_model=ChunkSetEvidence,
+    )
+    async def get_chunk_set(
+        request: Request,
+        workspace_id: UUID,
+        chunk_set_id: str,
+    ) -> ChunkSetEvidence:
+        if not chunk_set_id.startswith("chunkset:"):
+            raise HTTPException(status_code=422, detail="Chunk set id is invalid.")
+        context = _workspace_context(request, workspace_id)
+        try:
+            processing = await run_in_threadpool(resolve_processing)
+            return await run_in_threadpool(
+                processing.chunk_set,
+                context=context,
+                chunk_set_id=chunk_set_id,
+            )
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail="Chunk set was not found.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Chunk set retrieval is temporarily unavailable.",
             ) from error
 
     return application
