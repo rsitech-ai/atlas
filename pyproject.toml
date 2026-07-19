@@ -7,6 +7,7 @@ dependencies = [
   "rsi-atlas-contracts",
   "rsi-atlas-document-worker",
   "rsi-atlas-engine",
+  "rsi-atlas-evaluation",
   "rsi-atlas-ingestion",
   "rsi-atlas-models",
   "rsi-atlas-monitoring",
@@ -30,6 +31,7 @@ rsi-atlas-collectors = { workspace = true }
 rsi-atlas-contracts = { workspace = true }
 rsi-atlas-document-worker = { workspace = true }
 rsi-atlas-engine = { workspace = true }
+rsi-atlas-evaluation = { workspace = true }
 rsi-atlas-ingestion = { workspace = true }
 rsi-atlas-models = { workspace = true }
 rsi-atlas-monitoring = { workspace = true }
@@ -44,6 +46,7 @@ members = [
   "packages/collectors",
   "packages/contracts",
   "packages/document_worker",
+  "packages/evaluation",
   "packages/ingestion",
   "packages/models",
   "packages/monitoring",
@@ -60,6 +63,7 @@ testpaths = [
   "packages/collectors/tests",
   "packages/contracts/tests",
   "packages/document_worker/tests",
+  "packages/evaluation/tests",
   "packages/ingestion/tests",
   "packages/models/tests",
   "packages/monitoring/tests",
@@ -89,8 +93,10 @@ mypy_path = [
   "packages/collectors/src",
   "packages/contracts/src",
   "packages/document_worker/src",
+  "packages/evaluation/src",
   "packages/ingestion/src",
   "packages/models/src",
+  "packages/monitoring/src",
   "packages/observability/src",
   "packages/research/src",
   "packages/retrieval/src",

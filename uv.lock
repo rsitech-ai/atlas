@@ -8,6 +8,7 @@ members = [
     "rsi-atlas-contracts",
     "rsi-atlas-document-worker",
     "rsi-atlas-engine",
+    "rsi-atlas-evaluation",
     "rsi-atlas-ingestion",
     "rsi-atlas-models",
     "rsi-atlas-monitoring",
@@ -911,6 +912,17 @@ requires-dist = [
 ]
 
 [[package]]
+name = "rsi-atlas-evaluation"
+version = "0.1.0"
+source = { editable = "packages/evaluation" }
+dependencies = [
+    { name = "rsi-atlas-contracts" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "rsi-atlas-contracts", editable = "packages/contracts" }]
+
+[[package]]
 name = "rsi-atlas-ingestion"
 version = "0.1.0"
 source = { editable = "packages/ingestion" }
@@ -1025,6 +1037,7 @@ dependencies = [
     { name = "rsi-atlas-contracts" },
     { name = "rsi-atlas-document-worker" },
     { name = "rsi-atlas-engine" },
+    { name = "rsi-atlas-evaluation" },
     { name = "rsi-atlas-ingestion" },
     { name = "rsi-atlas-models" },
     { name = "rsi-atlas-monitoring" },
@@ -1049,6 +1062,7 @@ requires-dist = [
     { name = "rsi-atlas-contracts", editable = "packages/contracts" },
     { name = "rsi-atlas-document-worker", editable = "packages/document_worker" },
     { name = "rsi-atlas-engine", editable = "services/engine" },
+    { name = "rsi-atlas-evaluation", editable = "packages/evaluation" },
     { name = "rsi-atlas-ingestion", editable = "packages/ingestion" },
     { name = "rsi-atlas-models", editable = "packages/models" },
     { name = "rsi-atlas-monitoring", editable = "packages/monitoring" },
