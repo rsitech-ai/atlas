@@ -1,12 +1,14 @@
-"""Document-worker entrypoint: echo_hash and governed PDF preflight."""
+"""Document-worker entrypoint: echo_hash, preflight, and Tier-0 parse."""
 
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import sys
 from typing import assert_never
 
+from rsi_atlas_document_worker.parsers import PyPdfParserCandidate
 from rsi_atlas_document_worker.preflight import run_preflight, write_preflight_output
 from rsi_atlas_document_worker.protocol import (
     DocumentWorkerRequest,
@@ -108,7 +110,6 @@ def _handle_echo_hash(
 def _handle_preflight(
     request: DocumentWorkerRequest, digest: str, size: int
 ) -> DocumentWorkerResponse:
-    # Re-open artifact from FD start for pypdf after hashing consumed the stream.
     os.lseek(ARTIFACT_FD, 0, os.SEEK_SET)
     try:
         evidence = run_preflight(artifact_fd=ARTIFACT_FD)
@@ -132,6 +133,38 @@ def _handle_preflight(
     )
 
 
+def _handle_parse(request: DocumentWorkerRequest, digest: str, size: int) -> DocumentWorkerResponse:
+    os.lseek(ARTIFACT_FD, 0, os.SEEK_SET)
+    try:
+        result = PyPdfParserCandidate().parse(artifact_fd=ARTIFACT_FD)
+        payload = (json.dumps(result, sort_keys=True, separators=(",", ":")) + "\n").encode()
+        _write_run_file(RUN_DIRECTORY_FD, "parse_result.json", payload, request.max_output_bytes)
+    except (OSError, ValueError):
+        return _fail(
+            request,
+            code=WorkerFailureCode.OUTPUT_LIMIT,
+            artifact_sha256=digest,
+            artifact_size_bytes=size,
+        )
+    status = (
+        WorkerResponseStatus.SUCCEEDED
+        if result.get("status") == "succeeded"
+        else WorkerResponseStatus.FAILED
+    )
+    return DocumentWorkerResponse(
+        operation=WorkerOperation.PARSE,
+        run_id=request.run_id,
+        status=status,
+        artifact_sha256=digest,
+        artifact_size_bytes=size,
+        worker=worker_identity(),
+        failure_code=(
+            None if status is WorkerResponseStatus.SUCCEEDED else WorkerFailureCode.INTERNAL
+        ),
+        output_files=("parse_result.json",),
+    )
+
+
 def handle_request(request: DocumentWorkerRequest) -> DocumentWorkerResponse:
     try:
         digest, size = _hash_artifact_fd(ARTIFACT_FD, request.artifact_size_bytes)
@@ -150,6 +183,8 @@ def handle_request(request: DocumentWorkerRequest) -> DocumentWorkerResponse:
         return _handle_echo_hash(request, digest, size)
     if request.operation is WorkerOperation.PREFLIGHT:
         return _handle_preflight(request, digest, size)
+    if request.operation is WorkerOperation.PARSE:
+        return _handle_parse(request, digest, size)
     assert_never(request.operation)
 
 

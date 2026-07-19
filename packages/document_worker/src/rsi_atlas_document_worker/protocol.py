@@ -17,7 +17,7 @@ RESPONSE_SCHEMA: Literal["rsi-atlas.document-worker.response.v1"] = (
 )
 WORKER_NAME: Literal["rsi-atlas-document-worker"] = "rsi-atlas-document-worker"
 WORKER_VERSION: Literal["0.1.0"] = "0.1.0"
-WORKER_CAPABILITIES = frozenset({"echo_hash", "preflight"})
+WORKER_CAPABILITIES = frozenset({"echo_hash", "preflight", "parse"})
 _SHA256 = r"^[0-9a-f]{64}$"
 _MAX_REQUEST_BYTES = 64 * 1024
 _MAX_RESPONSE_BYTES = 256 * 1024
@@ -34,6 +34,7 @@ WORKER_BUILD_HASH = _worker_build_hash()
 class WorkerOperation(StrEnum):
     ECHO_HASH = "echo_hash"
     PREFLIGHT = "preflight"
+    PARSE = "parse"
 
 
 class WorkerResponseStatus(StrEnum):

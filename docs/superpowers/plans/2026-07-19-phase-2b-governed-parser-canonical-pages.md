@@ -399,18 +399,18 @@ git commit -m "feat: add governed PDF preflight"
 - Extend: `packages/storage/tests/test_document_processing_repository.py`
 - Modify: pinned dependencies and `uv.lock`.
 
-- [ ] **Step 1: Write candidate RED tests against the frozen corpus**
+- [x] **Step 1: Write candidate RED tests against the frozen corpus**
 
 Every candidate returns page geometry, ordered text spans, font/encoding evidence where supported,
 links, images/counts where supported, candidate warnings, and exact source coordinates. Unsupported
 evidence is explicit, not fabricated.
 
-- [ ] **Step 2: Implement pypdf and pdfminer candidates**
+- [x] **Step 2: Implement pypdf and pdfminer candidates**
 
 Normalize only into the candidate schema. Do not construct canonical elements inside adapters.
 Limit pages, objects, decoded bytes, spans, text bytes, images, recursion, runtime, and output size.
 
-- [ ] **Step 3: Exercise Docling as an evaluation-only candidate**
+- [x] **Step 3: Exercise Docling as an evaluation-only candidate**
 
 Pin `docling==2.113.0` and every required local model artifact/configuration hash in the benchmark
 record. Run with URL input disabled, remote services disabled, offline environment enforced, and
@@ -418,14 +418,14 @@ only the frozen corpus. If model artifacts/licenses are unavailable or the depen
 runtime egress, record `blocked:unqualified_artifact` and do not promote or substitute another
 structure-aware parser silently.
 
-- [ ] **Step 4: Score deterministic quality metrics**
+- [x] **Step 4: Score deterministic quality metrics**
 
 Measure page coverage, exact expected strings, bounding-region overlap, reading order, replacement
 characters, numeric/address/date/symbol preservation, duplicated/missing blocks, table header/cell
 coverage, runtime, peak RSS, output size, and deterministic rerun hash. Required fixture failures or
 unavailable required evidence block promotion.
 
-- [ ] **Step 5: Persist every attempt and freeze the development qualification record**
+- [x] **Step 5: Persist every attempt and freeze the development qualification record**
 
 For every acquisition-bound parser launch, `parser_service` persists `started` through the generic
 attempt journal; after any terminal path it persists exact status, resource evidence, warnings,
@@ -443,7 +443,7 @@ canonicalization. No candidate is production-promoted until an independently con
 holdout unavailable to implementation writers, dependency approval, and release signed-helper
 isolation gates all pass.
 
-- [ ] **Step 6: Verify and commit Task 6**
+- [x] **Step 6: Verify and commit Task 6**
 
 ```bash
 RSI_ATLAS_TEST_DATABASE_URL="$(./infra/local/postgres.sh test-url)" uv run pytest packages/document_worker/tests/test_parser_candidates.py packages/ingestion/tests/test_parser_benchmark.py packages/ingestion/tests/test_parser_service.py packages/storage/tests/test_document_processing_repository.py -q
