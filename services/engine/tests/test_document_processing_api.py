@@ -18,6 +18,7 @@ class FakeProcessingService:
         self.chunked: list[str] = []
         self.indexed: list[str] = []
         self.activated: list[UUID] = []
+        self.rolled_back: list[UUID] = []
         self._index_version_id = UUID("66666666-6666-4666-8666-666666666666")
 
     def start(
@@ -176,6 +177,24 @@ class FakeProcessingService:
             searchable=True,
         )
 
+    def rollback_publication(
+        self, *, context: ArtifactCommandContext, index_version_id: UUID
+    ) -> RetrievalIndexSummary:
+        del context
+        if index_version_id != self._index_version_id:
+            raise LookupError("index_version_not_found")
+        self.rolled_back.append(index_version_id)
+        return RetrievalIndexSummary(
+            index_version_id=index_version_id,
+            document_version_id="canonical:" + ("a" * 64),
+            chunk_set_id="chunkset:" + ("d" * 64),
+            status="superseded",
+            dense_cardinality=2,
+            lexical_cardinality=2,
+            exact_identifier_cardinality=0,
+            searchable=False,
+        )
+
 
 def _headers(workspace_id: UUID) -> dict[str, str]:
     return {
@@ -318,6 +337,15 @@ def test_retrieval_index_routes() -> None:
     assert activated.json()["status"] == "active"
     assert activated.json()["searchable"] is True
     assert processing.activated == [processing._index_version_id]
+
+    rolled = client.post(
+        f"/v1/workspaces/{workspace_id}/index-versions/{processing._index_version_id}/publication:rollback",
+        headers=headers,
+    )
+    assert rolled.status_code == 200
+    assert rolled.json()["status"] == "superseded"
+    assert rolled.json()["searchable"] is False
+    assert processing.rolled_back == [processing._index_version_id]
 
 
 def test_processing_rejects_invalid_page_bounds() -> None:

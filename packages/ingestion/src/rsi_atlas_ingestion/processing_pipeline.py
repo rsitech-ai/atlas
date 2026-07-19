@@ -478,6 +478,43 @@ class DocumentProcessingService:
             searchable=bool(result["searchable"]),
         )
 
+    def rollback_publication(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        index_version_id: UUID,
+    ) -> RetrievalIndexSummary:
+        version = self.processing.get_retrieval_index_version(
+            context=context, index_version_id=index_version_id
+        )
+        if version is None:
+            raise LookupError("index_version_not_found")
+        PublicationService(processing=self.processing).rollback(
+            context=context,
+            document_version_id=str(version["document_version_id"]),
+            chunk_set_id=str(version["chunk_set_id"]),
+        )
+        rolled = self.processing.get_retrieval_index_version(
+            context=context, index_version_id=index_version_id
+        )
+        if rolled is None:
+            raise LookupError("index_version_not_found")
+        return RetrievalIndexSummary(
+            index_version_id=index_version_id,
+            document_version_id=str(rolled["document_version_id"]),
+            chunk_set_id=str(rolled["chunk_set_id"]),
+            status=_require_index_status(rolled["status"]),
+            dense_cardinality=_require_int(rolled["dense_cardinality"], field="dense_cardinality"),
+            lexical_cardinality=_require_int(
+                rolled["lexical_cardinality"], field="lexical_cardinality"
+            ),
+            exact_identifier_cardinality=_require_int(
+                rolled["exact_identifier_cardinality"],
+                field="exact_identifier_cardinality",
+            ),
+            searchable=False,
+        )
+
 
 def _require_int(value: object, *, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):

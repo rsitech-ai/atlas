@@ -312,3 +312,49 @@ def test_activate_supersedes_prior_active(
     )
     assert first_hits
     assert second_hits
+
+
+def test_rollback_clears_active_search(postgres_database: PostgresDatabase, tmp_path: Path) -> None:
+    context = _context()
+    store = ContentAddressedArtifactStore(tmp_path / "artifacts")
+    chunk_set_id, acquisition_id, document_version_id = _seed_chunk_set(
+        database=postgres_database, store=store, context=context
+    )
+    processing = DocumentProcessingRepository(postgres_database)
+    artifacts = ArtifactRepository(postgres_database, store)
+    indexer = IndexService(processing=processing, artifacts=artifacts, store=store)
+    publisher = PublicationService(processing=processing)
+
+    staged = indexer.stage_indexes(
+        context=context, acquisition_id=acquisition_id, chunk_set_id=chunk_set_id
+    )
+    index_version_id = UUID(str(staged["index_version_id"]))
+    publisher.activate(context=context, index_version_id=index_version_id)
+    assert processing.search_lexical_active(
+        context=context,
+        document_version_id=document_version_id,
+        chunk_set_id=chunk_set_id,
+        query="Bitcoin",
+    )
+
+    rolled = publisher.rollback(
+        context=context,
+        document_version_id=document_version_id,
+        chunk_set_id=chunk_set_id,
+    )
+    assert rolled["searchable"] is False
+    assert rolled["status"] == "rolled_back"
+    assert (
+        processing.search_lexical_active(
+            context=context,
+            document_version_id=document_version_id,
+            chunk_set_id=chunk_set_id,
+            query="Bitcoin",
+        )
+        == []
+    )
+    version = processing.get_retrieval_index_version(
+        context=context, index_version_id=index_version_id
+    )
+    assert version is not None
+    assert version["status"] == "superseded"

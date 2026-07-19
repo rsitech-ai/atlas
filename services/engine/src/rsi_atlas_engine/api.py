@@ -100,6 +100,13 @@ class DocumentProcessingPort(Protocol):
         index_version_id: UUID,
     ) -> RetrievalIndexSummary: ...
 
+    def rollback_publication(
+        self,
+        *,
+        context: ArtifactCommandContext,
+        index_version_id: UUID,
+    ) -> RetrievalIndexSummary: ...
+
 
 def create_app(
     status_factory: Callable[[], SystemStatus] | None = None,
@@ -483,6 +490,31 @@ def create_app(
             raise HTTPException(
                 status_code=503,
                 detail="Publication activation is temporarily unavailable.",
+            ) from error
+
+    @application.post(
+        "/v1/workspaces/{workspace_id}/index-versions/{index_version_id}/publication:rollback",
+        response_model=RetrievalIndexSummary,
+    )
+    async def rollback_publication(
+        request: Request,
+        workspace_id: UUID,
+        index_version_id: UUID,
+    ) -> RetrievalIndexSummary:
+        context = _workspace_context(request, workspace_id)
+        try:
+            processing = await run_in_threadpool(resolve_processing)
+            return await run_in_threadpool(
+                processing.rollback_publication,
+                context=context,
+                index_version_id=index_version_id,
+            )
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail="Index version was not found.") from error
+        except Exception as error:
+            raise HTTPException(
+                status_code=503,
+                detail="Publication rollback is temporarily unavailable.",
             ) from error
 
     return application
