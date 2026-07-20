@@ -17,6 +17,7 @@ from rsi_atlas_security.ipc import IpcTransportMode, resolve_ipc_bind
 from rsi_atlas_release.assembly import (
     RUNTIME_DEPENDENCY_CLOSURE_BLOCKER,
     inspect_runtime_entrypoints,
+    validate_runtime_payload,
 )
 from rsi_atlas_release.inventory import inventory_staged_bundle
 from rsi_atlas_release.sbom import build_sbom_from_lock
@@ -44,8 +45,16 @@ def run_release_check(
     signing_identity = os.environ.get("RSI_ATLAS_SIGNING_IDENTITY", "").strip()
     notarization_key = os.environ.get("RSI_ATLAS_NOTARY_KEY", "").strip()
     blockers: list[str] = []
-    blockers.extend(inspect_runtime_entrypoints(bundle))
-    blockers.append(RUNTIME_DEPENDENCY_CLOSURE_BLOCKER)
+    entrypoint_blockers = inspect_runtime_entrypoints(bundle)
+    blockers.extend(entrypoint_blockers)
+    if entrypoint_blockers:
+        blockers.append(RUNTIME_DEPENDENCY_CLOSURE_BLOCKER)
+    else:
+        try:
+            validate_runtime_payload(bundle)
+        except ValueError:
+            blockers.append("runtime_payload_invalid")
+            blockers.append(RUNTIME_DEPENDENCY_CLOSURE_BLOCKER)
     signing_status = SigningStatus.UNSIGNED_DEVELOPMENT
     notarization_status = SigningStatus.NOTARIZATION_BLOCKED
     if not signing_identity:

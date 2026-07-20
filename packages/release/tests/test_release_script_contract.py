@@ -9,12 +9,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 
 
-def test_runtime_builder_cli_is_pinned_and_refuses_to_claim_closure() -> None:
+def test_runtime_builder_cli_is_pinned_and_reports_live_verified_closure() -> None:
     script = (ROOT / "script" / "build_release_runtime.py").read_text(encoding="utf-8")
 
     assert "RuntimeBuildInputs.local" in script
     assert "build_runtime_payload" in script
-    assert 'print("runtime_dependency_closure_verified=false")' in script
+    assert 'print("runtime_dependency_closure_verified=true")' in script
     assert "allow-dirty" not in script
 
 

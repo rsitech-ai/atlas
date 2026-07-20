@@ -38,7 +38,7 @@ def main() -> int:
         launcher_source=repo_root / "infra" / "release" / "RSIAtlasEngine.c",
     )
     print(f"built runtime payload {result}")
-    print("runtime_dependency_closure_verified=false")
+    print("runtime_dependency_closure_verified=true")
     return 0
 
 

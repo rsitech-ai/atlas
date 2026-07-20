@@ -78,9 +78,10 @@ def main() -> int:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     blockers = ",".join(manifest["blockers"])
     entrypoints_present = str(manifest["runtime_entrypoints_present"]).lower()
+    closure_verified = str(manifest["runtime_dependency_closure_verified"]).lower()
     print(f"assembled {bundle}")
     print(f"runtime_entrypoints_present={entrypoints_present}")
-    print("runtime_dependency_closure_verified=false")
+    print(f"runtime_dependency_closure_verified={closure_verified}")
     print(f"blockers={blockers}")
     return 0
 
