@@ -321,6 +321,7 @@ def _materialize_absolute_dependency(
     inputs: RuntimeBuildInputs,
     payload: Path,
     providers: dict[str, dict[str, object]],
+    materialized_sources: dict[Path, str],
 ) -> Path:
     source = Path(dependency).resolve(strict=True)
     python_source = inputs.python_prefix.resolve(strict=True)
@@ -355,7 +356,14 @@ def _materialize_absolute_dependency(
         / version
         / provider_relative
     )
-    _copy_distinct_file(source, destination)
+    source_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
+    previous_sha256 = materialized_sources.get(destination)
+    if previous_sha256 is not None:
+        if previous_sha256 != source_sha256:
+            raise ValueError("native dependency destination collision")
+    else:
+        _copy_distinct_file(source, destination)
+        materialized_sources[destination] = source_sha256
     key = f"{formula}/{version}"
     if key not in providers:
         receipt = keg_root / "INSTALL_RECEIPT.json"
@@ -396,6 +404,7 @@ def relocate_runtime_dependencies(
 ) -> dict[str, object]:
     """Materialize and rewrite all non-system absolute dependencies in the payload."""
     providers: dict[str, dict[str, object]] = {}
+    materialized_sources: dict[Path, str] = {}
     changes = 0
     while True:
         copied_or_changed = False
@@ -415,6 +424,7 @@ def relocate_runtime_dependencies(
                     inputs=inputs,
                     payload=payload,
                     providers=providers,
+                    materialized_sources=materialized_sources,
                 )
                 if not target.is_file():
                     raise ValueError(f"mapped native dependency is missing: {load.name}")

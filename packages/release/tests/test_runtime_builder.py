@@ -4,7 +4,11 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from rsi_atlas_release.runtime_builder import _copy_distinct_file, compile_engine_launcher
+from rsi_atlas_release.runtime_builder import (
+    RuntimeBuildInputs,
+    _materialize_absolute_dependency,
+    compile_engine_launcher,
+)
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -67,17 +71,55 @@ def test_native_launcher_fails_closed_when_embedded_python_is_missing(tmp_path: 
     assert str(tmp_path) not in result.stderr
 
 
-def test_native_provider_copy_rejects_same_destination_with_different_content(
+def test_materialized_provider_remembers_pristine_hash_after_staged_mutation(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    first = tmp_path / "first" / "libsame.dylib"
-    second = tmp_path / "second" / "libsame.dylib"
-    destination = tmp_path / "runtime" / "libsame.dylib"
-    first.parent.mkdir()
-    second.parent.mkdir()
-    first.write_bytes(b"provider-a")
-    second.write_bytes(b"provider-b")
+    cellar = tmp_path / "Cellar"
+    keg = cellar / "sample" / "1.0"
+    source = keg / "lib" / "libsample.dylib"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"pristine")
+    (keg / "INSTALL_RECEIPT.json").write_text("{}", encoding="utf-8")
+    (keg / "LICENSE").write_text("license", encoding="utf-8")
+    roots = []
+    for name in ("python", "postgresql", "pgvector"):
+        root = tmp_path / name
+        root.mkdir()
+        roots.append(root)
+    inputs = RuntimeBuildInputs(tmp_path, *roots)
+    payload = tmp_path / "payload"
+    providers: dict[str, dict[str, object]] = {}
+    materialized: dict[Path, str] = {}
+    monkeypatch.setattr(
+        "rsi_atlas_release.runtime_builder._homebrew_provider",
+        lambda _path: ("sample", "1.0", keg, Path("lib/libsample.dylib")),
+    )
 
-    _copy_distinct_file(first, destination)
+    destination = _materialize_absolute_dependency(
+        dependency=str(source),
+        inputs=inputs,
+        payload=payload,
+        providers=providers,
+        materialized_sources=materialized,
+    )
+    destination.write_bytes(b"relocated")
+    repeated = _materialize_absolute_dependency(
+        dependency=str(source),
+        inputs=inputs,
+        payload=payload,
+        providers=providers,
+        materialized_sources=materialized,
+    )
+
+    assert repeated == destination
+    assert repeated.read_bytes() == b"relocated"
+    source.write_bytes(b"different-provider-content")
     with pytest.raises(ValueError, match="destination collision"):
-        _copy_distinct_file(second, destination)
+        _materialize_absolute_dependency(
+            dependency=str(source),
+            inputs=inputs,
+            payload=payload,
+            providers=providers,
+            materialized_sources=materialized,
+        )
