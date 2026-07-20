@@ -29,6 +29,33 @@ REQUIRED_RUNTIME_COMPONENTS: Final[Mapping[str, Path]] = MappingProxyType(
 )
 _VERSION_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 _BUILD_PATTERN = re.compile(r"^[1-9][0-9]*$")
+_MACH_O_MAGICS: Final[frozenset[bytes]] = frozenset(
+    {
+        b"\xca\xfe\xba\xbe",
+        b"\xbe\xba\xfe\xca",
+        b"\xca\xfe\xba\xbf",
+        b"\xbf\xba\xfe\xca",
+        b"\xce\xfa\xed\xfe",
+        b"\xfe\xed\xfa\xce",
+        b"\xcf\xfa\xed\xfe",
+        b"\xfe\xed\xfa\xcf",
+    }
+)
+_EXECUTABLE_RUNTIME_BLOCKERS: Final[frozenset[str]] = frozenset(
+    {
+        "embedded_python_missing",
+        "engine_launcher_missing",
+        "postgresql_missing",
+    }
+)
+
+
+def _is_mach_o(path: Path) -> bool:
+    try:
+        with path.open("rb") as handle:
+            return handle.read(4) in _MACH_O_MAGICS
+    except OSError:
+        return False
 
 
 def inspect_runtime_completeness(bundle_path: Path) -> tuple[str, ...]:
@@ -50,6 +77,8 @@ def inspect_runtime_completeness(bundle_path: Path) -> tuple[str, ...]:
             or not contained
             or not component.is_file()
             or component.stat().st_size == 0
+            or not _is_mach_o(component)
+            or (blocker in _EXECUTABLE_RUNTIME_BLOCKERS and component.stat().st_mode & 0o111 == 0)
         ):
             blockers.append(blocker)
     return tuple(blockers)

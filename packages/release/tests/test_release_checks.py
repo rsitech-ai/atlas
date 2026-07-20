@@ -67,9 +67,36 @@ def test_runtime_completeness_accepts_every_required_component(tmp_path: Path) -
     for relative_path in REQUIRED_RUNTIME_COMPONENTS.values():
         component = bundle / relative_path
         component.parent.mkdir(parents=True, exist_ok=True)
-        component.write_bytes(b"release-component")
+        component.write_bytes(b"\xcf\xfa\xed\xfe" + b"release-component")
+        component.chmod(0o700)
 
     assert inspect_runtime_completeness(bundle) == ()
+
+
+def test_runtime_completeness_rejects_non_mach_o_placeholders(tmp_path: Path) -> None:
+    bundle = tmp_path / "RSIAtlas.app"
+    for relative_path in REQUIRED_RUNTIME_COMPONENTS.values():
+        component = bundle / relative_path
+        component.parent.mkdir(parents=True, exist_ok=True)
+        component.write_bytes(b"not-a-runtime-binary")
+        component.chmod(0o700)
+
+    assert inspect_runtime_completeness(bundle) == tuple(REQUIRED_RUNTIME_COMPONENTS)
+
+
+def test_runtime_completeness_requires_executable_runtime_entrypoints(tmp_path: Path) -> None:
+    bundle = tmp_path / "RSIAtlas.app"
+    for relative_path in REQUIRED_RUNTIME_COMPONENTS.values():
+        component = bundle / relative_path
+        component.parent.mkdir(parents=True, exist_ok=True)
+        component.write_bytes(b"\xcf\xfa\xed\xfe" + b"release-component")
+        component.chmod(0o600)
+
+    assert inspect_runtime_completeness(bundle) == (
+        "embedded_python_missing",
+        "engine_launcher_missing",
+        "postgresql_missing",
+    )
 
 
 def test_runtime_completeness_rejects_symlinked_components(tmp_path: Path) -> None:
