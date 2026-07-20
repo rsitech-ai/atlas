@@ -284,7 +284,10 @@ def create_app(
         if collector_service is not None:
             return collector_service
         if configured_collectors is None:
-            configured_collectors = CollectorServices.from_database(resolve_database())
+            configured_collectors = CollectorServices.from_database(
+                resolve_database(),
+                safe_mode=operational_safe_mode,
+            )
         return configured_collectors
 
     def resolve_monitoring() -> MonitoringPort:

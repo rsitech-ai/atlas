@@ -20,7 +20,9 @@ from rsi_atlas_contracts import (
     Observation,
     ProviderQualityState,
     ResearchSignal,
+    SafeModeCapability,
 )
+from rsi_atlas_recovery import SafeModeController
 from rsi_atlas_storage import ObservationRepository, PostgresDatabase
 
 
@@ -49,10 +51,16 @@ class CollectorPort(Protocol):
 @dataclass(frozen=True, slots=True)
 class CollectorServices:
     repository: ObservationRepository
+    safe_mode: SafeModeController
 
     @classmethod
-    def from_database(cls, database: PostgresDatabase) -> CollectorServices:
-        return cls(repository=ObservationRepository(database))
+    def from_database(
+        cls,
+        database: PostgresDatabase,
+        *,
+        safe_mode: SafeModeController,
+    ) -> CollectorServices:
+        return cls(repository=ObservationRepository(database), safe_mode=safe_mode)
 
     def import_fixture(
         self,
@@ -61,6 +69,7 @@ class CollectorServices:
         fixture_name: str,
         provider_quality: ProviderQualityState = ProviderQualityState.SINGLE_SOURCE,
     ) -> FixtureImportResult:
+        self.safe_mode.require(SafeModeCapability.COLLECTORS)
         result = import_fixture(
             context=context,
             fixture_name=fixture_name,
@@ -99,6 +108,7 @@ class CollectorServices:
     def orphan_observation(
         self, *, context: ArtifactCommandContext, observation_id: str
     ) -> Observation:
+        self.safe_mode.require(SafeModeCapability.COLLECTORS)
         current = self.get_observation(context=context, observation_id=observation_id)
         if current is None:
             raise LookupError("observation not found")
