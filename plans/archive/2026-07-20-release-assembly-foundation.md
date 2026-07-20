@@ -149,7 +149,12 @@
   and Team `2NY8A789TN`, validates an accepted notary result and staple, assesses Gatekeeper, and
   recreates/checksums the final post-staple archive. Sixteen release tests plus shell/static/type
   checks pass; a real incomplete bundle exited 3 and remained byte-for-byte unchanged.
-- 2026-07-20: Next: commit M3, run the full regression and exact artifact inspection, then review.
+- 2026-07-20: M4 local verification passed at implementation commit `b3372b3`: full regression
+  passed with 1,249 Python tests, one optional ONNX skip, 51 Swift tests, product build, Ruff,
+  formatting, strict mypy, dependency governance, and lock checks. The real version `0.1.0` build
+  `1` shell records the four runtime blockers and release checking exits 1 as designed.
+- 2026-07-20: Plan archived for PR review. PR state, independent verdict, and exact merge evidence
+  are recorded in GitHub rather than by changing the reviewed code head after verification.
 
 ## Rollback / Recovery
 
