@@ -15,7 +15,7 @@
   - `packages/ingestion/tests/test_worker_runner.py`
   - `docs/acceptance-matrix.md`
   - `docs/production-plan.md`
-- Existing behavior: commit `4cb6fc27c4d1` drains stdout/stderr concurrently with independent byte
+- Existing behavior: commit `1aa80a693c3a` drains stdout/stderr concurrently with independent byte
   limits and routes timeout/overflow errors through process-group kill and partial-output cleanup.
 - Constraints: Strict Offline remains the default; do not weaken timeout/output/resource limits; no
   production model, signing, packaging, push, or PR work.
@@ -58,8 +58,8 @@
     independently of leader exit.
 - Verification:
   - On current code, first create the tests without changing production code.
-  - Apply the test file to a disposable worktree at `8e46baf` and run the overflow test.
-  - Expected red result at `8e46baf`: `worker_timeout`, not expected
+  - Apply the test file to a disposable worktree at `8e9cf0e` and run the overflow test.
+  - Expected red result at `8e9cf0e`: `worker_timeout`, not expected
     `worker_output_too_large`.
   - Run all three tests on the current branch.
 - Expected result: all public-runner boundary tests pass; only
@@ -97,7 +97,7 @@
 ### M4. Independent review and closeout
 
 - Goal: independently assess test realism, cleanup semantics, and readiness wording.
-- Files / systems: full branch diff from `91cc82d` to final code/evidence commit.
+- Files / systems: full branch diff from `8e97db1` to final code/evidence commit.
 - Changes: fix any Critical/Important findings; record non-blocking gaps.
 - Verification: reviewer approval plus a clean worktree and `git diff --check`.
 - Expected result: no Critical/Important findings remain.
@@ -117,7 +117,7 @@
 - 2026-07-20: Use deterministic public-runner tests rather than private-helper-only assertions so
   kill and cleanup behavior are included.
 - 2026-07-20: Use an exact 64 KiB-plus-one fake-worker response to prove the configured stdout
-  boundary and reproduce the pre-drain deadlock classification at `8e46baf`.
+  boundary and reproduce the pre-drain deadlock classification at `8e9cf0e`.
 - 2026-07-20: Preserve the 4 GiB resource admission threshold; blocked host pressure is evidence,
   not a reason to weaken policy.
 
@@ -127,25 +127,25 @@
   runtime/test closeout sequence.
 - 2026-07-20: Current diagnostic still reports `resource_policy=blocked` and
   `model_registry=degraded`; all other components are healthy.
-- 2026-07-20: M1 initially completed at `19a72ec`: two public-runner boundary tests passed and the
-  overflow test failed against `8e46baf` with the expected old `worker_timeout` misclassification.
+- 2026-07-20: M1 initially completed at `33efc59`: two public-runner boundary tests passed and the
+  overflow test failed against `8e9cf0e` with the expected old `worker_timeout` misclassification.
 - 2026-07-20: Whole-branch review held M4 because the timeout assertion observed only the leader,
   so a leader-only termination mutation still passed, and because the overflow fixture did not use
   the exact limit-plus-one boundary.
-- 2026-07-20: M1 evidence remediated at `0800bc9`: timeout and overflow now each spawn a child and
+- 2026-07-20: M1 evidence remediated at `3241a75`: timeout and overflow now each spawn a child and
   prove leader, child, and process-group disappearance; overflow emits exactly 64 KiB plus one.
 - 2026-07-20: Whole-branch re-review held M4 again after a resistant-child probe proved the
   supervisor escalated only while the leader was alive, allowing a child that ignored `SIGTERM` to
   survive. M1 is reopened for a red test and bounded production fix.
-- 2026-07-20: M1 completed at `6329f5e`: the resistant-child test failed before the production fix
+- 2026-07-20: M1 completed at `697e0b8`: the resistant-child test failed before the production fix
   because the process group remained alive, then passed after escalation was based on group
   liveness and leader reaping was made independent.
 - 2026-07-20: M2 rerun: 17 worker/parser/containment tests passed; Ruff check/format, strict mypy,
   parser governance, and diff checks passed.
-- 2026-07-20: M3 rerun at `6329f5e040f1`: full regression passed with 1232 Python tests,
+- 2026-07-20: M3 rerun at `697e0b8400bc`: full regression passed with 1232 Python tests,
   one optional ONNX skip, 51 Swift tests, and the product build. Fresh runtime admission remained
   blocked by host resources, so the foreground smoke was not run.
-- 2026-07-20: M4 complete at `a734519`: independent base-to-head re-review approved with no
+- 2026-07-20: M4 complete at `69dcea7`: independent base-to-head re-review approved with no
   Critical or Important findings. The worktree and base-to-head diff checks were clean. The plan is
   archived; foreground runtime verification remains externally blocked by resource admission.
 
@@ -154,6 +154,6 @@
 - If tests are flaky: retain the existing production supervisor and remove only the new test commit
   after documenting the exact nondeterminism; do not weaken limits.
 - If a production regression appears: revert only the new bounded fix commit after preserving its
-  failing evidence; keep the previous `4cb6fc2` supervisor.
+  failing evidence; keep the previous `1aa80a6` supervisor.
 - Safe fallback: keep the branch local and leave the runtime status blocked until resource admission
   can be observed.

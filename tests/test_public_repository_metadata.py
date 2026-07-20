@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+import re
+import subprocess
 import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+EXTERNAL_REVISION_IDS = {
+    # Pinned upstream Hugging Face model revision.
+    "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    # Historical local review-agent identifier, not a repository commit.
+    "3b72a54e",
+}
 
 
 def _project_metadata(path: Path) -> dict[str, object]:
@@ -51,3 +59,29 @@ def test_every_workspace_package_keeps_apache_2_license() -> None:
 def test_internal_agent_reports_are_not_part_of_the_public_tree() -> None:
     assert not (ROOT / ".superpowers" / "sdd" / "task-1-report.md").exists()
     assert not (ROOT / ".superpowers" / "sdd" / "task-4-report.md").exists()
+
+
+def test_repository_commit_evidence_is_reachable_from_published_head() -> None:
+    failures: list[str] = []
+    reachable_commits = subprocess.run(
+        ["git", "rev-list", "HEAD"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    for directory in (ROOT / "docs", ROOT / "plans"):
+        for path in directory.rglob("*.md"):
+            text = path.read_text(encoding="utf-8")
+            for match in re.finditer(r"`([0-9a-f]{7,40})`", text):
+                revision = match.group(1)
+                if revision in EXTERNAL_REVISION_IDS:
+                    continue
+                location = f"{path.relative_to(ROOT)}:{text.count(chr(10), 0, match.start()) + 1}"
+                matches = [commit for commit in reachable_commits if commit.startswith(revision)]
+                if len(matches) != 1:
+                    failures.append(
+                        f"{location}: {revision} matches {len(matches)} commits reachable from HEAD"
+                    )
+
+    assert not failures, "\n".join(failures)

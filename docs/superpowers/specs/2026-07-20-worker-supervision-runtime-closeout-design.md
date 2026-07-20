@@ -56,7 +56,7 @@ packaging readiness.
 
 ## Verification
 
-- Prove the overflow regression test fails against pre-drain commit `8e46baf`.
+- Prove the overflow regression test fails against pre-drain commit `8e9cf0e`.
 - Run the new tests on the current branch.
 - Run all document-worker and ingestion worker-runner tests.
 - Run Ruff check/format, strict mypy, parser governance, and `git diff --check`.

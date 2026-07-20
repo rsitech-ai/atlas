@@ -248,7 +248,7 @@ benchmark exist. Do not claim Phase 2D.
 - [x] **Step 1: Run gates and update ledgers**
 
 Proven at closure: `uv lock --check`, ruff check/format, mypy, full pytest **973** passed,
-Swift **44** passed. Tip code evidence through `a51545d`; Docling remains blocked; no
+Swift **44** passed. Tip code evidence through `d6e49b0`; Docling remains blocked; no
 embeddings/indexes/publication; criterion 15 unclaimed.
 
 ```bash

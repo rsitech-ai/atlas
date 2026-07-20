@@ -389,7 +389,7 @@ git add packages/observability pyproject.toml uv.lock
 git commit -m "feat: add local privacy-safe tracing"
 ```
 
-Closure evidence through `01c6693`: exact import RED retained; 45 focused observability tests and 487 PostgreSQL-configured repository tests pass; Ruff, formatting, strict source mypy, lock, and diff checks pass; real multi-process initialization/append and cross-process partial-prefix poison regressions pass; current development-component zero-egress trace smoke denies external TCP and mDNS, permits the exact Unix canary, writes one owner-private canonical metadata record, and remains explicitly narrower than release proof. Independent final review approved with no findings.
+Closure evidence through `6933095`: exact import RED retained; 45 focused observability tests and 487 PostgreSQL-configured repository tests pass; Ruff, formatting, strict source mypy, lock, and diff checks pass; real multi-process initialization/append and cross-process partial-prefix poison regressions pass; current development-component zero-egress trace smoke denies external TCP and mDNS, permits the exact Unix canary, writes one owner-private canonical metadata record, and remains explicitly narrower than release proof. Independent final review approved with no findings.
 
 ### Task 5: Resource arbiter and model registry/provider boundary
 
@@ -476,7 +476,7 @@ git add packages/contracts packages/models pyproject.toml uv.lock
 git commit -m "feat: add model and resource boundaries"
 ```
 
-Closure evidence through `fe5d47f`: the exact import RED is retained; 132 focused model tests and 619 PostgreSQL-configured repository tests pass; Ruff, formatting, strict source mypy, lock, and diff checks pass. Registry admission reconstructs a validated immutable snapshot, detects synchronized descriptor/parent/path replacement, accepts only canonical SPDX or the exact reserved fixture license form, and cannot promote a Phase 1 candidate to production. The unavailable provider performs no filesystem/network/subprocess work, one-heavy admission is atomic with lease-forgery/cancellation recovery coverage, and the current development-component zero-egress smoke denies external TCP and mDNS while admitting the exact local Unix canary. Independent final review approved `fe5d47f` with no Critical or Important findings. No model was downloaded, loaded, executed, benchmarked, qualified, or promoted.
+Closure evidence through `1ca71e4`: the exact import RED is retained; 132 focused model tests and 619 PostgreSQL-configured repository tests pass; Ruff, formatting, strict source mypy, lock, and diff checks pass. Registry admission reconstructs a validated immutable snapshot, detects synchronized descriptor/parent/path replacement, accepts only canonical SPDX or the exact reserved fixture license form, and cannot promote a Phase 1 candidate to production. The unavailable provider performs no filesystem/network/subprocess work, one-heavy admission is atomic with lease-forgery/cancellation recovery coverage, and the current development-component zero-egress smoke denies external TCP and mDNS while admitting the exact local Unix canary. Independent final review approved `1ca71e4` with no Critical or Important findings. No model was downloaded, loaded, executed, benchmarked, qualified, or promoted.
 
 ### Task 6: Real diagnostics, native Command Center, and Phase 1 end-to-end gate
 
@@ -568,7 +568,7 @@ git commit -m "feat: complete durable local runtime"
 
 Update `docs/production-plan.md` with runtime observations, exact test counts, known release-only limitations, and the next Phase 2 blocker. Run a broad Phase 1 branch review and resolve every Critical/Important finding before marking Phase 1 complete.
 
-Closure evidence through `647c25b`: exact REDs were recorded before implementation; 660
+Closure evidence through `f8f9bcb`: exact REDs were recorded before implementation; 660
 PostgreSQL-configured Python tests and 21 Swift tests pass with Ruff, formatting, strict source
 mypy, lock, shell syntax, debug build, and release build. The launcher verifies schema `1.1.0` and
 the exact degraded-only-model eight-component contract against the same owner-private data root
@@ -577,10 +577,10 @@ corruption/recovery, engine loss with stale evidence and same-window recovery, r
 1120×760 and 860×600 content layouts, Light/Dark, increased contrast, large text, Reduce Motion,
 VoiceOver accessibility order, keyboard refresh, and a second window. Development zero-egress
 denied external TCP and mDNS while allowing only the exact PostgreSQL socket. Independent source
-review approved `7864630` and the debug-only presentation-QA delta through `647c25b` with no
+review approved `2669500` and the debug-only presentation-QA delta through `f8f9bcb` with no
 Critical or Important findings. The current physical thermal state may honestly block runtime work;
 the degraded-only-model launcher gate is rerun only when the machine returns to nominal/fair. After
-the sampler returned `ThermalState.FAIR`, the standard no-QA launcher passed at `91d9481`: schema
+the sampler returned `ThermalState.FAIR`, the standard no-QA launcher passed at `3ddba6e`: schema
 `1.1.0`, overall `degraded`, seven healthy components, and only `model_registry` degraded, with the
 launchd engine process carrying the exact disposable `RSI_ATLAS_DATA_ROOT`.
 

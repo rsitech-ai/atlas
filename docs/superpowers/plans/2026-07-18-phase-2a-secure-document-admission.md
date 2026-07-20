@@ -387,7 +387,7 @@ git add packages services pyproject.toml uv.lock
 git commit -m "feat: admit immutable PDFs through local boundaries"
 ```
 
-Closure evidence through `ab40fb2`: strict admission contracts and fail-closed policy are
+Closure evidence through `90de6b1`: strict admission contracts and fail-closed policy are
 independently approved; append-only acquisition, decision, duplicate, and outbox evidence is
 transactional and reconstructs across normalized and JSON representations; raw staged PDFs stream
 into CAS before downstream policy or persistence. CAS derives and verifies bounded prefix/suffix
@@ -562,7 +562,7 @@ Expected: Phase 2A is a truthful durable admission checkpoint, not a claim that 
 - 2026-07-18: Completed: approved §§12–15, acceptance criteria 10–24, Appendix D, current Phase 1 storage/runtime seams, and PDF tooling constraints reviewed.
 - 2026-07-18: Current: Task 1 strict acquisition/admission contract RED.
 - 2026-07-18: Next: implement Tasks 1–6 sequentially with independent review gates, then write the Phase 2B parser/preflight/canonicalization plan.
-- 2026-07-19: Completed: Tasks 1–6, 827 Python and 43 Swift tests, foreground native evidence, hard-kill/DB-down/restart recovery, live API/direct-CLI coexistence, adversarial and zero-egress matrices, and independent review with no remaining Critical/Important findings through `113110c`.
+- 2026-07-19: Completed: Tasks 1–6, 827 Python and 43 Swift tests, foreground native evidence, hard-kill/DB-down/restart recovery, live API/direct-CLI coexistence, adversarial and zero-egress matrices, and independent review with no remaining Critical/Important findings through `a4f75c9`.
 - 2026-07-19: Next: Phase 2B promoted parser/preflight/canonical-page evidence; Phase 2A remains raw admission and makes no parsing/searchability claim.
 
 ## Rollback / Recovery
