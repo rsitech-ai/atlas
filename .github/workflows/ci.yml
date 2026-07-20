@@ -67,6 +67,9 @@ jobs:
           packages/recovery/tests
           packages/storage/tests/test_database_policy.py
           packages/storage/tests/test_artifact_store.py
+          services/engine/tests/test_runtime.py
+          services/engine/tests/test_diagnostics.py
+          services/engine/tests/test_cli.py
           tests
           --ignore=infra/security/tests
 

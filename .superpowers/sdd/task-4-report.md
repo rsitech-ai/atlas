@@ -85,3 +85,18 @@ The focused checks above do not repeat the historical exact-head full regression
 production runtime, staged package, Developer ID signing, notarization, Gatekeeper clean install,
 or acceptance completion. The current CI intentionally still excludes full Unix-socket PostgreSQL
 integration and owner-controlled signed-release work.
+
+## Review follow-up: shared status-payload consistency
+
+A final review found that the Swift `system_status_v1_1` fixture and the Python diagnostics/CLI
+test fixtures still carried the pre-Task-4 model summary/remediation. Test-first updates produced
+the expected RED failures in the diagnostics fixture and Swift decoder; after updating the shared
+payload and direct consumers, the relevant engine suite reported **36 passed, 3 skipped** and the
+full Swift package suite reported **51 tests passed**. The full direct sweep also found and updated
+the stale CLI doctor-output assertion.
+
+The Ubuntu `python-unit` CI selection now explicitly includes the non-PostgreSQL
+`services/engine/tests/test_runtime.py`, `test_diagnostics.py`, and `test_cli.py`, so the runtime
+copy, diagnostics fixtures, and doctor presentation cannot silently regress while the broader
+PostgreSQL integration suite remains intentionally separate. The stale-copy scan, excluding only
+the immutable active Task 4 plan that documents the search itself, reports no matches.

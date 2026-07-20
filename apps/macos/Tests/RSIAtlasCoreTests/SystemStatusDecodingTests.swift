@@ -34,7 +34,7 @@ struct SystemStatusDecodingTests {
         #expect(status.components.first(where: { $0.id == "database" })?.remediation == nil)
         #expect(
             status.components.first(where: { $0.id == "model_registry" })?.remediation
-                == "Model execution remains disabled until evaluation and approval are implemented."
+                == "Select and admit a provider only after governed evaluation and owner approval."
         )
     }
 
