@@ -98,6 +98,7 @@
 - 2026-07-21: Artifact inventory verification passes against the staged app with exact file hashes, installed Python distributions, CPython/PostgreSQL/pgvector, all seven relocated native providers, and no missing license evidence. Release check now reads and verifies the embedded inventory instead of creating an unrelated `dist/sbom.cdx.json`.
 - 2026-07-21: The first full regression exposed a pre-existing collector API classification defect: a missing default PostgreSQL socket raised `ValueError` and was reported as invalid client input (422) instead of service unavailable (503). Narrowed the client-error boundary and added missing-fixture coverage; focused reproduction now passes.
 - 2026-07-21: Full regression passed at code commit `641f12912700`: 1308 Python tests passed, one optional ONNX test skipped, 55 Swift tests passed, Swift product build passed, and lock/Ruff/format/strict-mypy/parser-governance gates passed.
+- 2026-07-21: Final workflow inspection found `package_release.sh` still assembled the obsolete shell-only app. It now builds the pinned runtime payload and passes it explicitly into atomic app assembly before the fail-closed signing/notarization gate; the script contract locks this order and argument.
 - 2026-07-21: Next: exact-head full regression, final independent review, PR/merge, then stop at the owner notary-credential gate rather than publishing an unnotarized download.
 
 ## Rollback / Recovery

@@ -21,9 +21,11 @@ def test_runtime_builder_cli_is_pinned_and_reports_live_verified_closure() -> No
 def test_package_release_assembles_before_release_gate() -> None:
     script = (ROOT / "script" / "package_release.sh").read_text(encoding="utf-8")
 
+    runtime_build = script.index("build_release_runtime.py")
     assembly = script.index("assemble_release_app.py")
     release_gate = script.index("release_check.py --require-release")
-    assert assembly < release_gate
+    assert runtime_build < assembly < release_gate
+    assert '--runtime-payload "$RUNTIME_PAYLOAD"' in script
     assert "git rev-list --count HEAD" in script
 
 
