@@ -53,15 +53,19 @@ class SafeModeStore:
             try:
                 file_fd = os.open(self.path.name, _READ_FLAGS, dir_fd=directory_fd)
             except FileNotFoundError:
-                return _inactive_state()
-            try:
-                metadata = os.fstat(file_fd)
-                if not _trusted_file(metadata):
-                    return _unreadable_state()
-                payload = _read_limited(file_fd)
-            finally:
-                os.close(file_fd)
-            return SafeModeState.model_validate_json(payload)
+                state = _inactive_state()
+            else:
+                try:
+                    metadata = os.fstat(file_fd)
+                    if not _trusted_file(metadata):
+                        return _unreadable_state()
+                    payload = _read_limited(file_fd)
+                finally:
+                    os.close(file_fd)
+                state = SafeModeState.model_validate_json(payload)
+            if _exit_guard_present(directory_fd):
+                return _unreadable_state()
+            return state
         except (OSError, ValueError):
             return _unreadable_state()
         finally:
@@ -78,8 +82,7 @@ class SafeModeStore:
 
     def exit(self) -> SafeModeState:
         try:
-            if not self._create_exit_guard():
-                return _unreadable_state()
+            self._create_exit_guard()
             self._save_once(_inactive_state())
         except OSError:
             return _unreadable_state()
@@ -138,26 +141,34 @@ class SafeModeStore:
     def _open_directory(self) -> int:
         return os.open(self.path.parent, _DIRECTORY_FLAGS)
 
-    def _create_exit_guard(self) -> bool:
-        """Durably mark an exit in progress before replacing active state."""
+    def _create_exit_guard(self) -> None:
+        """Durably and atomically replace any prior marker before an exit."""
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         directory_fd = self._open_directory()
-        guard_fd: int | None = None
+        temporary_name = f".safe-mode-exit-guard-{secrets.token_hex(16)}.tmp"
+        temporary_fd: int | None = None
+        replaced = False
         try:
-            try:
-                guard_fd = os.open(_EXIT_GUARD_NAME, _WRITE_FLAGS, _STATE_MODE, dir_fd=directory_fd)
-            except FileExistsError:
-                return False
-            _write_all(guard_fd, b"safe-mode-exit-guard\n")
-            os.fchmod(guard_fd, _STATE_MODE)
-            os.fsync(guard_fd)
-            os.close(guard_fd)
-            guard_fd = None
+            temporary_fd = os.open(temporary_name, _WRITE_FLAGS, _STATE_MODE, dir_fd=directory_fd)
+            _write_all(temporary_fd, b"safe-mode-exit-guard\n")
+            os.fchmod(temporary_fd, _STATE_MODE)
+            os.fsync(temporary_fd)
+            os.close(temporary_fd)
+            temporary_fd = None
+            os.replace(
+                temporary_name,
+                _EXIT_GUARD_NAME,
+                src_dir_fd=directory_fd,
+                dst_dir_fd=directory_fd,
+            )
+            replaced = True
             os.fsync(directory_fd)
-            return True
         finally:
-            if guard_fd is not None:
-                os.close(guard_fd)
+            if temporary_fd is not None:
+                os.close(temporary_fd)
+            if not replaced:
+                with suppress(FileNotFoundError):
+                    os.unlink(temporary_name, dir_fd=directory_fd)
             os.close(directory_fd)
 
     def _remove_exit_guard(self) -> None:

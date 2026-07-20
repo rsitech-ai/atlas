@@ -232,3 +232,79 @@ def test_exit_guard_blocks_after_sync_failure_and_recovery_enospc(
     with pytest.raises(safe_mode.SafeModeBlocked, match="models"):
         controller.require(SafeModeCapability.MODELS)
     assert recovery_temp_open_attempted is False
+
+
+def test_exit_retries_a_stranded_guard_after_transient_sync_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data_root = tmp_path / "data"
+    store = _store(data_root)
+    controller = safe_mode.SafeModeController(store)
+    controller.enter(reason="integrity_failure", entered_at=NOW)
+    actual_fsync = safe_mode.os.fsync
+    actual_replace = safe_mode.os.replace
+    inactive_state_replaced = False
+    directory_sync_failed = False
+
+    def record_inactive_replacement(source, destination, *args, **kwargs) -> None:
+        nonlocal inactive_state_replaced
+        actual_replace(source, destination, *args, **kwargs)
+        if destination == store.path.name:
+            inactive_state_replaced = True
+
+    def fail_directory_sync_after_inactive_replacement(fd: int) -> None:
+        nonlocal directory_sync_failed
+        if (
+            inactive_state_replaced
+            and stat.S_ISDIR(safe_mode.os.fstat(fd).st_mode)
+            and not directory_sync_failed
+        ):
+            directory_sync_failed = True
+            raise OSError("transient directory sync failure")
+        actual_fsync(fd)
+
+    with monkeypatch.context() as transient_failure:
+        transient_failure.setattr(safe_mode.os, "replace", record_inactive_replacement)
+        transient_failure.setattr(
+            safe_mode.os, "fsync", fail_directory_sync_after_inactive_replacement
+        )
+        _assert_fail_closed(controller.exit())
+
+    assert inactive_state_replaced is True
+    assert directory_sync_failed is True
+    _assert_fail_closed(_store(data_root).load())
+
+    retry = safe_mode.SafeModeController(_store(data_root))
+    outcome = retry.exit()
+
+    assert outcome.active is False
+    assert _store(data_root).load().active is False
+    assert (store.path.parent / "safe-mode.exit-guard").exists() is False
+
+
+def test_load_rechecks_guard_created_after_state_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _store(tmp_path / "data")
+    store.enter(reason="integrity_failure", entered_at=NOW)
+    store.exit()
+    actual_read_limited = safe_mode._read_limited
+    guard_path = store.path.parent / "safe-mode.exit-guard"
+
+    def create_guard_after_read(file_fd: int) -> bytes:
+        payload = actual_read_limited(file_fd)
+        guard_fd = os.open(
+            guard_path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            0o600,
+        )
+        try:
+            os.write(guard_fd, b"guard-created-during-load\n")
+            os.fsync(guard_fd)
+        finally:
+            os.close(guard_fd)
+        return payload
+
+    monkeypatch.setattr(safe_mode, "_read_limited", create_guard_after_read)
+
+    _assert_fail_closed(store.load())

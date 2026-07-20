@@ -274,3 +274,62 @@ $ git diff --check
   blocked and asserts no recovery temporary file is attempted.
 - All direct inactive `SafeModeStore.save()` calls route through the guarded
   exit transition, preventing callers from bypassing the marker protocol.
+
+## Final Review Fix — 2026-07-20
+
+### Findings Addressed
+
+1. Explicit exit now atomically replaces the fixed guard marker before every
+   attempt. A valid, malformed, symlinked, or nonregular stranded marker is
+   therefore reconciled descriptor-relatively rather than permanently blocking
+   an authenticated retry.
+2. `load()` checks the guard before opening state and again after it has read
+   and validated that state. A guard installed during the read resolves active
+   Safe Mode instead of returning the now-stale inactive state.
+
+### RED — retry and TOCTOU regressions
+
+```text
+$ uv run pytest packages/recovery/tests/test_safe_mode_store.py -q
+............FF                                                           [100%]
+...
+E       AssertionError: assert True is False
+E       AssertionError: assert False is True
+2 failed, 12 passed in 0.19s
+```
+
+The first failure left a durable guard through a transient inactive-sync
+failure, restored the filesystem, and showed retry remained active. The second
+created a marker inside the state-read seam and showed `load()` returned
+inactive after only its original guard check.
+
+### GREEN — final review verification
+
+```text
+$ uv run pytest packages/recovery/tests/test_safe_mode_store.py packages/recovery/tests/test_backup_restore.py -q
+..................                                                       [100%]
+18 passed in 0.17s
+
+$ uv run ruff check packages/recovery/src/rsi_atlas_recovery/safe_mode.py packages/recovery/tests/test_safe_mode_store.py
+All checks passed!
+
+$ uv run pytest packages/recovery -q
+....................                                                     [100%]
+20 passed in 0.18s
+
+$ git diff --check
+<no output; success>
+```
+
+### Final Review Self-Review
+
+- Guard creation writes and syncs a fresh owner-private temporary marker, then
+  atomically replaces the fixed marker by directory descriptor. This safely
+  reconciles old symlinks and nonregular markers without any marker-absent
+  transition window.
+- The post-validation guard recheck makes the read operation linearize before
+  a newly-created guard or fail closed when that guard is already visible.
+- The retry regression proves a fresh controller can complete inactive-state
+  persistence and marker removal after the original filesystem failure is
+  gone; the TOCTOU regression creates the marker after state bytes are read and
+  verifies inactive is not returned.
