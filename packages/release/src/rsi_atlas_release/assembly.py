@@ -17,6 +17,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Final
 
+from rsi_atlas_release.macho import MachOParseError, verify_macho_closure
 from rsi_atlas_release.sbom import build_sbom_from_lock
 
 REQUIRED_RUNTIME_COMPONENTS: Final[Mapping[str, Path]] = MappingProxyType(
@@ -52,6 +53,7 @@ _RUNTIME_LEGAL_FILES: Final[tuple[Path, ...]] = (
     Path("Contents/Resources/Legal/third-party/PostgreSQL-COPYRIGHT.txt"),
     Path("Contents/Resources/Legal/third-party/pgvector-LICENSE.txt"),
 )
+_RUNTIME_PROVENANCE_FILE: Final = Path("Contents/Resources/runtime-build-inputs.json")
 _FORBIDDEN_PYTHON_ARTIFACT_PREFIXES: Final[tuple[str, ...]] = (
     "_pytest",
     "mypy",
@@ -147,6 +149,10 @@ def validate_runtime_payload(runtime_payload: Path) -> None:
         raise ValueError(f"runtime payload entrypoints are invalid: {','.join(blockers)}")
     for relative_path in _RUNTIME_LEGAL_FILES:
         _require_source_file(runtime_payload / relative_path, label=str(relative_path))
+    _require_source_file(
+        runtime_payload / _RUNTIME_PROVENANCE_FILE,
+        label=str(_RUNTIME_PROVENANCE_FILE),
+    )
 
     site_packages = (
         runtime_payload
@@ -175,6 +181,10 @@ def validate_runtime_payload(runtime_payload: Path) -> None:
             or forbidden_prefix
         ):
             raise ValueError(f"forbidden Python runtime artifact: {candidate.name}")
+    try:
+        verify_macho_closure(runtime_payload)
+    except (MachOParseError, ValueError) as error:
+        raise ValueError("runtime payload Mach-O closure is invalid") from error
 
 
 def _copy_runtime_payload(*, runtime_payload: Path, staged_bundle: Path) -> None:
@@ -183,6 +193,10 @@ def _copy_runtime_payload(*, runtime_payload: Path, staged_bundle: Path) -> None
     shutil.copytree(
         source_contents / "Resources" / "runtime",
         destination_contents / "Resources" / "runtime",
+    )
+    shutil.copy2(
+        source_contents / "Resources" / "runtime-build-inputs.json",
+        destination_contents / "Resources" / "runtime-build-inputs.json",
     )
     shutil.copytree(
         source_contents / "Resources" / "Legal" / "third-party",
@@ -238,13 +252,23 @@ def _write_staged_bundle(
         _copy_runtime_payload(runtime_payload=runtime_payload, staged_bundle=staged_bundle)
 
     entrypoint_blockers = inspect_runtime_entrypoints(staged_bundle)
+    closure_verified = False
+    if runtime_payload is not None and not entrypoint_blockers:
+        try:
+            verify_macho_closure(staged_bundle)
+            closure_verified = True
+        except (MachOParseError, ValueError):
+            closure_verified = False
+    blockers = list(entrypoint_blockers)
+    if not closure_verified:
+        blockers.append(RUNTIME_DEPENDENCY_CLOSURE_BLOCKER)
     manifest = {
-        "blockers": [*entrypoint_blockers, RUNTIME_DEPENDENCY_CLOSURE_BLOCKER],
+        "blockers": blockers,
         "build_number": build_number,
         "bundle_identifier": "ai.rsitech.RSIAtlas",
         "executable_sha256": sha256(executable.read_bytes()).hexdigest(),
-        "honesty_label": "runtime_unverified",
-        "runtime_dependency_closure_verified": False,
+        "honesty_label": ("runtime_closure_verified" if closure_verified else "runtime_unverified"),
+        "runtime_dependency_closure_verified": closure_verified,
         "runtime_entrypoints_present": not entrypoint_blockers,
         "schema_version": "rsi-atlas.release-assembly.v1",
         "version": version,

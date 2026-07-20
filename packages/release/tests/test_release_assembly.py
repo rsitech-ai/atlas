@@ -55,8 +55,23 @@ def _runtime_payload_fixture(path: Path) -> Path:
     for relative_path, file_type in components.items():
         component = path / relative_path
         component.parent.mkdir(parents=True, exist_ok=True)
-        component.write_bytes(_thin_arm64_mach_o(file_type=file_type))
-        component.chmod(0o700)
+        source = path / f"{component.name}.c"
+        source.write_text(
+            "int main(void) { return 0; }\n"
+            if file_type == 2
+            else "int vector_sample(void) { return 0; }\n",
+            encoding="utf-8",
+        )
+        arguments = ["/usr/bin/clang", "-arch", "arm64"]
+        if file_type != 2:
+            arguments.extend(["-dynamiclib", "-install_name", f"@rpath/{component.name}"])
+        subprocess.run(
+            [*arguments, str(source), "-o", str(component)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        source.unlink()
     site_packages = (
         path
         / "Contents"
@@ -76,6 +91,11 @@ def _runtime_payload_fixture(path: Path) -> Path:
     (legal / "CPython-LICENSE.txt").write_text("PSF license\n", encoding="utf-8")
     (legal / "PostgreSQL-COPYRIGHT.txt").write_text("PostgreSQL license\n", encoding="utf-8")
     (legal / "pgvector-LICENSE.txt").write_text("PostgreSQL license\n", encoding="utf-8")
+    provenance = path / "Contents" / "Resources" / "runtime-build-inputs.json"
+    provenance.write_text(
+        '{"schema_version":"rsi-atlas.runtime-build-inputs.v1"}\n',
+        encoding="utf-8",
+    )
     return path
 
 
@@ -175,8 +195,8 @@ def test_assemble_release_app_copies_validated_runtime_payload(tmp_path: Path) -
         )
     )
     assert manifest["runtime_entrypoints_present"] is True
-    assert manifest["runtime_dependency_closure_verified"] is False
-    assert manifest["blockers"] == ["runtime_dependency_closure_unverified"]
+    assert manifest["runtime_dependency_closure_verified"] is True
+    assert manifest["blockers"] == []
     assert (
         destination / "Contents" / "Resources" / "runtime" / "python" / "bin" / "python3"
     ).read_bytes() == (
@@ -185,6 +205,7 @@ def test_assemble_release_app_copies_validated_runtime_payload(tmp_path: Path) -
     assert (
         destination / "Contents" / "Resources" / "Legal" / "third-party" / "CPython-LICENSE.txt"
     ).is_file()
+    assert (destination / "Contents" / "Resources" / "runtime-build-inputs.json").is_file()
 
 
 @pytest.mark.parametrize(
