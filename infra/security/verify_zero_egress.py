@@ -97,6 +97,7 @@ class _ProcBSDInfo(ctypes.Structure):
 
 _PROC_PIDTBSDINFO = 3
 _TRACKING_POLL_SECONDS = 0.001
+_SUPERVISOR_HANDSHAKE_SECONDS = 3.0
 _SUPERVISOR_GRACE_SECONDS = 0.05
 _TARGET_GATE_CODE = (
     "import os,sys; gate=int(sys.argv[1]); "
@@ -519,6 +520,37 @@ def _read_supervisor_target(
     return process_id
 
 
+def _supervisor_handshake_deadline() -> float:
+    return time.monotonic() + _SUPERVISOR_HANDSHAKE_SECONDS
+
+
+def _wait_for_tracked_process(
+    process: subprocess.Popen[bytes],
+    tracker: _DarwinProcessTracker,
+    *,
+    deadline: float,
+) -> tuple[int | None, bool]:
+    while True:
+        tracker.refresh()
+        if time.monotonic() >= deadline:
+            return None, True
+        status = process.poll()
+        if status is not None:
+            tracker.refresh()
+            return status, False
+        time.sleep(_TRACKING_POLL_SECONDS)
+
+
+def _release_target_with_deadline(
+    control_descriptor: int,
+    *,
+    timeout_seconds: float,
+) -> float:
+    deadline = time.monotonic() + timeout_seconds
+    os.write(control_descriptor, b"G")
+    return deadline
+
+
 def _run_sandboxed(
     *,
     sandbox_executable: Path,
@@ -565,7 +597,7 @@ def _run_sandboxed(
             target_id = _read_supervisor_target(
                 ready_read,
                 process,
-                deadline=time.monotonic() + min(timeout_seconds, 3),
+                deadline=_supervisor_handshake_deadline(),
             )
         except VerificationError as handshake_error:
             rejected_status = process.poll()
@@ -577,21 +609,15 @@ def _run_sandboxed(
             _cleanup_tracked_processes(process, tracker)
             return rejected_status, False
         tracker.observe(target_id, expected_parent=process.pid)
-        os.write(control_write, b"G")
-        deadline = time.monotonic() + timeout_seconds
-        status: int | None = None
-        timed_out = False
-        while True:
-            tracker.refresh()
-            status = process.poll()
-            if status is not None:
-                tracker.refresh()
-                break
-            if time.monotonic() >= deadline:
-                status = None
-                timed_out = True
-                break
-            time.sleep(_TRACKING_POLL_SECONDS)
+        deadline = _release_target_with_deadline(
+            control_write,
+            timeout_seconds=timeout_seconds,
+        )
+        status, timed_out = _wait_for_tracked_process(
+            process,
+            tracker,
+            deadline=deadline,
+        )
         _cleanup_tracked_processes(process, tracker)
         return status, timed_out
     except VerificationError:

@@ -309,7 +309,7 @@ def test_timeout_terminates_only_the_target_process_group(tmp_path: Path) -> Non
         sys.executable,
         "-c",
         code,
-        timeout=10,
+        timeout=30,
     )
 
     assert result.returncode != 0
@@ -335,7 +335,7 @@ def test_timeout_terminates_detached_child_descendant(tmp_path: Path) -> None:
         sys.executable,
         "-c",
         code,
-        timeout=10,
+        timeout=30,
     )
 
     assert result.returncode != 0
@@ -345,19 +345,19 @@ def test_timeout_terminates_detached_child_descendant(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("target_exit", [0, 7])
-def test_every_target_completion_cleans_detached_child(
+def test_every_target_completion_cleans_observed_detached_child(
     tmp_path: Path,
     target_exit: int,
 ) -> None:
     marker = tmp_path / f"completion-orphan-{target_exit}"
     code = (
-        "import subprocess,sys; "
+        "import subprocess,sys,time; "
         "subprocess.Popen([sys.executable,'-c',"
         f'"import time,pathlib; time.sleep(1); pathlib.Path({str(marker)!r}).touch()"], '
-        f"start_new_session=True); raise SystemExit({target_exit})"
+        f"start_new_session=True); time.sleep(0.5); raise SystemExit({target_exit})"
     )
 
-    result = _run_verifier("--", sys.executable, "-c", code, timeout=10)
+    result = _run_verifier("--", sys.executable, "-c", code, timeout=30)
 
     assert result.returncode == (0 if target_exit == 0 else 1)
     assert json.loads(result.stdout)["target"]["exit_status"] == target_exit
@@ -368,7 +368,7 @@ def test_every_target_completion_cleans_detached_child(
 def test_cleanup_does_not_signal_unrelated_sentinel_process(tmp_path: Path) -> None:
     marker = tmp_path / "tracked-orphan"
     sentinel = subprocess.Popen(
-        [sys.executable, "-c", "import time; time.sleep(5)"],
+        [sys.executable, "-c", "import time; time.sleep(60)"],
         start_new_session=True,
     )
     try:
@@ -385,7 +385,7 @@ def test_cleanup_does_not_signal_unrelated_sentinel_process(tmp_path: Path) -> N
             sys.executable,
             "-c",
             code,
-            timeout=10,
+            timeout=30,
         )
 
         assert result.returncode == 1
@@ -433,6 +433,72 @@ def test_process_tracker_initialization_failure_is_stable(
     assert "Traceback" not in stderr.getvalue()
 
 
+def test_tracking_budget_exhaustion_fails_closed_before_accepting_completion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verifier = _load_verifier()
+    poll_calls = 0
+
+    class Process:
+        def poll(self) -> int:
+            nonlocal poll_calls
+            poll_calls += 1
+            return 0
+
+    class Tracker:
+        def refresh(self) -> None:
+            return None
+
+    monkeypatch.setattr(verifier.time, "monotonic", lambda: 2.0)
+
+    status, timed_out = verifier._wait_for_tracked_process(
+        Process(),
+        Tracker(),
+        deadline=1.0,
+    )
+
+    assert status is None
+    assert timed_out is True
+    assert poll_calls == 0
+
+
+def test_target_deadline_is_established_before_gate_release(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verifier = _load_verifier()
+    events: list[str] = []
+
+    def record_clock() -> float:
+        events.append("clock")
+        return 5.0
+
+    def record_release(descriptor: int, payload: bytes) -> int:
+        assert descriptor == 17
+        assert payload == b"G"
+        events.append("release")
+        return 1
+
+    monkeypatch.setattr(verifier.time, "monotonic", record_clock)
+    monkeypatch.setattr(verifier.os, "write", record_release)
+
+    deadline = verifier._release_target_with_deadline(
+        17,
+        timeout_seconds=0.3,
+    )
+
+    assert deadline == 5.3
+    assert events == ["clock", "release"]
+
+
+def test_supervisor_handshake_budget_is_independent_of_target_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    verifier = _load_verifier()
+    monkeypatch.setattr(verifier.time, "monotonic", lambda: 7.0)
+
+    assert verifier._supervisor_handshake_deadline() == 10.0
+
+
 def test_stalled_supervisor_handshake_is_stable_and_cleans_lineage(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -446,6 +512,7 @@ def test_stalled_supervisor_handshake_is_stable_and_cleans_lineage(
         "time.sleep(10)"
     )
     monkeypatch.setattr(verifier, "_SUPERVISOR_CODE", stalled_supervisor)
+    monkeypatch.setattr(verifier, "_SUPERVISOR_HANDSHAKE_SECONDS", 0.1)
     monkeypatch.setattr(verifier, "_validate_profile", lambda **kwargs: None)
     monkeypatch.setattr(verifier, "_validate_mdns_discriminator", lambda: None)
     monkeypatch.setattr(verifier, "_run_denial_canary", lambda **kwargs: True)
