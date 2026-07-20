@@ -3,6 +3,8 @@ name = "rsi-atlas-workspace"
 version = "0.1.0"
 description = "Local-first crypto research OS for Apple Silicon (workspace)"
 license = "Apache-2.0"
+authors = [{ name = "Rafal Sikora" }]
+maintainers = [{ name = "RSI Tech", email = "info@rsitech.ai" }]
 requires-python = ">=3.11,<3.15"
 readme = "README.md"
 dependencies = [
@@ -25,10 +27,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/s1korrrr/atlas"
-Repository = "https://github.com/s1korrrr/atlas"
-Issues = "https://github.com/s1korrrr/atlas/issues"
-Documentation = "https://github.com/s1korrrr/atlas#readme"
+Homepage = "https://rsitech.ai"
+Repository = "https://github.com/rsitech-ai/atlas"
+Issues = "https://github.com/rsitech-ai/atlas/issues"
+Documentation = "https://github.com/rsitech-ai/atlas#readme"
 
 [dependency-groups]
 dev = [
