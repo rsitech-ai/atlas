@@ -70,6 +70,7 @@ def _runtime_payload_fixture(path: Path) -> Path:
     package = site_packages / "rsi_atlas_engine"
     package.mkdir(parents=True)
     (package / "__init__.py").write_text("", encoding="utf-8")
+    (package / "pipeline.py").write_text("", encoding="utf-8")
     legal = path / "Contents" / "Resources" / "Legal" / "third-party"
     legal.mkdir(parents=True)
     (legal / "CPython-LICENSE.txt").write_text("PSF license\n", encoding="utf-8")

@@ -164,8 +164,8 @@ def validate_runtime_payload(runtime_payload: Path) -> None:
         relative = candidate.relative_to(site_packages)
         folded_name = candidate.name.casefold()
         path_parts = tuple(part.casefold() for part in relative.parts)
-        forbidden_prefix = any(
-            part.startswith(_FORBIDDEN_PYTHON_ARTIFACT_PREFIXES) for part in path_parts
+        forbidden_prefix = bool(path_parts) and path_parts[0].startswith(
+            _FORBIDDEN_PYTHON_ARTIFACT_PREFIXES
         )
         if (
             candidate.suffix.casefold() in {".egg-link", ".pth", ".pyc"}
