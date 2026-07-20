@@ -156,6 +156,19 @@ def test_conflicted_import_returns_quarantine() -> None:
     assert body["quarantine"]["reasons"] == ["provider_disagreement_conflicted"]
 
 
+def test_invalid_fixture_is_a_client_error() -> None:
+    client = TestClient(create_app(collector_service=FakeCollectorService()))
+
+    response = client.post(
+        f"/v1/workspaces/{WORKSPACE_ID}/collectors:import-fixture",
+        headers=_headers(),
+        json={"fixture_name": "missing.json"},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Fixture import is invalid."}
+
+
 def test_default_create_app_auto_wires_collectors() -> None:
     """Omitting collector_service still wires CollectorServices from the local DB.
 

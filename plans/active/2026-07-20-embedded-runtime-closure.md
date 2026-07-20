@@ -96,6 +96,7 @@
 - 2026-07-20: M1/M2 foundation passes 40 release/entrypoint tests: atomic payload copying, recursive path-injection/special-file rejection, isolated module entrypoint, native ARM64 launcher, pinned no-dev wheel build, local tool version checks, Git/tree and source/receipt/wheel provenance, and third-party legal inputs.
 - 2026-07-21: M1-M4 implemented. Live closure found 167 Mach-O images / 385 loads with every non-system load resolving in-bundle; isolated Python/PostgreSQL/pgvector, authenticated engine IPC, and normal app quit smokes passed without payload mutation or leaked processes.
 - 2026-07-21: Artifact inventory verification passes against the staged app with exact file hashes, installed Python distributions, CPython/PostgreSQL/pgvector, all seven relocated native providers, and no missing license evidence. Release check now reads and verifies the embedded inventory instead of creating an unrelated `dist/sbom.cdx.json`.
+- 2026-07-21: The first full regression exposed a pre-existing collector API classification defect: a missing default PostgreSQL socket raised `ValueError` and was reported as invalid client input (422) instead of service unavailable (503). Narrowed the client-error boundary and added missing-fixture coverage; focused reproduction now passes.
 - 2026-07-21: Next: exact-head full regression, final independent review, PR/merge, then stop at the owner notary-credential gate rather than publishing an unnotarized download.
 
 ## Rollback / Recovery

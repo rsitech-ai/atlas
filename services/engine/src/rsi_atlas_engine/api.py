@@ -9,6 +9,7 @@ from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import ValidationError
+from rsi_atlas_collectors import FixtureNormalizationError
 from rsi_atlas_contracts import (
     AcquisitionMethod,
     AcquisitionRequest,
@@ -963,9 +964,14 @@ def create_app(
         require_capability(SafeModeCapability.COLLECTORS)
         try:
             body = await request.json()
+            if not isinstance(body, dict):
+                raise TypeError("fixture request must be an object")
             fixture_name = str(body["fixture_name"])
             quality_raw = body.get("provider_quality", ProviderQualityState.SINGLE_SOURCE.value)
             provider_quality = ProviderQualityState(str(quality_raw))
+        except (KeyError, TypeError, ValueError) as error:
+            raise HTTPException(status_code=422, detail="Fixture import is invalid.") from error
+        try:
             collectors = await run_in_threadpool(resolve_collectors)
             result = await run_in_threadpool(
                 collectors.import_fixture,
@@ -986,7 +992,7 @@ def create_app(
             }
         except HTTPException:
             raise
-        except (ValidationError, KeyError, TypeError, ValueError) as error:
+        except (FixtureNormalizationError, ValidationError) as error:
             raise HTTPException(status_code=422, detail="Fixture import is invalid.") from error
         except Exception as error:
             raise HTTPException(
