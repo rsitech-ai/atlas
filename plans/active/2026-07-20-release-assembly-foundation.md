@@ -138,7 +138,12 @@
 - 2026-07-20: M1 red confirmed the runtime-completeness API was absent. M1 green now defines four
   fixed embedded-runtime paths, propagates their stable blocker codes into the release report, and
   passes seven release tests plus Ruff, format, strict mypy, and diff checks.
-- 2026-07-20: Next: commit M1, then execute M2 with failing atomic-assembly tests.
+- 2026-07-20: M2 red confirmed the assembler and CLI did not exist. M2 green atomically stages a
+  versioned Swift shell with legal files, SBOM, executable hash, and deterministic honesty manifest;
+  `package_release.sh` assembles before the release gate. Thirteen release tests and static/type
+  checks pass. A real release Swift build assembled version `0.1.0` build `1`; release checking
+  correctly exited 1 with the four runtime blockers plus signing and notarization blockers.
+- 2026-07-20: Next: commit M2, then execute M3 with failing signing-workflow contract tests.
 
 ## Rollback / Recovery
 

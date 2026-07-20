@@ -2,6 +2,7 @@
 
 from rsi_atlas_release.assembly import (
     REQUIRED_RUNTIME_COMPONENTS,
+    assemble_release_app,
     inspect_runtime_completeness,
 )
 from rsi_atlas_release.checks import run_release_check
@@ -10,6 +11,7 @@ from rsi_atlas_release.sbom import build_sbom_from_lock, parse_uv_lock_component
 
 __all__ = [
     "REQUIRED_RUNTIME_COMPONENTS",
+    "assemble_release_app",
     "build_sbom_from_lock",
     "inspect_runtime_completeness",
     "inventory_staged_bundle",
