@@ -143,7 +143,13 @@
   `package_release.sh` assembles before the release gate. Thirteen release tests and static/type
   checks pass. A real release Swift build assembled version `0.1.0` build `1`; release checking
   correctly exited 1 with the four runtime blockers plus signing and notarization blockers.
-- 2026-07-20: Next: commit M2, then execute M3 with failing signing-workflow contract tests.
+- 2026-07-20: M3 red proved the runtime-preflight CLI and hardened signing contract were absent.
+  M3 green rejects incomplete or symlink-escaped runtime components before signature mutation,
+  removes shallow `--deep` signing, signs nested Mach-O and bundles inside-out, requires timestamps
+  and Team `2NY8A789TN`, validates an accepted notary result and staple, assesses Gatekeeper, and
+  recreates/checksums the final post-staple archive. Sixteen release tests plus shell/static/type
+  checks pass; a real incomplete bundle exited 3 and remained byte-for-byte unchanged.
+- 2026-07-20: Next: commit M3, run the full regression and exact artifact inspection, then review.
 
 ## Rollback / Recovery
 

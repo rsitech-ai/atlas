@@ -72,6 +72,18 @@ def test_runtime_completeness_accepts_every_required_component(tmp_path: Path) -
     assert inspect_runtime_completeness(bundle) == ()
 
 
+def test_runtime_completeness_rejects_symlinked_components(tmp_path: Path) -> None:
+    bundle = tmp_path / "RSIAtlas.app"
+    external = tmp_path / "external-runtime-component"
+    external.write_bytes(b"outside-the-bundle")
+    for relative_path in REQUIRED_RUNTIME_COMPONENTS.values():
+        component = bundle / relative_path
+        component.parent.mkdir(parents=True, exist_ok=True)
+        component.symlink_to(external)
+
+    assert inspect_runtime_completeness(bundle) == tuple(REQUIRED_RUNTIME_COMPONENTS)
+
+
 def test_release_check_propagates_runtime_component_blockers(tmp_path: Path) -> None:
     (tmp_path / "uv.lock").write_bytes((ROOT / "uv.lock").read_bytes())
     entitlement = tmp_path / "docs" / "release" / "entitlement-matrix.md"

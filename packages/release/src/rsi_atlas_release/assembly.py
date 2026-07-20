@@ -34,9 +34,23 @@ _BUILD_PATTERN = re.compile(r"^[1-9][0-9]*$")
 def inspect_runtime_completeness(bundle_path: Path) -> tuple[str, ...]:
     """Return stable blocker codes for absent or empty embedded runtime components."""
     blockers: list[str] = []
+    bundle_is_symlink = bundle_path.is_symlink()
+    bundle_root = bundle_path.resolve()
     for blocker, relative_path in REQUIRED_RUNTIME_COMPONENTS.items():
         component = bundle_path / relative_path
-        if not component.is_file() or component.stat().st_size == 0:
+        contained = False
+        try:
+            component.resolve(strict=True).relative_to(bundle_root)
+            contained = True
+        except (FileNotFoundError, ValueError):
+            pass
+        if (
+            bundle_is_symlink
+            or component.is_symlink()
+            or not contained
+            or not component.is_file()
+            or component.stat().st_size == 0
+        ):
             blockers.append(blocker)
     return tuple(blockers)
 

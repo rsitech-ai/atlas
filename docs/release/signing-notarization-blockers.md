@@ -7,7 +7,7 @@ signing, notarization, or clean-install evidence.
 
 | Gate class | Remaining blocker | Required closure evidence |
 | --- | --- | --- |
-| Repository | Staged release packaging must include the embedded runtime, reviewed entitlements, and nested-sign inventory. | Reproducible staged artifact and checked release-assembly records. |
+| Repository | The versioned native shell is reproducibly assembled, but embedded Python, the engine launcher, PostgreSQL, and pgvector are absent. | All four fixed runtime paths present inside the bundle without symlinks; assembly manifest records `runtime_complete=true`. |
 | Owner | `Developer ID Application: Rafal Sikora (2NY8A789TN)` is installed with its private key. Apple notary API credentials remain owner-controlled and absent. | Owner supplies only the notary key reference, key ID, and issuer locally without committing them. |
 | External | Apple notarization processing and a clean-user Gatekeeper install are external/runtime outcomes. | Stapled notarization record and clean-machine install evidence for the exact signed `.app`. |
 
@@ -18,8 +18,10 @@ signing, notarization, or clean-install evidence.
 | Unsigned inventory | `uv run python script/release_check.py --require-release` | Always `release_ready=false` |
 | SBOM from lock | `dist/sbom.cdx.json` via release check | Generated; not Gatekeeper evidence |
 | Entitlement matrix | `docs/release/entitlement-matrix.md` | Draft; includes Unix domain IPC policy |
-| Packaging helper | `script/package_release.sh` | Stages + runs checks; refuses to claim notarized |
-| Nested-sign stub | `script/sign_and_notarize.sh` | Fail-closed without `RSI_ATLAS_SIGNING_IDENTITY` / `RSI_ATLAS_NOTARY_KEY` |
+| Native-shell assembler | `script/assemble_release_app.py --build-number <positive integer>` | Writes version/build metadata, legal files, SBOM, executable hash, and an honesty manifest; does not claim a complete runtime |
+| Packaging helper | `script/package_release.sh` | Builds and atomically stages the shell before the fail-closed release check |
+| Runtime preflight | `script/check_release_runtime.py --bundle dist/RSIAtlas.app` | Rejects absent, empty, external, or symlinked required runtime components before signing |
+| Nested signing workflow | `script/sign_and_notarize.sh` | Signs Mach-O code and nested bundles inside-out with hardened runtime/timestamps only after runtime preflight; workflow is unproven until executed with a complete bundle and owner credentials |
 
 ## Local release inputs
 
@@ -35,8 +37,10 @@ key is already present in the local keychain. A public certificate download cann
 missing private key, and App Store `Apple Distribution` credentials are not interchangeable with
 the Developer ID identity used for this direct-download route.
 
-Until the repository, owner, and external gates above close **and**
-`script/sign_and_notarize.sh` records stapled notarization output for the exact staged `.app`,
+After a complete runtime is assembled, the signing workflow submits a temporary archive, requires
+an `Accepted` notary result, staples and validates the app, runs Gatekeeper assessment, recreates
+the final `RSIAtlas-<version>-macOS.zip`, and writes its SHA-256. Until the repository, owner, and
+external gates above close **and** those steps pass for the exact staged `.app`,
 criteria 112–134 stay **Not proven**.
 
 ## Not claimed
