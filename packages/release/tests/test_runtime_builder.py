@@ -7,6 +7,7 @@ import pytest
 from rsi_atlas_release.runtime_builder import (
     RuntimeBuildInputs,
     _materialize_absolute_dependency,
+    _source_token_dependency,
     compile_engine_launcher,
 )
 
@@ -90,7 +91,7 @@ def test_materialized_provider_remembers_pristine_hash_after_staged_mutation(
     inputs = RuntimeBuildInputs(tmp_path, *roots)
     payload = tmp_path / "payload"
     providers: dict[str, dict[str, object]] = {}
-    materialized: dict[Path, str] = {}
+    materialized: dict[Path, tuple[Path, str]] = {}
     monkeypatch.setattr(
         "rsi_atlas_release.runtime_builder._homebrew_provider",
         lambda _path: ("sample", "1.0", keg, Path("lib/libsample.dylib")),
@@ -123,3 +124,22 @@ def test_materialized_provider_remembers_pristine_hash_after_staged_mutation(
             providers=providers,
             materialized_sources=materialized,
         )
+
+
+def test_provider_loader_alias_resolves_to_regular_keg_file(tmp_path: Path) -> None:
+    library = tmp_path / "libsample.1.2.dylib"
+    alias = tmp_path / "libsample.1.dylib"
+    loader = tmp_path / "libconsumer.dylib"
+    library.write_bytes(b"library")
+    alias.symlink_to(library.name)
+    loader.write_bytes(b"loader")
+
+    resolved = _source_token_dependency(
+        name="@loader_path/libsample.1.dylib",
+        source_image=loader,
+        rpaths=(),
+    )
+
+    assert resolved == library
+    assert resolved.is_file()
+    assert not resolved.is_symlink()

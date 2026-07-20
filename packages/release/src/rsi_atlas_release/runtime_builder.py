@@ -18,6 +18,7 @@ from rsi_atlas_release.assembly import validate_runtime_payload
 from rsi_atlas_release.macho import (
     is_macho,
     read_macho_commands,
+    resolve_load_path,
     verify_macho_closure,
 )
 
@@ -321,7 +322,7 @@ def _materialize_absolute_dependency(
     inputs: RuntimeBuildInputs,
     payload: Path,
     providers: dict[str, dict[str, object]],
-    materialized_sources: dict[Path, str],
+    materialized_sources: dict[Path, tuple[Path, str]],
 ) -> Path:
     source = Path(dependency).resolve(strict=True)
     python_source = inputs.python_prefix.resolve(strict=True)
@@ -357,13 +358,13 @@ def _materialize_absolute_dependency(
         / provider_relative
     )
     source_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
-    previous_sha256 = materialized_sources.get(destination)
-    if previous_sha256 is not None:
-        if previous_sha256 != source_sha256:
+    previous_source = materialized_sources.get(destination)
+    if previous_source is not None:
+        if previous_source[1] != source_sha256:
             raise ValueError("native dependency destination collision")
     else:
         _copy_distinct_file(source, destination)
-        materialized_sources[destination] = source_sha256
+        materialized_sources[destination] = (source, source_sha256)
     key = f"{formula}/{version}"
     if key not in providers:
         receipt = keg_root / "INSTALL_RECEIPT.json"
@@ -397,6 +398,30 @@ def _loader_reference(*, loader: Path, dependency: Path) -> str:
     return f"@loader_path/{Path(relative).as_posix()}"
 
 
+def _source_token_dependency(
+    *,
+    name: str,
+    source_image: Path,
+    rpaths: tuple[str, ...],
+) -> Path:
+    if name.startswith("@loader_path/"):
+        return (source_image.parent / name.removeprefix("@loader_path/")).resolve(strict=True)
+    if name.startswith("@rpath/"):
+        suffix = name.removeprefix("@rpath/")
+        for rpath in rpaths:
+            if rpath.startswith("@loader_path"):
+                prefix = rpath.removeprefix("@loader_path").lstrip("/")
+                candidate = source_image.parent / prefix / suffix
+            elif rpath.startswith("/"):
+                candidate = Path(rpath) / suffix
+            else:
+                continue
+            if candidate.exists():
+                return candidate.resolve(strict=True)
+        raise ValueError(f"provider has unresolved @rpath dependency: {name}")
+    raise ValueError(f"unsupported unresolved provider dependency: {name}")
+
+
 def relocate_runtime_dependencies(
     *,
     inputs: RuntimeBuildInputs,
@@ -404,7 +429,7 @@ def relocate_runtime_dependencies(
 ) -> dict[str, object]:
     """Materialize and rewrite all non-system absolute dependencies in the payload."""
     providers: dict[str, dict[str, object]] = {}
-    materialized_sources: dict[Path, str] = {}
+    materialized_sources: dict[Path, tuple[Path, str]] = {}
     changes = 0
     while True:
         copied_or_changed = False
@@ -414,13 +439,37 @@ def relocate_runtime_dependencies(
             arguments: list[str] = ["/usr/bin/install_name_tool"]
             if commands.identifier is not None and commands.identifier.startswith("/"):
                 arguments.extend(["-id", f"@rpath/{image.name}"])
+            for rpath in commands.rpaths:
+                if rpath.startswith("/"):
+                    arguments.extend(["-delete_rpath", rpath])
             for load in commands.loads:
                 if load.name.startswith(("/System/Library/", "/usr/lib/")):
                     continue
-                if not load.name.startswith("/"):
-                    continue
+                if load.name.startswith("/"):
+                    source_dependency = load.name
+                else:
+                    try:
+                        resolve_load_path(
+                            load.name,
+                            loader=image,
+                            executable=image,
+                            rpaths=commands.rpaths,
+                            bundle_root=payload,
+                        )
+                        continue
+                    except ValueError:
+                        source_record = materialized_sources.get(image)
+                        if source_record is None:
+                            raise
+                        source_dependency = str(
+                            _source_token_dependency(
+                                name=load.name,
+                                source_image=source_record[0],
+                                rpaths=commands.rpaths,
+                            )
+                        )
                 target = _materialize_absolute_dependency(
-                    dependency=load.name,
+                    dependency=source_dependency,
                     inputs=inputs,
                     payload=payload,
                     providers=providers,

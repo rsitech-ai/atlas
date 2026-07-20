@@ -214,15 +214,29 @@ def verify_macho_closure(bundle_root: Path) -> MachOClosure:
                 raise ValueError(f"absolute Mach-O identifier: {identifier}")
             if not identifier.startswith(("@loader_path/", "@rpath/")):
                 raise ValueError(f"unsupported Mach-O identifier: {identifier}")
-        for load in commands.loads:
-            loads += 1
-            resolved = resolve_load_path(
-                load.name,
+        for rpath in commands.rpaths:
+            if rpath.startswith("/"):
+                raise ValueError(f"absolute Mach-O rpath in {image.name}: {rpath}")
+            if not rpath.startswith(("@loader_path", "@executable_path")):
+                raise ValueError(f"unsupported Mach-O rpath in {image.name}: {rpath}")
+            _expand_token(
+                rpath,
                 loader=image,
                 executable=image,
-                rpaths=commands.rpaths,
                 bundle_root=root,
             )
+        for load in commands.loads:
+            loads += 1
+            try:
+                resolved = resolve_load_path(
+                    load.name,
+                    loader=image,
+                    executable=image,
+                    rpaths=commands.rpaths,
+                    bundle_root=root,
+                )
+            except ValueError as error:
+                raise ValueError(f"{image.relative_to(root)}: {error}") from error
             if resolved is None:
                 system_loads += 1
             else:
