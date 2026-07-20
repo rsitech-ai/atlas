@@ -24,7 +24,8 @@
 
 - Desired behavior:
   - Limit-plus-one output is rejected as `worker_output_too_large`, not misclassified as a timeout.
-  - Timeout kills the process-group leader and removes worker-created partial output.
+  - Timeout terminates the complete process group, including descendants that ignore `SIGTERM`,
+    and removes worker-created partial output.
   - The rendered sandbox profile remains available for diagnostics after either failure.
   - The foreground runtime smoke runs only when `resource_policy` is not blocked.
 - Non-goals: production API changes, dependency changes, model/provider admission, Apple release
@@ -144,7 +145,9 @@
 - 2026-07-20: M3 rerun at `6329f5e040f1`: full regression passed with 1232 Python tests,
   one optional ONNX skip, 51 Swift tests, and the product build. Fresh runtime admission remained
   blocked by host resources, so the foreground smoke was not run.
-- 2026-07-20: Next: independent re-review of the remediated branch and reconciled evidence.
+- 2026-07-20: M4 complete at `a734519`: independent base-to-head re-review approved with no
+  Critical or Important findings. The worktree and base-to-head diff checks were clean. The plan is
+  archived; foreground runtime verification remains externally blocked by resource admission.
 
 ## Rollback / Recovery
 
