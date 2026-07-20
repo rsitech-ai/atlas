@@ -15,7 +15,7 @@ from rsi_atlas_contracts import SAFE_MODE_DISABLED_CAPABILITIES, SafeModeCapabil
 _STATE_MODE = 0o600
 _MAX_STATE_BYTES = 16 * 1024
 _DIRECTORY_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
-_READ_FLAGS = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC
+_READ_FLAGS = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC
 _WRITE_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC
 
 
@@ -25,6 +25,10 @@ class SafeModeBlocked(RuntimeError):
     def __init__(self, capability: SafeModeCapability) -> None:
         self.capability = capability
         super().__init__(f"Safe Mode blocks capability: {capability.value}")
+
+
+class _PostReplaceSyncFailure(OSError):
+    """The replacement is visible but its containing directory was not synced."""
 
 
 class SafeModeStore:
@@ -67,16 +71,24 @@ class SafeModeStore:
             entered_at=entered_at,
             reason=reason,
         )
-        self.save(state)
-        return state
+        return self.save(state)
 
     def exit(self) -> SafeModeState:
         state = _inactive_state()
-        self.save(state)
+        return self.save(state)
+
+    def save(self, state: SafeModeState) -> SafeModeState:
+        """Atomically replace the state file after fully syncing a private temp file."""
+        try:
+            self._save_once(state)
+        except _PostReplaceSyncFailure:
+            fail_closed = _unreadable_state()
+            with suppress(OSError):
+                self._save_once(fail_closed)
+            return fail_closed
         return state
 
-    def save(self, state: SafeModeState) -> None:
-        """Atomically replace the state file after fully syncing a private temp file."""
+    def _save_once(self, state: SafeModeState) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         directory_fd = self._open_directory()
         temporary_name = f".safe-mode-{secrets.token_hex(16)}.tmp"
@@ -97,7 +109,10 @@ class SafeModeStore:
                 dst_dir_fd=directory_fd,
             )
             replaced = True
-            os.fsync(directory_fd)
+            try:
+                os.fsync(directory_fd)
+            except OSError as error:
+                raise _PostReplaceSyncFailure from error
         finally:
             if temporary_fd is not None:
                 os.close(temporary_fd)
@@ -127,15 +142,16 @@ class SafeModeController:
             reason=reason,
         )
         self._set_state(state)
-        return state
+        return self._state
 
     def exit(self) -> SafeModeState:
         state = _inactive_state()
         self._set_state(state)
-        return state
+        return self._state
 
     def is_disabled(self, capability: SafeModeCapability) -> bool:
-        return self._state.active and capability in self._state.disabled_capabilities
+        state = self._refresh_guard_state()
+        return state.active and capability in state.disabled_capabilities
 
     def require(self, capability: SafeModeCapability) -> None:
         if self.is_disabled(capability):
@@ -143,8 +159,13 @@ class SafeModeController:
 
     def _set_state(self, state: SafeModeState) -> None:
         if self._store is not None:
-            self._store.save(state)
+            state = self._store.save(state)
         self._state = state
+
+    def _refresh_guard_state(self) -> SafeModeState:
+        if self._store is not None:
+            self._state = self._store.load()
+        return self._state
 
 
 def _inactive_state() -> SafeModeState:

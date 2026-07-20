@@ -152,3 +152,61 @@ $ git diff --check
 - Engine-boundary enforcement is deliberately out of scope for this task; it
   remains Task 2's responsibility to call `require()` before each protected
   capability.
+
+## Review-Fix Evidence — 2026-07-20
+
+### Review Findings Addressed
+
+1. Store-backed controllers now refresh from disk in `is_disabled()` and,
+   therefore, every `require()` guard boundary. The `state` property remains a
+   usable cached snapshot and is updated by a guard refresh or a local change.
+2. State-file reads include `O_NONBLOCK`, so a FIFO cannot block a guard path;
+   descriptor validation then rejects it as unreadable and resolves active.
+3. A directory `fsync` failure after `os.replace` is distinguished from a
+   pre-replace write failure. It triggers a best-effort atomic rewrite to the
+   fail-closed state, and that returned state becomes the controller state.
+
+### RED — review regressions before the fix
+
+```text
+$ uv run pytest packages/recovery/tests/test_safe_mode_store.py -q
+........FFF                                                              [100%]
+...
+E       AssertionError: assert False is True
+E       assert True is False
+E       assert None is not None
+3 failed, 8 passed in 0.37s
+```
+
+The failures respectively proved stale guard state, a FIFO-blocked load, and
+the post-replace directory-sync exception leaving no coherent exit outcome.
+
+### GREEN — review-fix verification
+
+```text
+$ uv run pytest packages/recovery/tests/test_safe_mode_store.py packages/recovery/tests/test_backup_restore.py -q
+...............                                                          [100%]
+15 passed in 0.18s
+
+$ uv run ruff check packages/recovery/src/rsi_atlas_recovery/safe_mode.py packages/recovery/tests/test_safe_mode_store.py
+All checks passed!
+
+$ uv run pytest packages/recovery -q
+.................                                                        [100%]
+17 passed in 0.17s
+
+$ git diff --check
+<no output; success>
+```
+
+### Review-Fix Self-Review
+
+- A live controller no longer authorizes a capability based solely on the
+  constructor snapshot when it has a store; every capability predicate reloads
+  and updates that snapshot.
+- `O_NONBLOCK` prevents FIFO deadlock before the regular-file check. The
+  regression uses a real FIFO and a bounded daemon thread so the pre-fix test
+  fails promptly instead of hanging the test runner.
+- The post-replace path returns a fail-closed `SafeModeState` even though the
+  requested exit was inactive. Its deterministic test verifies the controller
+  and a fresh store load are both active after the recovery rewrite.

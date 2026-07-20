@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import stat
 from datetime import UTC, datetime
 from pathlib import Path
+from queue import Empty, Queue
+from threading import Thread
 from types import SimpleNamespace
 
 import pytest
@@ -110,3 +113,69 @@ def test_controller_recreates_store_state_and_blocks_disabled_capability(tmp_pat
     assert recreated.state.active is True
     with pytest.raises(safe_mode.SafeModeBlocked, match="models"):
         recreated.require(SafeModeCapability.MODELS)
+
+
+def test_existing_controller_refreshes_store_at_guard_boundaries(tmp_path: Path) -> None:
+    data_root = tmp_path / "data"
+    controller = safe_mode.SafeModeController(_store(data_root))
+    external_store = _store(data_root)
+
+    external_store.enter(reason="integrity_failure", entered_at=NOW)
+
+    assert controller.is_disabled(SafeModeCapability.MODELS) is True
+    with pytest.raises(safe_mode.SafeModeBlocked, match="models"):
+        controller.require(SafeModeCapability.MODELS)
+    assert controller.state.active is True
+
+
+def test_fifo_state_fails_closed_without_blocking_load(tmp_path: Path) -> None:
+    store = _store(tmp_path / "data")
+    store.path.parent.mkdir(parents=True)
+    os.mkfifo(store.path, 0o600)
+    results: Queue[object] = Queue()
+    worker = Thread(target=lambda: results.put(store.load()), daemon=True)
+    worker.start()
+    worker.join(timeout=0.2)
+    blocked = worker.is_alive()
+
+    if blocked:
+        writer_fd = os.open(store.path, os.O_WRONLY | os.O_NONBLOCK)
+        os.close(writer_fd)
+        worker.join(timeout=1)
+
+    assert blocked is False
+    try:
+        state = results.get_nowait()
+    except Empty as error:
+        raise AssertionError("Safe Mode FIFO load did not return a state") from error
+    _assert_fail_closed(state)
+
+
+def test_failed_exit_directory_sync_restores_fail_closed_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _store(tmp_path / "data")
+    controller = safe_mode.SafeModeController(store)
+    controller.enter(reason="integrity_failure", entered_at=NOW)
+    actual_fsync = safe_mode.os.fsync
+    directory_sync_failed = False
+
+    def fail_first_directory_sync(fd: int) -> None:
+        nonlocal directory_sync_failed
+        if stat.S_ISDIR(safe_mode.os.fstat(fd).st_mode) and not directory_sync_failed:
+            directory_sync_failed = True
+            raise OSError("directory sync failed after replacement")
+        actual_fsync(fd)
+
+    monkeypatch.setattr(safe_mode.os, "fsync", fail_first_directory_sync)
+
+    try:
+        outcome = controller.exit()
+    except OSError:
+        outcome = None
+
+    assert directory_sync_failed is True
+    assert outcome is not None
+    _assert_fail_closed(outcome)
+    _assert_fail_closed(controller.state)
+    _assert_fail_closed(store.load())
