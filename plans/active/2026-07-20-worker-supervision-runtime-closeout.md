@@ -124,7 +124,15 @@
   runtime/test closeout sequence.
 - 2026-07-20: Current diagnostic still reports `resource_policy=blocked` and
   `model_registry=degraded`; all other components are healthy.
-- 2026-07-20: Next: implement M1 tests and prove the overflow regression against `8e46baf`.
+- 2026-07-20: M1 complete at `19a72ec`: two public-runner boundary tests pass; the overflow test
+  failed against `8e46baf` with the expected old `worker_timeout` misclassification; task review
+  approved with no findings.
+- 2026-07-20: M2 complete: 16 worker/parser/containment tests passed; Ruff check/format, strict mypy,
+  parser governance, and diff checks passed.
+- 2026-07-20: M3 complete at `19a72ec`: exact-head full regression passed with 1231 Python tests,
+  one optional ONNX skip, 51 Swift tests, and the product build. Fresh runtime admission remained
+  blocked by host resources, so the foreground smoke was not run.
+- 2026-07-20: Next: independent whole-branch review and plan closeout.
 
 ## Rollback / Recovery
 
