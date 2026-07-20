@@ -422,6 +422,23 @@ def _source_token_dependency(
     raise ValueError(f"unsupported unresolved provider dependency: {name}")
 
 
+def _adhoc_sign_macho(image: Path) -> None:
+    result = subprocess.run(
+        [
+            "/usr/bin/codesign",
+            "--force",
+            "--sign",
+            "-",
+            "--timestamp=none",
+            str(image),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise ValueError(f"ad hoc signing failed for {image.name}")
+
+
 def relocate_runtime_dependencies(
     *,
     inputs: RuntimeBuildInputs,
@@ -431,17 +448,21 @@ def relocate_runtime_dependencies(
     providers: dict[str, dict[str, object]] = {}
     materialized_sources: dict[Path, tuple[Path, str]] = {}
     changes = 0
+    signed_images: set[Path] = set()
     while True:
         copied_or_changed = False
         images = [candidate for candidate in sorted(payload.rglob("*")) if is_macho(candidate)]
         for image in images:
             commands = read_macho_commands(image)
             arguments: list[str] = ["/usr/bin/install_name_tool"]
+            image_changes = 0
             if commands.identifier is not None and commands.identifier.startswith("/"):
                 arguments.extend(["-id", f"@rpath/{image.name}"])
+                image_changes += 1
             for rpath in commands.rpaths:
                 if rpath.startswith("/"):
                     arguments.extend(["-delete_rpath", rpath])
+                    image_changes += 1
             for load in commands.loads:
                 if load.name.startswith(("/System/Library/", "/usr/lib/")):
                     continue
@@ -479,18 +500,15 @@ def relocate_runtime_dependencies(
                     raise ValueError(f"mapped native dependency is missing: {load.name}")
                 replacement = _loader_reference(loader=image, dependency=target)
                 arguments.extend(["-change", load.name, replacement])
+                image_changes += 1
             if len(arguments) == 1:
                 continue
             result = subprocess.run([*arguments, str(image)], capture_output=True, text=True)
             if result.returncode != 0:
                 raise ValueError(f"install_name_tool failed for {image.name}")
-            subprocess.run(
-                ["/usr/bin/codesign", "--remove-signature", str(image)],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            changes += (len(arguments) - 1) // 2
+            _adhoc_sign_macho(image)
+            signed_images.add(image)
+            changes += image_changes
             copied_or_changed = True
         if not copied_or_changed:
             break
@@ -498,6 +516,7 @@ def relocate_runtime_dependencies(
     return {
         "bundled_loads": closure.bundled_loads,
         "changes": changes,
+        "staging_adhoc_signed_images": len(signed_images),
         "images": closure.images,
         "loads": closure.loads,
         "providers": [providers[key] for key in sorted(providers)],

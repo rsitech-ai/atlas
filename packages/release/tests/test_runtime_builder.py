@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from rsi_atlas_release.runtime_builder import (
     RuntimeBuildInputs,
+    _adhoc_sign_macho,
     _materialize_absolute_dependency,
     _source_token_dependency,
     compile_engine_launcher,
@@ -143,3 +144,38 @@ def test_provider_loader_alias_resolves_to_regular_keg_file(tmp_path: Path) -> N
     assert resolved == library
     assert resolved.is_file()
     assert not resolved.is_symlink()
+
+
+def test_modified_arm64_library_is_adhoc_signed_for_staging(tmp_path: Path) -> None:
+    source = tmp_path / "sample.c"
+    library = tmp_path / "libsample.dylib"
+    source.write_text("int sample(void) { return 1; }\n", encoding="utf-8")
+    subprocess.run(
+        [
+            "/usr/bin/clang",
+            "-arch",
+            "arm64",
+            "-dynamiclib",
+            str(source),
+            "-o",
+            str(library),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["/usr/bin/install_name_tool", "-id", "@rpath/libsample.dylib", str(library)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    _adhoc_sign_macho(library)
+
+    subprocess.run(
+        ["/usr/bin/codesign", "--verify", "--strict", str(library)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
