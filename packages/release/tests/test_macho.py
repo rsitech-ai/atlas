@@ -192,3 +192,17 @@ def test_live_closure_rejects_absolute_identifier(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="absolute Mach-O rpath"):
         verify_macho_closure(tmp_path / "RSIAtlas.app")
+
+    subprocess.run(
+        ["/usr/bin/install_name_tool", "-delete_rpath", "/tmp/injected", str(library)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["/usr/bin/install_name_tool", "-add_rpath", "/usr/lib/swift", str(library)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    verify_macho_closure(tmp_path / "RSIAtlas.app")

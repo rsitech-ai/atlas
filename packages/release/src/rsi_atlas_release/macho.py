@@ -216,7 +216,13 @@ def verify_macho_closure(bundle_root: Path) -> MachOClosure:
                 raise ValueError(f"unsupported Mach-O identifier: {identifier}")
         for rpath in commands.rpaths:
             if rpath.startswith("/"):
-                raise ValueError(f"absolute Mach-O rpath in {image.name}: {rpath}")
+                absolute_rpath = Path(rpath)
+                if not any(
+                    absolute_rpath == root or absolute_rpath.is_relative_to(root)
+                    for root in _SYSTEM_ROOTS
+                ):
+                    raise ValueError(f"absolute Mach-O rpath in {image.name}: {rpath}")
+                continue
             if not rpath.startswith(("@loader_path", "@executable_path")):
                 raise ValueError(f"unsupported Mach-O rpath in {image.name}: {rpath}")
             _expand_token(
