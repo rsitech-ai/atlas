@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import pytest
 from pydantic import ValidationError
 from rsi_atlas_document_worker.protocol import (
@@ -68,18 +70,24 @@ def test_protocol_rejects_unknown_fields_and_unsafe_outputs() -> None:
         )
 
 
-def test_handle_request_rejects_digest_mismatch(tmp_path_factory: pytest.TempPathFactory) -> None:
-    del tmp_path_factory
+def test_handle_request_rejects_missing_artifact_descriptor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     request = DocumentWorkerRequest(
         operation=WorkerOperation.ECHO_HASH,
         run_id="run-echo-002",
         artifact_sha256="b" * 64,
         artifact_size_bytes=0,
     )
-    # Without FD 3 open this fails closed as an artifact mismatch/internal path.
+
+    def missing_artifact_fd(descriptor: int, size: int) -> bytes:
+        del size
+        assert descriptor == 3
+        raise OSError("artifact descriptor is not open")
+
+    # Explicitly simulate the worker contract's missing FD 3. The test runner may itself inherit an
+    # unrelated descriptor 3, so relying on ambient process descriptors can block the test.
+    monkeypatch.setattr(os, "read", missing_artifact_fd)
     response = handle_request(request)
     assert response.status is WorkerResponseStatus.FAILED
-    assert response.failure_code in {
-        WorkerFailureCode.ARTIFACT_MISMATCH,
-        WorkerFailureCode.INTERNAL,
-    }
+    assert response.failure_code is WorkerFailureCode.ARTIFACT_MISMATCH

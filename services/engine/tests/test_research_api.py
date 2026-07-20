@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from json import dumps
+from pathlib import Path
+from threading import Event
 from uuid import UUID
 
+import pytest
 from fastapi.testclient import TestClient
 from rsi_atlas_contracts import (
     ArtifactCommandContext,
@@ -38,7 +42,10 @@ from rsi_atlas_contracts import (
     retrieval_run_id,
     specialist_finding_id,
 )
+from rsi_atlas_engine import research as research_module
 from rsi_atlas_engine.api import create_app
+from rsi_atlas_engine.research import ResearchFacade, ResearchServices
+from rsi_atlas_recovery import SafeModeBlocked, SafeModeController, SafeModeStore
 from rsi_atlas_research.workflow import WorkflowCheckpoint, WorkflowStep, workflow_id_for_query
 
 TENANT_ID = UUID("00000000-0000-4000-8000-000000000001")
@@ -441,3 +448,123 @@ def test_research_workflow_start_and_resume_routes() -> None:
     assert resumed.status_code == 200
     assert resumed.json()["checkpoint"]["step"] == "completed"
     assert resumed.json()["interrupted"] is False
+
+
+def test_safe_mode_blocks_models_and_workflow_mutation_but_keeps_listing_readable(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("RSI_ATLAS_DATA_ROOT", str(tmp_path / "runtime"))
+    client = TestClient(
+        create_app(
+            status_factory=lambda: (_ for _ in ()).throw(RuntimeError("unused")),
+            research_service=FakeResearchService(),
+        )
+    )
+    query = ResearchQuery(
+        context=_context(),
+        query_id=QUERY_ID,
+        text="Bitcoin unlock schedule",
+        document_version_ids=(DOCUMENT_VERSION,),
+        chunk_set_ids=(CHUNK_SET_ID,),
+        as_of=NOW,
+        query_family=QueryFamily.NARRATIVE_EXPLANATION,
+        latency_budget_ms=5_000,
+        context_budget_tokens=2_048,
+    )
+    assert (
+        client.post("/v1/recovery/safe-mode:enter", json={"reason": "operator"}).status_code == 200
+    )
+
+    retrieval = client.post(
+        f"/v1/workspaces/{WORKSPACE_ID}/research:retrieve",
+        headers=_headers(),
+        json=query.model_dump(mode="json"),
+    )
+    assert retrieval.status_code == 423
+    assert retrieval.json() == {"detail": "Safe Mode blocks models."}
+
+    started = client.post(
+        f"/v1/workspaces/{WORKSPACE_ID}/research/workflows:start",
+        headers=_headers(),
+        json={"query": query.model_dump(mode="json"), "title": "Unlock note"},
+    )
+    assert started.status_code == 423
+    assert started.json() == {"detail": "Safe Mode blocks workflow_resumption."}
+
+    workflow_id = workflow_id_for_query(query_id=query.query_id)
+    resumed = client.post(
+        f"/v1/workspaces/{WORKSPACE_ID}/research/workflows/{workflow_id}:resume",
+        headers=_headers(),
+        json={"query": query.model_dump(mode="json"), "title": "Unlock note"},
+    )
+    assert resumed.status_code == 423
+    assert resumed.json() == {"detail": "Safe Mode blocks workflow_resumption."}
+
+    listed = client.get(
+        f"/v1/workspaces/{WORKSPACE_ID}/research/workflows",
+        headers=_headers(),
+    )
+    assert listed.status_code == 200
+    assert listed.json() == {"workflows": []}
+
+
+def test_research_facade_guards_direct_model_and_workflow_calls(
+    tmp_path: Path,
+) -> None:
+    controller = SafeModeController(SafeModeStore(tmp_path / "runtime"))
+    services = ResearchServices(
+        orchestrator=FakeResearchService(),  # type: ignore[arg-type]
+        database=object(),  # type: ignore[arg-type]
+        workflow_repository=object(),  # type: ignore[arg-type]
+        research_repository=object(),  # type: ignore[arg-type]
+        safe_mode=controller,
+    )
+    research = ResearchFacade(services)
+    query = ResearchQuery(
+        context=_context(),
+        query_id=QUERY_ID,
+        text="Bitcoin unlock schedule",
+        document_version_ids=(DOCUMENT_VERSION,),
+        chunk_set_ids=(CHUNK_SET_ID,),
+        as_of=NOW,
+        query_family=QueryFamily.NARRATIVE_EXPLANATION,
+        latency_budget_ms=5_000,
+        context_budget_tokens=2_048,
+    )
+    controller.enter(reason="operator", entered_at=NOW)
+
+    with pytest.raises(SafeModeBlocked, match="models"):
+        research.retrieve(query=query)
+    with pytest.raises(SafeModeBlocked, match="workflow_resumption"):
+        research.start_workflow(query=query, title="Unlock note")
+
+
+def test_lazy_embedder_initializes_once_under_concurrent_first_use(tmp_path: Path) -> None:
+    controller = SafeModeController(SafeModeStore(tmp_path / "runtime"))
+    resolver_entered = Event()
+    release_resolver = Event()
+    resolver_calls = 0
+
+    class FakeEmbedder:
+        def embed_text(self, text: str) -> tuple[float, ...]:
+            del text
+            return (1.0,)
+
+    def resolve() -> FakeEmbedder:
+        nonlocal resolver_calls
+        resolver_calls += 1
+        resolver_entered.set()
+        assert release_resolver.wait(timeout=2)
+        return FakeEmbedder()
+
+    embedder = research_module._LazySafeModeEmbedder(  # type: ignore[attr-defined]
+        safe_mode=controller,
+        resolver=resolve,
+    )
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(embedder.embed_text, "btc") for _ in range(8)]
+        assert resolver_entered.wait(timeout=2)
+        release_resolver.set()
+        assert [future.result(timeout=2) for future in futures] == [(1.0,)] * 8
+
+    assert resolver_calls == 1

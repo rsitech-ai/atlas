@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import selectors
 import signal
 import subprocess
 import sys
@@ -187,21 +188,55 @@ def render_document_worker_profile(
     return rendered
 
 
-def _bounded_read(pipe: int, limit: int) -> bytes:
-    chunks: list[bytes] = []
-    total = 0
-    while True:
-        try:
-            chunk = os.read(pipe, min(65_536, max(1, limit - total + 1)))
-        except OSError as error:
-            raise DocumentWorkerRunnerError("worker_io_failed") from error
-        if not chunk:
-            break
-        total += len(chunk)
-        if total > limit:
-            raise DocumentWorkerRunnerError("worker_output_too_large")
-        chunks.append(chunk)
-    return b"".join(chunks)
+def _drain_process_output(
+    process: subprocess.Popen[bytes],
+    *,
+    stdout_fd: int,
+    stderr_fd: int,
+    max_stdout_bytes: int,
+    max_stderr_bytes: int,
+    deadline: float,
+) -> tuple[bytes, bytes]:
+    """Drain both child pipes while it runs, enforcing strict memory bounds."""
+    selector = selectors.DefaultSelector()
+    buffers = {
+        stdout_fd: bytearray(),
+        stderr_fd: bytearray(),
+    }
+    limits = {
+        stdout_fd: max_stdout_bytes,
+        stderr_fd: max_stderr_bytes,
+    }
+    try:
+        for descriptor in buffers:
+            os.set_blocking(descriptor, False)
+            selector.register(descriptor, selectors.EVENT_READ)
+
+        while process.poll() is None or selector.get_map():
+            if time.monotonic() > deadline:
+                raise DocumentWorkerRunnerError("worker_timeout")
+            if not selector.get_map():
+                time.sleep(0.01)
+                continue
+            for key, _ in selector.select(timeout=0.01):
+                descriptor = int(key.fd)
+                buffer = buffers[descriptor]
+                limit = limits[descriptor]
+                try:
+                    chunk = os.read(descriptor, min(65_536, max(1, limit - len(buffer) + 1)))
+                except BlockingIOError:
+                    continue
+                except OSError as error:
+                    raise DocumentWorkerRunnerError("worker_io_failed") from error
+                if not chunk:
+                    selector.unregister(descriptor)
+                    continue
+                buffer.extend(chunk)
+                if len(buffer) > limit:
+                    raise DocumentWorkerRunnerError("worker_output_too_large")
+    finally:
+        selector.close()
+    return bytes(buffers[stdout_fd]), bytes(buffers[stderr_fd])
 
 
 def _close_quietly(*descriptors: int) -> None:
@@ -364,19 +399,18 @@ class DocumentWorkerRunner:
                 except BrokenPipeError as error:
                     raise DocumentWorkerRunnerError("worker_stdin_failed") from error
 
-                deadline = started + self.timeout_seconds
-                while process.poll() is None:
-                    if time.monotonic() > deadline:
-                        self._kill_process_group(process)
-                        raise DocumentWorkerRunnerError("worker_timeout")
-                    time.sleep(0.01)
-
-                stdout = _bounded_read(stdout_r, self.max_stdout_bytes)
-                stderr = _bounded_read(stderr_r, self.max_stderr_bytes)
+                stdout, stderr = _drain_process_output(
+                    process,
+                    stdout_fd=stdout_r,
+                    stderr_fd=stderr_r,
+                    max_stdout_bytes=self.max_stdout_bytes,
+                    max_stderr_bytes=self.max_stderr_bytes,
+                    deadline=started + self.timeout_seconds,
+                )
                 duration = time.monotonic() - started
                 exit_code = int(process.returncode)
             except DocumentWorkerRunnerError:
-                if process is not None and process.poll() is None:
+                if process is not None:
                     self._kill_process_group(process)
                 self._cleanup_partial_outputs(run_dir)
                 raise
@@ -430,18 +464,22 @@ class DocumentWorkerRunner:
 
     @staticmethod
     def _kill_process_group(process: subprocess.Popen[bytes]) -> None:
-        try:
+        with suppress(ProcessLookupError, PermissionError):
             os.killpg(process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            return
         deadline = time.monotonic() + 0.5
-        while process.poll() is None and time.monotonic() < deadline:
+        while time.monotonic() < deadline:
+            try:
+                os.killpg(process.pid, 0)
+            except ProcessLookupError:
+                break
+            except PermissionError:
+                pass
             time.sleep(0.01)
-        if process.poll() is None:
-            with suppress(ProcessLookupError):
+        else:
+            with suppress(ProcessLookupError, PermissionError):
                 os.killpg(process.pid, signal.SIGKILL)
-            with suppress(subprocess.TimeoutExpired):
-                process.wait(timeout=1)
+        with suppress(subprocess.TimeoutExpired):
+            process.wait(timeout=1)
 
     @staticmethod
     def _cleanup_partial_outputs(run_directory: Path) -> None:

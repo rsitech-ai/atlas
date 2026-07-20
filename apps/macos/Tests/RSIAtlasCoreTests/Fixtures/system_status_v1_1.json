@@ -58,8 +58,8 @@
       "title": "Model Registry",
       "group": "resources",
       "state": "degraded",
-      "summary": "No qualified local model or provider is available in Phase 1.",
-      "remediation": "Model execution remains disabled until evaluation and approval are implemented."
+      "summary": "No production-qualified local model or provider is active.",
+      "remediation": "Select and admit a provider only after governed evaluation and owner approval."
     },
     {
       "component_id": "contract_api",

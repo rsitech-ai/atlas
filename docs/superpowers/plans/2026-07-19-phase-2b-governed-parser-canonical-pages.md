@@ -616,15 +616,15 @@ interrupts, citations, and benchmark-complete document intelligence unproven whe
 - [x] **Step 5: Broad independent review and remediation**
 
 Independent re-review (agent `3b72a54e`) verdict: **approve-with-nits**. Important blockers
-cleared in `6383861` (preflight-before-parse composition, Process PDF admission/assessment gate,
+cleared in `c4263e0` (preflight-before-parse composition, Process PDF admission/assessment gate,
 Keychain Seatbelt Mach canary, honest Task 8/9 evidence language). Focused remediation tests:
 `infra/security/tests/test_document_worker_sandbox.py`,
 `packages/ingestion/tests/test_processing_pipeline.py`,
 `packages/ingestion/tests/test_preflight_service.py`,
 `services/engine/tests/test_document_processing_api.py`, and Swift
 `EvidencePresentationTests`. Remaining nits are documentation tip accuracy only (this checklist
-item + acceptance-matrix tip through `6383861`). Critical/Important findings: none open.
-Accepted remediation tip: `6383861`. Full gate re-run evidence remains in
+item + acceptance-matrix tip through `c4263e0`). Critical/Important findings: none open.
+Accepted remediation tip: `c4263e0`. Full gate re-run evidence remains in
 `.superpowers/sdd/phase-2b-report.md` (ignored).
 
 - [x] **Step 6: Commit Phase 2B closure**

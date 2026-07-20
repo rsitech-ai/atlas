@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from threading import Lock
 from typing import Any
 from uuid import UUID
 
@@ -17,9 +18,11 @@ from rsi_atlas_contracts import (
     RetrievalAbstention,
     ReviewAction,
     ReviewDecision,
+    SafeModeCapability,
     SpecialistFinding,
 )
-from rsi_atlas_ingestion.embedding.resolve import resolve_embedder
+from rsi_atlas_ingestion.embedding.resolve import Embedder, resolve_embedder
+from rsi_atlas_recovery import SafeModeController
 from rsi_atlas_research import (
     PostgresWorkflowStore,
     ResearchOrchestrator,
@@ -39,11 +42,36 @@ from rsi_atlas_storage import (
 )
 
 from rsi_atlas_engine.runtime import RuntimePaths
+from rsi_atlas_engine.safe_mode import apply_or_verify_migrations, runtime_safe_mode
 
 _DATABASE_CONNECT_TIMEOUT_SECONDS = 1
 _DATABASE_STATEMENT_TIMEOUT_MS = 10_000
 _DATABASE_LOCK_TIMEOUT_MS = 5_000
 _DATABASE_TRANSACTION_TIMEOUT_MS = 15_000
+
+
+class _LazySafeModeEmbedder:
+    def __init__(
+        self,
+        *,
+        safe_mode: SafeModeController,
+        resolver: Callable[[], Embedder],
+    ) -> None:
+        self._safe_mode = safe_mode
+        self._resolver = resolver
+        self._lock = Lock()
+        self._embedder: Embedder | None = None
+
+    def embed_text(self, text: str) -> tuple[float, ...]:
+        self._safe_mode.require(SafeModeCapability.MODELS)
+        embedder = self._embedder
+        if embedder is None:
+            with self._lock:
+                self._safe_mode.require(SafeModeCapability.MODELS)
+                if self._embedder is None:
+                    self._embedder = self._resolver()
+                embedder = self._embedder
+        return embedder.embed_text(text)
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +80,7 @@ class ResearchServices:
     database: PostgresDatabase
     workflow_repository: WorkflowRepository
     research_repository: RetrievalResearchRepository
+    safe_mode: SafeModeController
 
     @classmethod
     def from_environment(
@@ -59,6 +88,7 @@ class ResearchServices:
         *,
         environ: Mapping[str, str] | None = None,
         database_conninfo: str | None = None,
+        safe_mode: SafeModeController | None = None,
     ) -> ResearchServices:
         values = os.environ if environ is None else environ
         paths = RuntimePaths.from_environment(environ=values)
@@ -74,9 +104,17 @@ class ResearchServices:
             transaction_timeout_ms=_DATABASE_TRANSACTION_TIMEOUT_MS,
         )
         database = PostgresDatabase(settings)
-        MigrationRunner(database, paths.migration_root).apply_all()
+        controller = safe_mode or runtime_safe_mode(environ=values)
+        apply_or_verify_migrations(
+            MigrationRunner(database, paths.migration_root),
+            controller,
+        )
         processing = DocumentProcessingRepository(database)
-        embedder = resolve_embedder()
+        embedder = _LazySafeModeEmbedder(
+            safe_mode=controller,
+            resolver=resolve_embedder,
+        )
+
         retrieval = HybridRetrievalService(
             processing=processing,
             embed_text=embedder.embed_text,
@@ -91,6 +129,7 @@ class ResearchServices:
             database=database,
             workflow_repository=WorkflowRepository(database),
             research_repository=research_repository,
+            safe_mode=controller,
         )
 
     def workflow_for(self, context: ArtifactCommandContext) -> ResearchWorkflow:
@@ -108,6 +147,7 @@ class ResearchFacade:
         self._services = services
 
     def retrieve(self, *, query: ResearchQuery) -> EvidencePacket | RetrievalAbstention:
+        self._services.safe_mode.require(SafeModeCapability.MODELS)
         return self._services.orchestrator.retrieve(query=query)
 
     def run_document_specialist(
@@ -117,6 +157,7 @@ class ResearchFacade:
         packet: EvidencePacket,
         subquestion: str | None = None,
     ) -> SpecialistFinding:
+        self._services.safe_mode.require(SafeModeCapability.MODELS)
         return self._services.orchestrator.run_document_specialist(
             query=query,
             packet=packet,
@@ -131,6 +172,7 @@ class ResearchFacade:
         finding: SpecialistFinding,
         title: str,
     ) -> ReportDraft:
+        self._services.safe_mode.require(SafeModeCapability.MODELS)
         return self._services.orchestrator.draft_report(
             query=query,
             packet=packet,
@@ -156,6 +198,7 @@ class ResearchFacade:
     def start_workflow(
         self, *, query: ResearchQuery, title: str, now: datetime | None = None
     ) -> dict[str, Any]:
+        self._services.safe_mode.require(SafeModeCapability.WORKFLOW_RESUMPTION)
         workflow = self._services.workflow_for(query.context)
         try:
             checkpoint = workflow.start(query=query, title=title, now=now)
@@ -171,6 +214,7 @@ class ResearchFacade:
         human_decision: ReviewDecision | None = None,
         now: datetime | None = None,
     ) -> dict[str, Any]:
+        self._services.safe_mode.require(SafeModeCapability.WORKFLOW_RESUMPTION)
         workflow = self._services.workflow_for(query.context)
         try:
             checkpoint = workflow.resume(

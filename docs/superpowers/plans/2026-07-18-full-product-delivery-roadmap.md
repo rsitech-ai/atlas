@@ -6,13 +6,17 @@
 
 RSI Atlas is complete only when all 134 normative acceptance criteria in Section 33 and all 20 evidence rows in Appendix D have current authoritative proof against the built release artifact. Green unit tests, source presence, or a narrow smoke cannot close a broader criterion.
 
-## Current evidence boundary
+## Historical evidence boundary
 
-The reviewed Phase 1 chain through `647c25b`, Phase 2A chain through `113110c`, Phase 2B
-development chain through `6383861` (re-review approve-with-nits), Phase 2C development chain
-through `a51545d`, Phase 2D development chain through `c634b25`, Phase 3 development slice
-through `a64dfec`, Phase 4 development slice through `27d1656`, Phase 5 development slice
-through `6d5d7a5`, and Phase 6 development slice through the tip prove the native-to-engine seam,
+> **Historical ledger (2026-07-19):** The phase ranges below preserve the evidence recorded when
+> this roadmap was last updated. They are not an exact-head readiness assertion. Consult the live
+> production plan and acceptance matrix for current development evidence and unresolved release gates.
+
+The reviewed Phase 1 chain through `f8f9bcb`, Phase 2A chain through `a4f75c9`, Phase 2B
+development chain through `c4263e0` (re-review approve-with-nits), Phase 2C development chain
+through `d6e49b0`, Phase 2D development chain through `307f835`, Phase 3 development slice
+through `ab4c162`, Phase 4 development slice through `97af9aa`, Phase 5 development slice
+through `42aa800`, and Phase 6 development slice through the tip prove the native-to-engine seam,
 immutable local artifacts, Unix-socket PostgreSQL/pgvector persistence, exact runtime capability
 policy, isolated metadata-only OpenTelemetry, strict model/resource boundaries, eight real
 bounded diagnostics, raw fail-closed PDF admission with exact-duplicate and hard-kill recovery,

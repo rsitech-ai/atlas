@@ -43,6 +43,7 @@ from rsi_atlas_storage import (
 )
 
 from rsi_atlas_engine.diagnostics import build_system_status
+from rsi_atlas_engine.safe_mode import apply_or_verify_migrations, runtime_safe_mode
 
 COMPONENT_IDS = (
     "engine_runtime",
@@ -327,7 +328,7 @@ class RuntimeServices:
     ) -> None:
         configured = tuple(probes)
         if tuple(probe.component_id for probe in configured) != COMPONENT_IDS:
-            raise ValueError("runtime services require the exact Phase 1 probes")
+            raise ValueError("runtime services require the exact runtime probes")
         self._probes = configured
         self._clock = clock
 
@@ -509,8 +510,8 @@ def _configuration_failure_probes() -> tuple[RuntimeProbe, ...]:
         ),
         "model_registry": _observation(
             HealthState.DEGRADED,
-            "No qualified local model or provider is available in Phase 1.",
-            "Model execution remains disabled until evaluation and approval are implemented.",
+            "No production-qualified local model or provider is active.",
+            "Select and admit a provider only after governed evaluation and owner approval.",
         ),
         "contract_api": _observation(
             HealthState.HEALTHY,
@@ -558,7 +559,11 @@ def _check_database(paths: RuntimePaths, conninfo: str) -> ProbeObservation:
     migration_runner = MigrationRunner(database, paths.migration_root)
     expected_migrations = list(migration_runner.expected_versions())
     with database.connect() as connection:
-        migration_runner.apply_all(connection=connection)
+        apply_or_verify_migrations(
+            migration_runner,
+            runtime_safe_mode(environ={"RSI_ATLAS_DATA_ROOT": str(paths.data_root)}),
+            connection=connection,
+        )
         with connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -675,12 +680,12 @@ def _check_model_registry() -> ProbeObservation:
         or provider.capabilities
         or provider.health.state is not ProviderHealthState.UNAVAILABLE
     ):
-        raise RuntimeError("Phase 1 model boundary is invalid")
+        raise RuntimeError("runtime model boundary is invalid")
     provider.unload()
     return _observation(
         HealthState.DEGRADED,
-        "No qualified local model or provider is available in Phase 1.",
-        "Model execution remains disabled until evaluation and approval are implemented.",
+        "No production-qualified local model or provider is active.",
+        "Select and admit a provider only after governed evaluation and owner approval.",
     )
 
 

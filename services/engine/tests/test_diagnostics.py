@@ -22,7 +22,8 @@ DEGRADED = ComponentStatus(
     title="Model Registry",
     group=ComponentGroup.RESOURCES,
     state=HealthState.DEGRADED,
-    summary="No qualified local model or provider is available in Phase 1.",
+    summary="No production-qualified local model or provider is active.",
+    remediation="Select and admit a provider only after governed evaluation and owner approval.",
 )
 BLOCKED = ComponentStatus(
     component_id="database",
@@ -78,6 +79,13 @@ CONTRACT = ComponentStatus(
 
 def _components(*, database: ComponentStatus = HEALTHY_DATABASE) -> tuple[ComponentStatus, ...]:
     return (HEALTHY, database, ARTIFACT, OFFLINE, TRACE, RESOURCE, DEGRADED, CONTRACT)
+
+
+def test_model_registry_diagnostic_fixture_uses_the_production_qualified_boundary() -> None:
+    assert DEGRADED.summary == "No production-qualified local model or provider is active."
+    assert DEGRADED.remediation == (
+        "Select and admit a provider only after governed evaluation and owner approval."
+    )
 
 
 def test_build_system_status_uses_exact_profile_components_and_severity() -> None:

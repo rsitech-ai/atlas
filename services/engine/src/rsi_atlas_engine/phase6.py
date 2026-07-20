@@ -11,6 +11,7 @@ from rsi_atlas_contracts import (
     CodexAuthorityAction,
     CodexCommandClass,
     ReleaseCheckReport,
+    SafeModeCapability,
     SafeModeState,
 )
 from rsi_atlas_engineering import (
@@ -28,14 +29,21 @@ from rsi_atlas_recovery import (
 )
 from rsi_atlas_release import run_release_check
 
+from rsi_atlas_engine.safe_mode import runtime_safe_mode
+
 
 class Phase6Service:
     """In-process Phase 6 development surfaces for loopback APIs."""
 
-    def __init__(self, *, repo_root: Path | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        repo_root: Path | None = None,
+        safe_mode: SafeModeController | None = None,
+    ) -> None:
         # rsi_atlas_engine -> src -> engine -> services -> repo root
         self.repo_root = repo_root or Path(__file__).resolve().parents[4]
-        self.safe_mode = SafeModeController()
+        self.safe_mode = safe_mode or runtime_safe_mode()
 
     def run_evaluation(
         self,
@@ -81,8 +89,18 @@ class Phase6Service:
             worktree_hint="tmp/codex-worktrees/loopback",
             created_at=now,
         )
-        patch = build_candidate_patch(bundle, diff_text=diff_text, created_at=now)
-        gated, gate = run_patch_quality_gate(patch, diff_text=diff_text, created_at=now)
+        patch = build_candidate_patch(
+            bundle,
+            diff_text=diff_text,
+            created_at=now,
+            base_commit=None,
+        )
+        gated, gate = run_patch_quality_gate(
+            patch,
+            diff_text=diff_text,
+            created_at=now,
+            test_evidence=(),
+        )
         denials = [
             authority_denial(action).model_dump(mode="json")
             for action in (
@@ -127,7 +145,11 @@ class Phase6Service:
         return self.safe_mode.enter(reason=reason, entered_at=entered_at or datetime.now(tz=UTC))
 
     def safe_mode_state(self) -> SafeModeState:
+        self.safe_mode.is_disabled(SafeModeCapability.COLLECTORS)
         return self.safe_mode.state
+
+    def exit_safe_mode(self) -> SafeModeState:
+        return self.safe_mode.exit()
 
     def release_check(self, *, require_release: bool = False) -> ReleaseCheckReport:
         return run_release_check(repo_root=self.repo_root, require_release=require_release)

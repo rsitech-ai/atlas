@@ -26,7 +26,7 @@ Report issues that affect:
 Preferred:
 
 1. Use [GitHub private vulnerability advisories](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing/privately-reporting-a-security-vulnerability) for this repository (enable “Private vulnerability reporting” in repo settings if it is not on yet).
-2. Or email: **SECURITY_CONTACT_EMAIL_PLACEHOLDER** (replace before first public push).
+2. Or email: [info@rsitech.ai](mailto:info@rsitech.ai).
 
 Include:
 

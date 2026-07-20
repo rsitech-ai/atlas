@@ -2,11 +2,17 @@
 
 Local-first **crypto intelligence and research** OS for evidence-backed, reproducible analysis on **Apple Silicon** Macs.
 
+RSI Atlas is maintained by [RSI Tech](https://rsitech.ai). Public project questions and private
+security or confidentiality-sensitive reports can be sent to
+[info@rsitech.ai](mailto:info@rsitech.ai).
+
 | Status | Detail |
 | --- | --- |
-| Maturity | **Dev-complete / not production Proven** — phases 1–6 implemented with tests; release criteria that need Apple Developer ID signing, notarization, sealed embedding promotion, and related proofs remain open |
+| Maturity | **Dev-complete / not production Proven** — phases 1–6 implemented with tests; standalone packaging, signed-artifact verification, notarization, sealed embedding promotion, and related proofs remain open |
 | Platform | macOS 15+, Apple Silicon, Swift 6, Python 3.11+ |
 | License | [Apache-2.0](LICENSE) — see [NOTICE](NOTICE) for third-party notes |
+| Maintainer | [RSI Tech](https://rsitech.ai) |
+| Contact | [info@rsitech.ai](mailto:info@rsitech.ai) |
 | Trading / custody | **None** — research only; no wallet, signing, or private-key authority |
 
 Design: [`docs/superpowers/specs/2026-07-18-rsi-atlas-design.md`](docs/superpowers/specs/2026-07-18-rsi-atlas-design.md).  
@@ -22,7 +28,9 @@ Acceptance honesty: [`docs/acceptance-matrix.md`](docs/acceptance-matrix.md).
 
 ## What is still blocked or candidate-only
 
-- Apple Developer ID **signing / notarization / stapling** (no secrets in-repo; see `docs/release/signing-notarization-blockers.md`)
+- Standalone release assembly and **Developer ID signing / notarization / stapling**. A usable
+  Developer ID identity is installed locally, but no self-contained signed artifact or notary
+  credential evidence exists; see `docs/release/signing-notarization-blockers.md`.
 - Docling; system Tesseract OCR when absent (fail-closed)
 - Sealed-holdout **PRODUCTION** embedding promotion, neural cross-encoder, calibrated semantic triage
 - Keychain-wrapped backup keys; WebSocket collectors; LangGraph; XPC

@@ -93,7 +93,10 @@ def test_doctor_text_displays_remediation_and_degraded_is_operational() -> None:
 
     assert exit_code == 0
     assert "RSI Atlas: degraded (offline)" in output.getvalue()
-    assert "Remediation: Model execution remains disabled" in output.getvalue()
+    assert (
+        "Remediation: Select and admit a provider only after governed evaluation "
+        "and owner approval." in output.getvalue()
+    )
 
 
 def test_doctor_returns_failure_for_actionable_status() -> None:

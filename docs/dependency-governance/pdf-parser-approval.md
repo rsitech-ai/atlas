@@ -4,7 +4,7 @@ Status: **approved** (Tier-0 only)
 
 This record separates the product design decision from authority to change the accepted Python
 dependency set. The governance capture is bound to manifest
-`b05c0fd0bc387ea5621e44a0e235793f94a8414038cda7acc3be7f669768eb96` and to the unchanged
+`568cfbc62f60580d9263d327306a19e456366eaf21dbea8889394488218cf789` and to the current
 workspace `pyproject.toml` and `uv.lock` hashes recorded there.
 
 ## Decision
@@ -38,7 +38,7 @@ The JSON below is authoritative; prose is explanatory.
 {
   "accepted_exceptions": [],
   "actor_id": "andrzej:continue-development-instruction",
-  "approval_sha256": "279d7a77d610bc2bdb04ec8b1812089d93e2b7581cea5e8397a01bd074857e12",
+  "approval_sha256": "fcf150985573b2869eb55ab0c5d2bd13a8cbd9bbd2eb289132fdd9c51f5d7238",
   "authority": {
     "allows_commit_or_push": false,
     "allows_dependency_lock_change": true,
@@ -56,7 +56,7 @@ The JSON below is authoritative; prose is explanatory.
   ],
   "decided_at": "2026-07-19T08:18:00Z",
   "decision": "approved",
-  "manifest_sha256": "b05c0fd0bc387ea5621e44a0e235793f94a8414038cda7acc3be7f669768eb96",
+  "manifest_sha256": "568cfbc62f60580d9263d327306a19e456366eaf21dbea8889394488218cf789",
   "model_artifacts": [],
   "proposed_candidates": [
     {

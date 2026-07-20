@@ -94,8 +94,8 @@ def _eight_probes(*, replacement: RuntimeProbe | None = None) -> tuple[RuntimePr
     )
 
 
-def test_runtime_services_require_exact_ordered_phase_one_probes() -> None:
-    with pytest.raises(ValueError, match="exact Phase 1 probes"):
+def test_runtime_services_require_exact_ordered_runtime_probes() -> None:
+    with pytest.raises(ValueError, match="exact runtime probes"):
         RuntimeServices(probes=(_probe("engine_runtime"),), clock=lambda: CHECKED_AT)
 
     services = RuntimeServices(probes=_eight_probes(), clock=lambda: CHECKED_AT)
@@ -104,6 +104,16 @@ def test_runtime_services_require_exact_ordered_phase_one_probes() -> None:
     assert tuple(component.component_id for component in status.components) == COMPONENT_IDS
     assert status.checked_at == CHECKED_AT
     assert status.state is HealthState.HEALTHY
+
+
+def test_model_unavailability_status_is_scoped_to_the_local_runtime() -> None:
+    observation = runtime_module._check_model_registry()
+
+    assert observation.summary == "No production-qualified local model or provider is active."
+    assert observation.remediation == (
+        "Select and admit a provider only after governed evaluation and owner approval."
+    )
+    assert "Phase 1" not in observation.summary
 
 
 def test_probe_failure_is_sanitized_and_cannot_escape_status_contract() -> None:

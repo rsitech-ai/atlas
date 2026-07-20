@@ -5,6 +5,18 @@ import Testing
 
 struct RuntimePresentationTests {
     @Test
+    func commandCenterUsesScopedLocalRuntimeHealthCopy() {
+        #expect(
+            RuntimePresentationCopy.statusSummary
+                == "Local runtime health, integrity, privacy, and resource evidence. This is not production or release readiness."
+        )
+        #expect(
+            RuntimePresentationCopy.modelExecutionBoundary
+                == "Production-qualified model execution remains disabled; development candidates do not close production acceptance."
+        )
+    }
+
+    @Test
     func qaPresentationOverridesAreExactAndOptIn() {
         #expect(QAPresentationOptions.parse(arguments: ["RSIAtlas"]) == QAPresentationOptions(
             forceLight: false,
