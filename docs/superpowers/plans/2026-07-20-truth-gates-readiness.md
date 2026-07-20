@@ -69,25 +69,25 @@
 - Produce: `runtime_safe_mode(environ=None) -> SafeModeController` and a stable API error `423` with detail `Safe Mode blocks <capability>.`.
 - Produce: `MigrationRunner.verify_all_applied()` for schema/checksum verification without DDL.
 
-- [ ] **Step 1: Write failing API and migration tests**
+- [x] **Step 1: Write failing API and migration tests**
 
   Prove default `create_app()` retains state, app recreation over the same `RSI_ATLAS_DATA_ROOT` retains state, exit clears it, collector import and parser start are locked, observation/status reads remain available, workflow resume and model-backed research are locked, and Safe Mode schema verification performs no migration.
 
-- [ ] **Step 2: Verify red behavior**
+- [x] **Step 2: Verify red behavior**
 
   Run: `uv run pytest services/engine/tests/test_phase6_api.py services/engine/tests/test_collectors_api.py services/engine/tests/test_document_processing_api.py services/engine/tests/test_research_api.py -q`
 
   Expected: state-recreation and capability-lock assertions fail because the current service is in-memory and unguarded.
 
-- [ ] **Step 3: Cache one Phase 6 service and add boundary guards**
+- [x] **Step 3: Cache one Phase 6 service and add boundary guards**
 
   Resolve one file-backed controller per application; guard collector mutation, processing start, model-backed research, and workflow start/resume. Add authenticated `POST /v1/recovery/safe-mode:exit`. Keep recovery/status/read-only evidence paths available.
 
-- [ ] **Step 4: Split migration verification from application**
+- [x] **Step 4: Split migration verification from application**
 
   `verify_all_applied()` must check the exact expected versions and hashes without creating tables or executing migration SQL. Automatic service composition uses apply only when `AUTOMATIC_MIGRATION` is enabled; runtime diagnostics use verify-only while Safe Mode is active.
 
-- [ ] **Step 5: Verify focused engine/storage tests pass**
+- [x] **Step 5: Verify focused engine/storage tests pass**
 
   Run: `RSI_ATLAS_TEST_DATABASE_URL="$(./infra/local/postgres.sh test-url)" uv run pytest services/engine/tests/test_phase6_api.py services/engine/tests/test_collectors_api.py services/engine/tests/test_document_processing_api.py services/engine/tests/test_research_api.py packages/storage/tests/test_postgres_integration.py -q`
 
