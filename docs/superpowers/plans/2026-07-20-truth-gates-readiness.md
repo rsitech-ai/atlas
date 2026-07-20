@@ -106,23 +106,23 @@
 - Produce: strict `PatchTestEvidence` bound to `patch_id` and `diff_hash`, with an allowlisted suite identifier, fixed argv tuple, exit code, timestamps, bounded output hashes, and runner version.
 - Change: `run_patch_quality_gate(..., test_evidence: tuple[PatchTestEvidence, ...] = ())` has no default-true boolean.
 
-- [ ] **Step 1: Write failing contract and gate tests**
+- [x] **Step 1: Write failing contract and gate tests**
 
   Missing evidence, non-zero evidence, mismatched patch/diff, stale evidence, and caller-injected evidence through the current API must fail. A directly supplied valid trusted evidence object may pass the unit-evidence check while all authority denials remain intact.
 
-- [ ] **Step 2: Verify the current default-true behavior fails the new tests**
+- [x] **Step 2: Verify the current default-true behavior fails the new tests**
 
   Run: `uv run pytest packages/contracts/tests/test_codex.py packages/engineering/tests/test_engineering.py services/engine/tests/test_phase6_api.py -q`
 
-- [ ] **Step 3: Implement the strict evidence contract and gate validation**
+- [x] **Step 3: Implement the strict evidence contract and gate validation**
 
   Recompute `sha256(diff_text)` and require it to equal the patch diff hash. Validate every evidence object against both patch identity fields and successful execution. Rename the check from `unit_stub` to `unit_test_evidence`.
 
-- [ ] **Step 4: Keep the current API safely blocked**
+- [x] **Step 4: Keep the current API safely blocked**
 
   `Phase6Service.codex_gate()` supplies no evidence until a trusted local worktree runner exists, so a clean caller-provided diff returns `gate_failed`; it must never accept caller-provided `passed`, argv, or evidence JSON as proof.
 
-- [ ] **Step 5: Verify Codex tests pass**
+- [x] **Step 5: Verify Codex tests pass**
 
   Run the command from Step 2 and inspect the serialized gate result.
 
