@@ -113,8 +113,8 @@
 
 - 2026-07-20: Use deterministic public-runner tests rather than private-helper-only assertions so
   kill and cleanup behavior are included.
-- 2026-07-20: Use a 256 KiB fake-worker response to exceed common pipe capacity and reproduce the
-  pre-drain deadlock classification at `8e46baf`.
+- 2026-07-20: Use an exact 64 KiB-plus-one fake-worker response to prove the configured stdout
+  boundary and reproduce the pre-drain deadlock classification at `8e46baf`.
 - 2026-07-20: Preserve the 4 GiB resource admission threshold; blocked host pressure is evidence,
   not a reason to weaken policy.
 
@@ -124,15 +124,19 @@
   runtime/test closeout sequence.
 - 2026-07-20: Current diagnostic still reports `resource_policy=blocked` and
   `model_registry=degraded`; all other components are healthy.
-- 2026-07-20: M1 complete at `19a72ec`: two public-runner boundary tests pass; the overflow test
-  failed against `8e46baf` with the expected old `worker_timeout` misclassification; task review
-  approved with no findings.
+- 2026-07-20: M1 initially completed at `19a72ec`: two public-runner boundary tests passed and the
+  overflow test failed against `8e46baf` with the expected old `worker_timeout` misclassification.
+- 2026-07-20: Whole-branch review held M4 because the timeout assertion observed only the leader,
+  so a leader-only termination mutation still passed, and because the overflow fixture did not use
+  the exact limit-plus-one boundary.
+- 2026-07-20: M1 evidence remediated at `0800bc9`: timeout and overflow now each spawn a child and
+  prove leader, child, and process-group disappearance; overflow emits exactly 64 KiB plus one.
 - 2026-07-20: M2 complete: 16 worker/parser/containment tests passed; Ruff check/format, strict mypy,
   parser governance, and diff checks passed.
-- 2026-07-20: M3 complete at `19a72ec`: exact-head full regression passed with 1231 Python tests,
+- 2026-07-20: M3 rerun at `0800bc95afb5`: exact-head full regression passed with 1231 Python tests,
   one optional ONNX skip, 51 Swift tests, and the product build. Fresh runtime admission remained
   blocked by host resources, so the foreground smoke was not run.
-- 2026-07-20: Next: independent whole-branch review and plan closeout.
+- 2026-07-20: Next: independent re-review of the remediated branch and reconciled evidence.
 
 ## Rollback / Recovery
 
