@@ -22,12 +22,15 @@ def test_native_launcher_uses_only_in_bundle_isolated_python(tmp_path: Path) -> 
     python = bundle / "Contents" / "Resources" / "runtime" / "python" / "bin" / "python3"
     capture = tmp_path / "argv.txt"
     resource_capture = tmp_path / "resource-root.txt"
+    runtime_capture = tmp_path / "runtime-root.txt"
     python.parent.mkdir(parents=True)
     python.write_text(
         "#!/bin/sh\nprintf '%s\\n' \"$@\" > "
         + repr(str(capture))
         + "\nprintf '%s\\n' \"$RSI_ATLAS_RESOURCE_ROOT\" > "
         + repr(str(resource_capture))
+        + "\nprintf '%s\\n' \"$RSI_ATLAS_RUNTIME_ROOT\" > "
+        + repr(str(runtime_capture))
         + "\n",
         encoding="utf-8",
     )
@@ -57,6 +60,9 @@ def test_native_launcher_uses_only_in_bundle_isolated_python(tmp_path: Path) -> 
     ]
     assert resource_capture.read_text(encoding="utf-8").strip() == str(
         bundle / "Contents" / "Resources" / "app"
+    )
+    assert runtime_capture.read_text(encoding="utf-8").strip() == str(
+        bundle / "Contents" / "Resources" / "runtime"
     )
 
 

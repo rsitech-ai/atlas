@@ -59,6 +59,17 @@ int main(int argc, char *argv[]) {
         setenv("RSI_ATLAS_RESOURCE_ROOT", resources, 1) != 0) {
         return fail();
     }
+    char runtime[PATH_MAX];
+    const int runtime_written = snprintf(
+        runtime,
+        sizeof(runtime),
+        "%s/Contents/Resources/runtime",
+        resolved
+    );
+    if (runtime_written < 0 || (size_t)runtime_written >= sizeof(runtime) ||
+        setenv("RSI_ATLAS_RUNTIME_ROOT", runtime, 1) != 0) {
+        return fail();
+    }
 
     const char *cleared[] = {
         "DYLD_FALLBACK_FRAMEWORK_PATH",
