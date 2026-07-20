@@ -7,12 +7,14 @@ from rsi_atlas_recovery.file_key import (
     load_owner_key,
 )
 from rsi_atlas_recovery.restore import restore_verified, verify_backup
-from rsi_atlas_recovery.safe_mode import SafeModeController
+from rsi_atlas_recovery.safe_mode import SafeModeBlocked, SafeModeController, SafeModeStore
 from rsi_atlas_recovery.scrub import scrub_against_manifest
 
 __all__ = [
     "FileKeyError",
+    "SafeModeBlocked",
     "SafeModeController",
+    "SafeModeStore",
     "create_workspace_backup",
     "generate_owner_key_file",
     "load_owner_key",

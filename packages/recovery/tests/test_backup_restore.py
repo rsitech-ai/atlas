@@ -5,8 +5,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
 from rsi_atlas_contracts import BackupEncryptionStatus, IntegrityFindingKind, SafeModeCapability
 from rsi_atlas_recovery import (
+    SafeModeBlocked,
     SafeModeController,
     create_workspace_backup,
     restore_verified,
@@ -56,8 +58,11 @@ def test_safe_mode_disables_capabilities() -> None:
     assert state.active is True
     assert controller.is_disabled(SafeModeCapability.MODELS) is True
     assert controller.is_disabled(SafeModeCapability.AUTOMATIC_MIGRATION) is True
+    with pytest.raises(SafeModeBlocked, match="models"):
+        controller.require(SafeModeCapability.MODELS)
     controller.exit()
     assert controller.state.active is False
+    assert controller.require(SafeModeCapability.MODELS) is None
 
 
 def test_scrub_detects_missing(tmp_path: Path) -> None:
