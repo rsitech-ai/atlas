@@ -145,19 +145,19 @@
 - Security contact: `info@rsitech.ai`.
 - Readiness state: development-complete/partially runtime-proven; production, package, signing, notarization, and clean-install proof remain open.
 
-- [ ] **Step 1: Add red copy assertions**
+- [x] **Step 1: Add red copy assertions**
 
   Assert the current runtime status no longer contains `Phase 1`, and Swift presentation uses the scoped local-runtime wording.
 
-- [ ] **Step 2: Update exact-head truth surfaces**
+- [x] **Step 2: Update exact-head truth surfaces**
 
   Replace the Phase 2A-only production brief, mark the old roadmap evidence boundary historical, add a dated exact-head development verification row without moving acceptance status, relabel signing blockage as mixed repo/owner/external, and replace the security placeholder.
 
-- [ ] **Step 3: Strengthen deterministic CI evidence**
+- [x] **Step 3: Strengthen deterministic CI evidence**
 
   Set `UV_PYTHON: "3.12"`, lint `script` and `tests`, run parser-governance verification, and run macOS document-worker containment tests. Keep full PostgreSQL and signed-release gaps explicit.
 
-- [ ] **Step 4: Verify focused copy/docs/CI checks**
+- [x] **Step 4: Verify focused copy/docs/CI checks**
 
   Run: `uv run pytest services/engine/tests/test_runtime.py -q`
 
