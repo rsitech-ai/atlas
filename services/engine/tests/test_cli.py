@@ -1,4 +1,7 @@
 import json
+import os
+import subprocess
+import sys
 from datetime import UTC, datetime
 from io import StringIO
 from pathlib import Path
@@ -20,6 +23,24 @@ from rsi_atlas_contracts import (
 from rsi_atlas_engine.cli import main
 from rsi_atlas_engine.import_staging import ImportStagingArea
 from rsi_atlas_ingestion import StagedPDFEvidence
+
+
+def test_python_module_entrypoint_exposes_cli_without_source_path_fallback() -> None:
+    environment = os.environ.copy()
+    environment.pop("PYTHONPATH", None)
+
+    result = subprocess.run(
+        [sys.executable, "-I", "-s", "-m", "rsi_atlas_engine", "--help"],
+        cwd=Path("/tmp"),
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "RSI Atlas local tooling" in result.stdout
 
 
 def _fixture_status() -> SystemStatus:

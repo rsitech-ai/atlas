@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import plistlib
+import struct
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -22,6 +24,57 @@ def _repo_fixture(path: Path) -> Path:
     (path / "LICENSE").write_bytes((ROOT / "LICENSE").read_bytes())
     (path / "NOTICE").write_bytes((ROOT / "NOTICE").read_bytes())
     (path / "uv.lock").write_bytes((ROOT / "uv.lock").read_bytes())
+    return path
+
+
+def _thin_arm64_mach_o(*, file_type: int) -> bytes:
+    load_command = struct.pack("<II", 0x1B, 24) + (b"\0" * 16)
+    return (
+        b"\xcf\xfa\xed\xfe"
+        + struct.pack(
+            "<iiIIIII",
+            0x0100000C,
+            0,
+            file_type,
+            1,
+            len(load_command),
+            0,
+            0,
+        )
+        + load_command
+    )
+
+
+def _runtime_payload_fixture(path: Path) -> Path:
+    components = {
+        Path("Contents/Resources/runtime/python/bin/python3"): 2,
+        Path("Contents/MacOS/RSIAtlasEngine"): 2,
+        Path("Contents/Resources/runtime/postgresql/bin/postgres"): 2,
+        Path("Contents/Resources/runtime/postgresql/lib/postgresql/vector.dylib"): 6,
+    }
+    for relative_path, file_type in components.items():
+        component = path / relative_path
+        component.parent.mkdir(parents=True, exist_ok=True)
+        component.write_bytes(_thin_arm64_mach_o(file_type=file_type))
+        component.chmod(0o700)
+    site_packages = (
+        path
+        / "Contents"
+        / "Resources"
+        / "runtime"
+        / "python"
+        / "lib"
+        / "python3.12"
+        / "site-packages"
+    )
+    package = site_packages / "rsi_atlas_engine"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    legal = path / "Contents" / "Resources" / "Legal" / "third-party"
+    legal.mkdir(parents=True)
+    (legal / "CPython-LICENSE.txt").write_text("PSF license\n", encoding="utf-8")
+    (legal / "PostgreSQL-COPYRIGHT.txt").write_text("PostgreSQL license\n", encoding="utf-8")
+    (legal / "pgvector-LICENSE.txt").write_text("PostgreSQL license\n", encoding="utf-8")
     return path
 
 
@@ -96,6 +149,187 @@ def test_assemble_release_app_is_deterministic_for_fixed_inputs(tmp_path: Path) 
         Path("Contents/Resources/sbom.cdx.json"),
     ):
         assert (first / relative_path).read_bytes() == (second / relative_path).read_bytes()
+
+
+def test_assemble_release_app_copies_validated_runtime_payload(tmp_path: Path) -> None:
+    repo_root = _repo_fixture(tmp_path / "repo")
+    source = tmp_path / "RSIAtlas"
+    source.write_bytes(b"release-swift-binary")
+    payload = _runtime_payload_fixture(tmp_path / "runtime-payload")
+    destination = tmp_path / "dist" / "RSIAtlas.app"
+
+    assemble_release_app(
+        source_executable=source,
+        destination_bundle=destination,
+        version="0.1.0",
+        build_number="8",
+        repo_root=repo_root,
+        runtime_payload=payload,
+        created_at=NOW,
+    )
+
+    manifest = json.loads(
+        (destination / "Contents" / "Resources" / "release-assembly.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert manifest["runtime_entrypoints_present"] is True
+    assert manifest["runtime_dependency_closure_verified"] is False
+    assert manifest["blockers"] == ["runtime_dependency_closure_unverified"]
+    assert (
+        destination / "Contents" / "Resources" / "runtime" / "python" / "bin" / "python3"
+    ).read_bytes() == (
+        payload / "Contents" / "Resources" / "runtime" / "python" / "bin" / "python3"
+    ).read_bytes()
+    assert (
+        destination / "Contents" / "Resources" / "Legal" / "third-party" / "CPython-LICENSE.txt"
+    ).is_file()
+
+
+@pytest.mark.parametrize(
+    "contaminant",
+    [
+        "pytest",
+        "_pytest",
+        "mypy",
+        "ruff",
+        "pip",
+        "_editable_rsi_atlas.pth",
+    ],
+)
+def test_runtime_payload_rejects_development_or_mutating_python_artifacts(
+    tmp_path: Path,
+    contaminant: str,
+) -> None:
+    repo_root = _repo_fixture(tmp_path / "repo")
+    source = tmp_path / "RSIAtlas"
+    source.write_bytes(b"release-swift-binary")
+    payload = _runtime_payload_fixture(tmp_path / "runtime-payload")
+    site_packages = (
+        payload
+        / "Contents"
+        / "Resources"
+        / "runtime"
+        / "python"
+        / "lib"
+        / "python3.12"
+        / "site-packages"
+    )
+    candidate = site_packages / contaminant
+    if candidate.suffix:
+        candidate.write_text("/private/source/path\n", encoding="utf-8")
+    else:
+        candidate.mkdir()
+    destination = tmp_path / "dist" / "RSIAtlas.app"
+
+    with pytest.raises(ValueError, match="forbidden Python runtime artifact"):
+        assemble_release_app(
+            source_executable=source,
+            destination_bundle=destination,
+            version="0.1.0",
+            build_number="8",
+            repo_root=repo_root,
+            runtime_payload=payload,
+            created_at=NOW,
+        )
+
+    assert not destination.exists()
+
+
+def test_runtime_payload_rejects_any_symlink_without_replacing_existing_bundle(
+    tmp_path: Path,
+) -> None:
+    repo_root = _repo_fixture(tmp_path / "repo")
+    source = tmp_path / "RSIAtlas"
+    source.write_bytes(b"release-swift-binary")
+    payload = _runtime_payload_fixture(tmp_path / "runtime-payload")
+    external = tmp_path / "external-library"
+    external.write_bytes(b"external")
+    (payload / "Contents" / "Resources" / "runtime" / "python" / "external").symlink_to(external)
+    destination = tmp_path / "dist" / "RSIAtlas.app"
+    preserved = destination / "Contents" / "preserved"
+    preserved.parent.mkdir(parents=True)
+    preserved.write_text("preserve", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="runtime payload must not contain symlinks"):
+        assemble_release_app(
+            source_executable=source,
+            destination_bundle=destination,
+            version="0.1.0",
+            build_number="8",
+            repo_root=repo_root,
+            runtime_payload=payload,
+            created_at=NOW,
+        )
+
+    assert preserved.read_text(encoding="utf-8") == "preserve"
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "content"),
+    [
+        ("nested/escape.pth", "/private/source/path\n"),
+        ("nested/editable.egg-link", "/private/source/path\n"),
+        (
+            "rsi_atlas_engine-0.1.0.dist-info/direct_url.json",
+            '{"dir_info":{"editable":true},"url":"file:///private/source"}\n',
+        ),
+        ("bin/atlas", "#!/Users/builder/python\n"),
+    ],
+)
+def test_runtime_payload_recursively_rejects_path_injection_artifacts(
+    tmp_path: Path,
+    relative_path: str,
+    content: str,
+) -> None:
+    repo_root = _repo_fixture(tmp_path / "repo")
+    source = tmp_path / "RSIAtlas"
+    source.write_bytes(b"release-swift-binary")
+    payload = _runtime_payload_fixture(tmp_path / "runtime-payload")
+    candidate = (
+        payload
+        / "Contents"
+        / "Resources"
+        / "runtime"
+        / "python"
+        / "lib"
+        / "python3.12"
+        / "site-packages"
+        / relative_path
+    )
+    candidate.parent.mkdir(parents=True, exist_ok=True)
+    candidate.write_text(content, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="forbidden Python runtime artifact"):
+        assemble_release_app(
+            source_executable=source,
+            destination_bundle=tmp_path / "dist" / "RSIAtlas.app",
+            version="0.1.0",
+            build_number="8",
+            repo_root=repo_root,
+            runtime_payload=payload,
+            created_at=NOW,
+        )
+
+
+def test_runtime_payload_rejects_special_files(tmp_path: Path) -> None:
+    repo_root = _repo_fixture(tmp_path / "repo")
+    source = tmp_path / "RSIAtlas"
+    source.write_bytes(b"release-swift-binary")
+    payload = _runtime_payload_fixture(tmp_path / "runtime-payload")
+    fifo = payload / "Contents" / "Resources" / "runtime" / "python" / "runtime.fifo"
+    os.mkfifo(fifo, mode=0o600)
+
+    with pytest.raises(ValueError, match="regular files and directories"):
+        assemble_release_app(
+            source_executable=source,
+            destination_bundle=tmp_path / "dist" / "RSIAtlas.app",
+            version="0.1.0",
+            build_number="8",
+            repo_root=repo_root,
+            runtime_payload=payload,
+            created_at=NOW,
+        )
 
 
 def test_assemble_release_app_rejects_unsafe_destination_without_mutation(

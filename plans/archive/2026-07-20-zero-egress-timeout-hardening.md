@@ -69,7 +69,7 @@
 - 2026-07-20: Reproduced three failures in the focused security file under load average above 160; identified deadline ordering and undersized fixture watchdogs.
 - 2026-07-20: Added three deterministic RED regressions and implemented the minimal deadline-before-poll, deadline-before-release, and independent-handshake fixes.
 - 2026-07-20: Security verifier file passed 31 tests. Exact full regression passed: lock, Ruff check/format, strict mypy, parser governance, 1,259 Python tests with one optional skip, 51 Swift tests, and the `RSIAtlas` product build.
-- 2026-07-20: Next: commit and push the scoped fix, update PR #2 evidence, and request independent re-review.
+- 2026-07-20: Committed as `d7c0143`, pushed, independently approved with no Critical or Important findings, and merged through PR #2 as canonical main commit `7b0a8e9`; admin branch protection was restored.
 
 ## Rollback / Recovery
 
