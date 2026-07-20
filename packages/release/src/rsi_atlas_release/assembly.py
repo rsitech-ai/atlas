@@ -17,7 +17,11 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Final
 
-from rsi_atlas_release.macho import MachOParseError, verify_macho_closure
+from rsi_atlas_release.macho import (
+    MachOParseError,
+    remove_non_system_rpaths,
+    verify_macho_closure,
+)
 from rsi_atlas_release.sbom import build_sbom_from_lock
 
 REQUIRED_RUNTIME_COMPONENTS: Final[Mapping[str, Path]] = MappingProxyType(
@@ -278,6 +282,7 @@ def _write_staged_bundle(
     executable = macos / "RSIAtlas"
     shutil.copy2(source_executable, executable)
     executable.chmod(executable.stat().st_mode | 0o111)
+    remove_non_system_rpaths(executable)
 
     plist = {
         "CFBundleExecutable": "RSIAtlas",

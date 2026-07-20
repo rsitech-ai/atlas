@@ -8,6 +8,7 @@ from rsi_atlas_release.macho import (
     MachOLoad,
     MachOParseError,
     parse_otool_load_commands,
+    remove_non_system_rpaths,
     resolve_load_path,
     verify_macho_closure,
 )
@@ -193,12 +194,7 @@ def test_live_closure_rejects_absolute_identifier(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="absolute Mach-O rpath"):
         verify_macho_closure(tmp_path / "RSIAtlas.app")
 
-    subprocess.run(
-        ["/usr/bin/install_name_tool", "-delete_rpath", "/tmp/injected", str(library)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    assert remove_non_system_rpaths(library) == ("/tmp/injected",)
     subprocess.run(
         ["/usr/bin/install_name_tool", "-add_rpath", "/usr/lib/swift", str(library)],
         check=True,

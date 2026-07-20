@@ -199,6 +199,43 @@ def read_macho_commands(path: Path, *, architecture: str = "arm64") -> MachOComm
     return parse_otool_load_commands(result.stdout, architecture=architecture)
 
 
+def remove_non_system_rpaths(path: Path) -> tuple[str, ...]:
+    """Delete build-machine rpaths and restore a valid ad hoc staging signature."""
+    if not is_macho(path):
+        return ()
+    commands = read_macho_commands(path)
+    removed = tuple(
+        rpath
+        for rpath in commands.rpaths
+        if rpath.startswith("/")
+        and not any(
+            Path(rpath) == root or Path(rpath).is_relative_to(root) for root in _SYSTEM_ROOTS
+        )
+    )
+    if not removed:
+        return ()
+    arguments = ["/usr/bin/install_name_tool"]
+    for rpath in removed:
+        arguments.extend(["-delete_rpath", rpath])
+    result = subprocess.run(
+        [*arguments, str(path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise ValueError(f"could not remove build-machine rpaths from {path.name}")
+    signing = subprocess.run(
+        ["/usr/bin/codesign", "--force", "--sign", "-", "--timestamp=none", str(path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if signing.returncode != 0:
+        raise ValueError(f"could not ad hoc sign sanitized Mach-O image {path.name}")
+    return removed
+
+
 def verify_macho_closure(bundle_root: Path) -> MachOClosure:
     """Recompute ARM64 dyld closure without trusting a prior manifest."""
     root = bundle_root.resolve(strict=True)
