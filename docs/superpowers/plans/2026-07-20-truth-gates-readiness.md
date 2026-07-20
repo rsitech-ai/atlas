@@ -33,19 +33,19 @@
 - Produce: `SafeModeStore(path: Path)`, `SafeModeBlocked`, and `SafeModeController.require(capability)`.
 - State path: `<data_root>/recovery/safe-mode.json`.
 
-- [ ] **Step 1: Write failing persistence and fail-closed tests**
+- [x] **Step 1: Write failing persistence and fail-closed tests**
 
   Cover missing state as inactive; enter/recreate as active; exit/recreate as inactive; mode `0600`; malformed, symlinked, overly permissive, and monkeypatched wrong-owner metadata as active fail-closed; and `require()` raising `SafeModeBlocked` for disabled capabilities.
 
-- [ ] **Step 2: Verify the tests fail for missing persistence APIs**
+- [x] **Step 2: Verify the tests fail for missing persistence APIs**
 
   Run: `uv run pytest packages/recovery/tests/test_safe_mode_store.py -q`
 
-- [ ] **Step 3: Implement descriptor-safe persistence**
+- [x] **Step 3: Implement descriptor-safe persistence**
 
   Write a fresh same-directory temporary file using `O_CREAT | O_EXCL | O_NOFOLLOW`, mode `0600`, `fsync`, atomic `os.replace`, and parent-directory `fsync`. Validate reads with `SafeModeState.model_validate_json`; unsafe or invalid state resolves to an active full capability mask with reason `safe_mode_state_unreadable`.
 
-- [ ] **Step 4: Verify recovery tests pass**
+- [x] **Step 4: Verify recovery tests pass**
 
   Run: `uv run pytest packages/recovery/tests/test_safe_mode_store.py packages/recovery/tests/test_backup_restore.py -q`
 
