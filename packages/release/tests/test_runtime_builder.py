@@ -7,6 +7,7 @@ import pytest
 from rsi_atlas_release.runtime_builder import (
     RuntimeBuildInputs,
     _adhoc_sign_macho,
+    _copy_release_resources,
     _materialize_absolute_dependency,
     _source_token_dependency,
     compile_engine_launcher,
@@ -20,9 +21,14 @@ def test_native_launcher_uses_only_in_bundle_isolated_python(tmp_path: Path) -> 
     launcher = bundle / "Contents" / "MacOS" / "RSIAtlasEngine"
     python = bundle / "Contents" / "Resources" / "runtime" / "python" / "bin" / "python3"
     capture = tmp_path / "argv.txt"
+    resource_capture = tmp_path / "resource-root.txt"
     python.parent.mkdir(parents=True)
     python.write_text(
-        "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + repr(str(capture)) + "\n",
+        "#!/bin/sh\nprintf '%s\\n' \"$@\" > "
+        + repr(str(capture))
+        + "\nprintf '%s\\n' \"$RSI_ATLAS_RESOURCE_ROOT\" > "
+        + repr(str(resource_capture))
+        + "\n",
         encoding="utf-8",
     )
     python.chmod(0o700)
@@ -49,6 +55,9 @@ def test_native_launcher_uses_only_in_bundle_isolated_python(tmp_path: Path) -> 
         "doctor",
         "--json",
     ]
+    assert resource_capture.read_text(encoding="utf-8").strip() == str(
+        bundle / "Contents" / "Resources" / "app"
+    )
 
 
 def test_native_launcher_fails_closed_when_embedded_python_is_missing(tmp_path: Path) -> None:
@@ -179,3 +188,20 @@ def test_modified_arm64_library_is_adhoc_signed_for_staging(tmp_path: Path) -> N
         capture_output=True,
         text=True,
     )
+
+
+def test_release_resources_include_only_operational_inputs(tmp_path: Path) -> None:
+    payload = tmp_path / "payload"
+    unused = tmp_path / "unused"
+    unused.mkdir()
+    inputs = RuntimeBuildInputs(ROOT, unused, unused, unused)
+
+    inventory = _copy_release_resources(inputs, payload)
+
+    resource_root = payload / "Contents" / "Resources" / "app"
+    assert "migrations/0001_foundation.sql" in inventory
+    assert "security/document-worker.sb" in inventory
+    assert not (resource_root / "fixtures").exists()
+    assert not (resource_root / "docs").exists()
+    assert not (resource_root / "uv.lock").exists()
+    assert (resource_root / "resource-manifest.json").is_file()

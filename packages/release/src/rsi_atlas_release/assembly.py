@@ -54,6 +54,27 @@ _RUNTIME_LEGAL_FILES: Final[tuple[Path, ...]] = (
     Path("Contents/Resources/Legal/third-party/pgvector-LICENSE.txt"),
 )
 _RUNTIME_PROVENANCE_FILE: Final = Path("Contents/Resources/runtime-build-inputs.json")
+_RUNTIME_RESOURCE_ROOT: Final = Path("Contents/Resources/app")
+_EXPECTED_MIGRATIONS: Final = tuple(
+    f"migrations/{number:04d}_{name}.sql"
+    for number, name in enumerate(
+        (
+            "foundation",
+            "immutable_artifact_contents",
+            "document_admission",
+            "document_admission_invariants",
+            "document_preflight",
+            "canonical_documents",
+            "chunk_sets",
+            "retrieval_indexes",
+            "retrieval_research_runs",
+            "structured_observations",
+            "monitoring_alerts",
+            "research_workflow_attempts",
+        ),
+        start=1,
+    )
+)
 _FORBIDDEN_PYTHON_ARTIFACT_PREFIXES: Final[tuple[str, ...]] = (
     "_pytest",
     "mypy",
@@ -135,6 +156,31 @@ def _require_source_file(path: Path, *, label: str) -> None:
         raise ValueError(f"{label} must be a non-empty file: {path}")
 
 
+def _validate_release_resources(runtime_payload: Path) -> None:
+    root = runtime_payload / _RUNTIME_RESOURCE_ROOT
+    manifest_path = root / "resource-manifest.json"
+    _require_source_file(manifest_path, label="release resource manifest")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("schema_version") != "rsi-atlas.resource-manifest.v1":
+            raise ValueError
+        declared = manifest["files"]
+        if not isinstance(declared, dict) or not all(
+            isinstance(key, str) and isinstance(value, str) for key, value in declared.items()
+        ):
+            raise ValueError
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
+        raise ValueError("release resource manifest is invalid") from error
+    actual = {
+        candidate.relative_to(root).as_posix(): sha256(candidate.read_bytes()).hexdigest()
+        for candidate in sorted(root.rglob("*"))
+        if candidate.is_file() and candidate != manifest_path
+    }
+    expected_paths = {*_EXPECTED_MIGRATIONS, "security/document-worker.sb"}
+    if set(actual) != expected_paths or actual != declared:
+        raise ValueError("release resource inventory does not match the staged files")
+
+
 def validate_runtime_payload(runtime_payload: Path) -> None:
     if runtime_payload.is_symlink() or not runtime_payload.is_dir():
         raise ValueError("runtime payload must be a real directory")
@@ -153,6 +199,7 @@ def validate_runtime_payload(runtime_payload: Path) -> None:
         runtime_payload / _RUNTIME_PROVENANCE_FILE,
         label=str(_RUNTIME_PROVENANCE_FILE),
     )
+    _validate_release_resources(runtime_payload)
 
     site_packages = (
         runtime_payload
@@ -197,6 +244,10 @@ def _copy_runtime_payload(*, runtime_payload: Path, staged_bundle: Path) -> None
     shutil.copy2(
         source_contents / "Resources" / "runtime-build-inputs.json",
         destination_contents / "Resources" / "runtime-build-inputs.json",
+    )
+    shutil.copytree(
+        source_contents / "Resources" / "app",
+        destination_contents / "Resources" / "app",
     )
     shutil.copytree(
         source_contents / "Resources" / "Legal" / "third-party",

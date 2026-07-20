@@ -265,6 +265,40 @@ def _copy_legal(inputs: RuntimeBuildInputs, payload: Path) -> None:
     shutil.copy2(inputs.pgvector_prefix / "LICENSE", legal / "pgvector-LICENSE.txt")
 
 
+def _copy_release_resources(inputs: RuntimeBuildInputs, payload: Path) -> dict[str, str]:
+    resource_root = payload / "Contents" / "Resources" / "app"
+    migrations = inputs.repo_root / "migrations"
+    if not migrations.is_dir():
+        raise ValueError("release migrations are missing")
+    _copy_materialized_tree(migrations, resource_root / "migrations")
+    profile = inputs.repo_root / "infra" / "security" / "document-worker.sb"
+    if not profile.is_file() or profile.is_symlink() or profile.stat().st_size == 0:
+        raise ValueError("release document-worker profile is missing")
+    profile_destination = resource_root / "security" / "document-worker.sb"
+    profile_destination.parent.mkdir(parents=True)
+    shutil.copy2(profile, profile_destination)
+    inventory = {
+        candidate.relative_to(resource_root).as_posix(): hashlib.sha256(
+            candidate.read_bytes()
+        ).hexdigest()
+        for candidate in sorted(resource_root.rglob("*"))
+        if candidate.is_file()
+    }
+    (resource_root / "resource-manifest.json").write_text(
+        json.dumps(
+            {
+                "files": inventory,
+                "schema_version": "rsi-atlas.resource-manifest.v1",
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return inventory
+
+
 def _relative_to(path: Path, root: Path) -> Path | None:
     try:
         return path.relative_to(root)
@@ -552,6 +586,7 @@ def build_runtime_payload(
         wheel_hashes = _install_python_packages(inputs, payload, build_root)
         _copy_postgresql(inputs, payload)
         _copy_legal(inputs, payload)
+        resource_hashes = _copy_release_resources(inputs, payload)
         compile_engine_launcher(
             source=launcher_source,
             destination=payload / "Contents" / "MacOS" / "RSIAtlasEngine",
@@ -578,6 +613,10 @@ def build_runtime_payload(
                 "version": _PYTHON_VERSION,
             },
             "macho_closure": macho_closure,
+            "release_resources": resource_hashes,
+            "release_resources_tree_sha256": _tree_sha256(
+                payload / "Contents" / "Resources" / "app"
+            ),
             "runtime_tree_sha256": _tree_sha256(payload / "Contents" / "Resources" / "runtime"),
             "schema_version": "rsi-atlas.runtime-build-inputs.v1",
             "workspace_wheels": wheel_hashes,

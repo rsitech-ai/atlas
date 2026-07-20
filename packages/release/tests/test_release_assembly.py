@@ -96,6 +96,44 @@ def _runtime_payload_fixture(path: Path) -> Path:
         '{"schema_version":"rsi-atlas.runtime-build-inputs.v1"}\n',
         encoding="utf-8",
     )
+    app_resources = path / "Contents" / "Resources" / "app"
+    migrations = app_resources / "migrations"
+    migrations.mkdir(parents=True)
+    migration_names = (
+        "foundation",
+        "immutable_artifact_contents",
+        "document_admission",
+        "document_admission_invariants",
+        "document_preflight",
+        "canonical_documents",
+        "chunk_sets",
+        "retrieval_indexes",
+        "retrieval_research_runs",
+        "structured_observations",
+        "monitoring_alerts",
+        "research_workflow_attempts",
+    )
+    for number, name in enumerate(migration_names, start=1):
+        (migrations / f"{number:04d}_{name}.sql").write_text(
+            f"SELECT {number};\n", encoding="utf-8"
+        )
+    security = app_resources / "security"
+    security.mkdir()
+    (security / "document-worker.sb").write_text("(version 1)\n", encoding="utf-8")
+    inventory = {
+        candidate.relative_to(app_resources).as_posix(): sha256(candidate.read_bytes()).hexdigest()
+        for candidate in sorted(app_resources.rglob("*"))
+        if candidate.is_file()
+    }
+    (app_resources / "resource-manifest.json").write_text(
+        json.dumps(
+            {"files": inventory, "schema_version": "rsi-atlas.resource-manifest.v1"},
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return path
 
 
@@ -206,6 +244,44 @@ def test_assemble_release_app_copies_validated_runtime_payload(tmp_path: Path) -
         destination / "Contents" / "Resources" / "Legal" / "third-party" / "CPython-LICENSE.txt"
     ).is_file()
     assert (destination / "Contents" / "Resources" / "runtime-build-inputs.json").is_file()
+    assert (
+        destination / "Contents" / "Resources" / "app" / "migrations" / "0001_foundation.sql"
+    ).is_file()
+    assert (
+        destination / "Contents" / "Resources" / "app" / "security" / "document-worker.sb"
+    ).is_file()
+
+
+def test_runtime_payload_rejects_missing_migration_before_replacement(tmp_path: Path) -> None:
+    repo_root = _repo_fixture(tmp_path / "repo")
+    source = tmp_path / "RSIAtlas"
+    source.write_bytes(b"release-swift-binary")
+    payload = _runtime_payload_fixture(tmp_path / "runtime-payload")
+    (
+        payload
+        / "Contents"
+        / "Resources"
+        / "app"
+        / "migrations"
+        / "0012_research_workflow_attempts.sql"
+    ).unlink()
+    destination = tmp_path / "dist" / "RSIAtlas.app"
+    preserved = destination / "Contents" / "preserved"
+    preserved.parent.mkdir(parents=True)
+    preserved.write_text("keep", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="resource inventory"):
+        assemble_release_app(
+            source_executable=source,
+            destination_bundle=destination,
+            version="0.1.0",
+            build_number="8",
+            repo_root=repo_root,
+            runtime_payload=payload,
+            created_at=NOW,
+        )
+
+    assert preserved.read_text(encoding="utf-8") == "keep"
 
 
 @pytest.mark.parametrize(

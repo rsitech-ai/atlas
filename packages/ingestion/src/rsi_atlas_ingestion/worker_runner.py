@@ -15,6 +15,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 
+from rsi_atlas_contracts.runtime_resources import RuntimeResources
 from rsi_atlas_document_worker.protocol import (
     DocumentWorkerRequest,
     DocumentWorkerResponse,
@@ -64,12 +65,13 @@ class DocumentWorkerRunResult:
 
 
 def profile_template_path() -> Path:
-    here = Path(__file__).resolve()
-    for parent in here.parents:
-        candidate = parent / "infra" / "security" / "document-worker.sb"
-        if candidate.is_file():
-            return candidate
-    raise DocumentWorkerRunnerError("sandbox_profile_missing")
+    try:
+        resources = RuntimeResources.resolve(
+            development_fallback=Path(__file__).resolve().parents[4]
+        )
+    except ValueError as error:
+        raise DocumentWorkerRunnerError("sandbox_profile_missing") from error
+    return resources.document_worker_profile
 
 
 def _scrub_environment(base: Mapping[str, str] | None = None) -> dict[str, str]:

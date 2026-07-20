@@ -48,6 +48,17 @@ int main(int argc, char *argv[]) {
     if (written < 0 || (size_t)written >= sizeof(python)) {
         return fail();
     }
+    char resources[PATH_MAX];
+    const int resources_written = snprintf(
+        resources,
+        sizeof(resources),
+        "%s/Contents/Resources/app",
+        resolved
+    );
+    if (resources_written < 0 || (size_t)resources_written >= sizeof(resources) ||
+        setenv("RSI_ATLAS_RESOURCE_ROOT", resources, 1) != 0) {
+        return fail();
+    }
 
     const char *cleared[] = {
         "DYLD_FALLBACK_FRAMEWORK_PATH",
