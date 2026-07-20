@@ -50,18 +50,20 @@
 - Changes:
   - Add a helper that writes mode-`0700` test-local shell executables.
   - Add a sandbox shim that consumes `-f <profile>` and execs the worker command.
-  - Add an overflow worker that consumes stdin, creates `partial.out`, and emits 256 KiB while the
-    runner ceiling is 64 KiB.
-  - Add a timeout worker that records its PID outside the run directory, creates `partial.out`,
-    consumes stdin, and sleeps.
+  - Add an overflow worker that creates `partial.out` and emits exactly 64 KiB plus one byte while
+    the runner ceiling is 64 KiB.
+  - Make the overflow and timeout workers record leader and child PIDs outside the run directory;
+    add a dedicated timeout worker whose child ignores `SIGTERM`, so escalation is tested
+    independently of leader exit.
 - Verification:
   - On current code, first create the tests without changing production code.
   - Apply the test file to a disposable worktree at `8e46baf` and run the overflow test.
   - Expected red result at `8e46baf`: `worker_timeout`, not expected
     `worker_output_too_large`.
-  - Run both tests on the current branch.
-- Expected result: both public-runner boundary tests pass; only
-  `document-worker.rendered.sb` remains after each failure; the timed-out PID no longer exists.
+  - Run all three tests on the current branch.
+- Expected result: all public-runner boundary tests pass; only
+  `document-worker.rendered.sb` remains after each failure; leader, child, and process group no
+  longer exist, including when a child ignores `SIGTERM`.
 
 ### M2. Verify the affected worker and parser paths
 
@@ -131,9 +133,15 @@
   the exact limit-plus-one boundary.
 - 2026-07-20: M1 evidence remediated at `0800bc9`: timeout and overflow now each spawn a child and
   prove leader, child, and process-group disappearance; overflow emits exactly 64 KiB plus one.
-- 2026-07-20: M2 complete: 16 worker/parser/containment tests passed; Ruff check/format, strict mypy,
+- 2026-07-20: Whole-branch re-review held M4 again after a resistant-child probe proved the
+  supervisor escalated only while the leader was alive, allowing a child that ignored `SIGTERM` to
+  survive. M1 is reopened for a red test and bounded production fix.
+- 2026-07-20: M1 completed at `6329f5e`: the resistant-child test failed before the production fix
+  because the process group remained alive, then passed after escalation was based on group
+  liveness and leader reaping was made independent.
+- 2026-07-20: M2 rerun: 17 worker/parser/containment tests passed; Ruff check/format, strict mypy,
   parser governance, and diff checks passed.
-- 2026-07-20: M3 rerun at `0800bc95afb5`: exact-head full regression passed with 1231 Python tests,
+- 2026-07-20: M3 rerun at `6329f5e040f1`: full regression passed with 1232 Python tests,
   one optional ONNX skip, 51 Swift tests, and the product build. Fresh runtime admission remained
   blocked by host resources, so the foreground smoke was not run.
 - 2026-07-20: Next: independent re-review of the remediated branch and reconciled evidence.

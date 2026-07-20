@@ -35,14 +35,17 @@ owner-executable shell scripts below `tmp_path`: a sandbox shim that consumes th
 arguments and execs the supplied worker, and bounded fake workers that first drain stdin and then
 either emit an oversized response or sleep after recording their PID and a partial output.
 
-The overflow test configures a one-byte stdout ceiling and requires
-`DocumentWorkerRunnerError("worker_output_too_large")`; it verifies that worker-created output is
-removed while the rendered sandbox profile remains for inspection. The timeout test configures a
-short monotonic deadline, requires `DocumentWorkerRunnerError("worker_timeout")`, verifies the
-process-group leader no longer exists, and verifies partial output cleanup.
+The overflow test configures a 64 KiB stdout ceiling, emits exactly 64 KiB plus one byte, and
+requires `DocumentWorkerRunnerError("worker_output_too_large")`; it verifies that worker-created
+output is removed while the rendered sandbox profile remains for inspection. The timeout test
+configures a short monotonic deadline and requires `DocumentWorkerRunnerError("worker_timeout")`.
+The overflow and timeout workers both prove leader, child, and process-group cleanup. A dedicated
+timeout worker uses a descendant that ignores `SIGTERM`, so `SIGKILL` escalation remains covered
+even when the leader exits during the grace period.
 
 These are supervisor boundary tests, not substitutes for the existing real Seatbelt echo, parser,
-containment, and full-regression coverage. No production API or dependency changes are expected.
+containment, and full-regression coverage. The public API and dependencies remain unchanged; the
+process-group cleanup implementation may change only when a red boundary test proves a defect.
 
 ## Runtime And Evidence Rules
 
