@@ -125,7 +125,7 @@ def _validate_versions(inputs: RuntimeBuildInputs) -> None:
     pgvector_version = receipt["source"]["versions"]["stable"]
     if python_version != f"Python {_PYTHON_VERSION}":
         raise ValueError("unexpected CPython build input version")
-    if postgres_version != f"postgres (PostgreSQL) {_POSTGRESQL_VERSION}":
+    if postgres_version != f"postgres (PostgreSQL) {_POSTGRESQL_VERSION} (Homebrew)":
         raise ValueError("unexpected PostgreSQL build input version")
     if pgvector_version != _PGVECTOR_VERSION:
         raise ValueError("unexpected pgvector build input version")
