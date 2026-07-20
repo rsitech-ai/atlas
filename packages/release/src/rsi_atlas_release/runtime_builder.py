@@ -15,6 +15,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from rsi_atlas_release.assembly import validate_runtime_payload
+from rsi_atlas_release.macho import (
+    is_macho,
+    read_macho_commands,
+    verify_macho_closure,
+)
 
 _PYTHON_VERSION = "3.12.10"
 _POSTGRESQL_VERSION = "17.10"
@@ -259,6 +264,188 @@ def _copy_legal(inputs: RuntimeBuildInputs, payload: Path) -> None:
     shutil.copy2(inputs.pgvector_prefix / "LICENSE", legal / "pgvector-LICENSE.txt")
 
 
+def _relative_to(path: Path, root: Path) -> Path | None:
+    try:
+        return path.relative_to(root)
+    except ValueError:
+        return None
+
+
+def _copy_distinct_file(source: Path, destination: Path) -> None:
+    if not source.is_file() or source.is_symlink():
+        raise ValueError("native dependency must resolve to a regular file")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists():
+        if (
+            hashlib.sha256(source.read_bytes()).digest()
+            != hashlib.sha256(destination.read_bytes()).digest()
+        ):
+            raise ValueError("native dependency destination collision")
+        return
+    shutil.copy2(source, destination)
+
+
+def _copy_native_provider_legal(
+    *,
+    keg_root: Path,
+    formula: str,
+    payload: Path,
+) -> list[str]:
+    legal_root = payload / "Contents" / "Resources" / "Legal" / "third-party" / "native" / formula
+    copied: list[str] = []
+    accepted = {"copying", "copyright", "license", "license.txt", "notice"}
+    for source in sorted(keg_root.iterdir()):
+        if source.name.lower() not in accepted or not source.is_file():
+            continue
+        destination = legal_root / source.name
+        _copy_distinct_file(source, destination)
+        copied.append(source.name)
+    if not copied:
+        raise ValueError(f"native provider has no redistributable license: {formula}")
+    return copied
+
+
+def _homebrew_provider(path: Path) -> tuple[str, str, Path, Path]:
+    cellar = Path("/opt/homebrew/Cellar")
+    relative = _relative_to(path, cellar)
+    if relative is None or len(relative.parts) < 3:
+        raise ValueError(f"unsupported native dependency provider: {path}")
+    formula, version = relative.parts[:2]
+    keg_root = cellar / formula / version
+    return formula, version, keg_root, Path(*relative.parts[2:])
+
+
+def _materialize_absolute_dependency(
+    *,
+    dependency: str,
+    inputs: RuntimeBuildInputs,
+    payload: Path,
+    providers: dict[str, dict[str, object]],
+) -> Path:
+    source = Path(dependency).resolve(strict=True)
+    python_source = inputs.python_prefix.resolve(strict=True)
+    postgres_source = inputs.postgresql_prefix.resolve(strict=True)
+    pgvector_source = inputs.pgvector_prefix.resolve(strict=True)
+    python_relative = _relative_to(source, python_source)
+    if python_relative is not None:
+        return payload / "Contents" / "Resources" / "runtime" / "python" / python_relative
+    postgres_relative = _relative_to(source, postgres_source)
+    if postgres_relative is not None:
+        return payload / "Contents" / "Resources" / "runtime" / "postgresql" / postgres_relative
+    pgvector_relative = _relative_to(source, pgvector_source)
+    if pgvector_relative == Path("lib/postgresql@17/vector.dylib"):
+        return (
+            payload
+            / "Contents"
+            / "Resources"
+            / "runtime"
+            / "postgresql"
+            / "lib"
+            / "postgresql"
+            / "vector.dylib"
+        )
+    formula, version, keg_root, provider_relative = _homebrew_provider(source)
+    destination = (
+        payload
+        / "Contents"
+        / "Resources"
+        / "runtime"
+        / "native"
+        / formula
+        / version
+        / provider_relative
+    )
+    _copy_distinct_file(source, destination)
+    key = f"{formula}/{version}"
+    if key not in providers:
+        receipt = keg_root / "INSTALL_RECEIPT.json"
+        if not receipt.is_file():
+            raise ValueError(f"native provider receipt is missing: {formula}")
+        providers[key] = {
+            "formula": formula,
+            "licenses": _copy_native_provider_legal(
+                keg_root=keg_root,
+                formula=formula,
+                payload=payload,
+            ),
+            "receipt_sha256": hashlib.sha256(receipt.read_bytes()).hexdigest(),
+            "version": version,
+            "files": [],
+        }
+    files = providers[key]["files"]
+    if not isinstance(files, list):
+        raise AssertionError("native provider file inventory is invalid")
+    relative_text = provider_relative.as_posix()
+    if relative_text not in files:
+        files.append(relative_text)
+        files.sort()
+    return destination
+
+
+def _loader_reference(*, loader: Path, dependency: Path) -> str:
+    relative = os.path.relpath(dependency, loader.parent)
+    if relative == ".":
+        raise ValueError("Mach-O image cannot load itself")
+    return f"@loader_path/{Path(relative).as_posix()}"
+
+
+def relocate_runtime_dependencies(
+    *,
+    inputs: RuntimeBuildInputs,
+    payload: Path,
+) -> dict[str, object]:
+    """Materialize and rewrite all non-system absolute dependencies in the payload."""
+    providers: dict[str, dict[str, object]] = {}
+    changes = 0
+    while True:
+        copied_or_changed = False
+        images = [candidate for candidate in sorted(payload.rglob("*")) if is_macho(candidate)]
+        for image in images:
+            commands = read_macho_commands(image)
+            arguments: list[str] = ["/usr/bin/install_name_tool"]
+            if commands.identifier is not None and commands.identifier.startswith("/"):
+                arguments.extend(["-id", f"@rpath/{image.name}"])
+            for load in commands.loads:
+                if load.name.startswith(("/System/Library/", "/usr/lib/")):
+                    continue
+                if not load.name.startswith("/"):
+                    continue
+                target = _materialize_absolute_dependency(
+                    dependency=load.name,
+                    inputs=inputs,
+                    payload=payload,
+                    providers=providers,
+                )
+                if not target.is_file():
+                    raise ValueError(f"mapped native dependency is missing: {load.name}")
+                replacement = _loader_reference(loader=image, dependency=target)
+                arguments.extend(["-change", load.name, replacement])
+            if len(arguments) == 1:
+                continue
+            result = subprocess.run([*arguments, str(image)], capture_output=True, text=True)
+            if result.returncode != 0:
+                raise ValueError(f"install_name_tool failed for {image.name}")
+            subprocess.run(
+                ["/usr/bin/codesign", "--remove-signature", str(image)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            changes += (len(arguments) - 1) // 2
+            copied_or_changed = True
+        if not copied_or_changed:
+            break
+    closure = verify_macho_closure(payload)
+    return {
+        "bundled_loads": closure.bundled_loads,
+        "changes": changes,
+        "images": closure.images,
+        "loads": closure.loads,
+        "providers": [providers[key] for key in sorted(providers)],
+        "system_loads": closure.system_loads,
+    }
+
+
 def build_runtime_payload(
     *,
     inputs: RuntimeBuildInputs,
@@ -291,6 +478,7 @@ def build_runtime_payload(
             source=launcher_source,
             destination=payload / "Contents" / "MacOS" / "RSIAtlasEngine",
         )
+        macho_closure = relocate_runtime_dependencies(inputs=inputs, payload=payload)
         provenance = {
             "git": git,
             "pgvector": {
@@ -311,6 +499,8 @@ def build_runtime_payload(
                 "source_tree_sha256": _tree_sha256(inputs.python_prefix),
                 "version": _PYTHON_VERSION,
             },
+            "macho_closure": macho_closure,
+            "runtime_tree_sha256": _tree_sha256(payload / "Contents" / "Resources" / "runtime"),
             "schema_version": "rsi-atlas.runtime-build-inputs.v1",
             "workspace_wheels": wheel_hashes,
         }

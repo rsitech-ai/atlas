@@ -3,7 +3,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from rsi_atlas_release.runtime_builder import compile_engine_launcher
+import pytest
+from rsi_atlas_release.runtime_builder import _copy_distinct_file, compile_engine_launcher
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -64,3 +65,19 @@ def test_native_launcher_fails_closed_when_embedded_python_is_missing(tmp_path: 
     assert result.stdout == ""
     assert result.stderr == "RSIAtlasEngine: embedded Python launch failed\n"
     assert str(tmp_path) not in result.stderr
+
+
+def test_native_provider_copy_rejects_same_destination_with_different_content(
+    tmp_path: Path,
+) -> None:
+    first = tmp_path / "first" / "libsame.dylib"
+    second = tmp_path / "second" / "libsame.dylib"
+    destination = tmp_path / "runtime" / "libsame.dylib"
+    first.parent.mkdir()
+    second.parent.mkdir()
+    first.write_bytes(b"provider-a")
+    second.write_bytes(b"provider-b")
+
+    _copy_distinct_file(first, destination)
+    with pytest.raises(ValueError, match="destination collision"):
+        _copy_distinct_file(second, destination)
