@@ -1,8 +1,14 @@
 # Signing and notarization blockers
 
-Status: **blocked on Apple Developer secrets** — software fail-closed paths exist;
-release-ready remains `false` until Developer ID + notary credentials are supplied
-and nested signing/stapling/Gatekeeper clean-user proofs are recorded.
+Status: **blocked: mixed repository, owner, and external gates** — local fail-closed paths exist,
+but `release_ready` remains `false`. No development regression result is package, signing,
+notarization, or clean-install evidence.
+
+| Gate class | Remaining blocker | Required closure evidence |
+| --- | --- | --- |
+| Repository | Staged release packaging must include the embedded runtime, reviewed entitlements, and nested-sign inventory. | Reproducible staged artifact and checked release-assembly records. |
+| Owner | Developer ID identity and Apple notary API credentials are owner-controlled and absent. | Owner supplies the required secrets locally without committing them. |
+| External | Apple notarization processing and a clean-user Gatekeeper install are external/runtime outcomes. | Stapled notarization record and clean-machine install evidence for the exact signed `.app`. |
 
 ## What is implemented without secrets
 
@@ -23,8 +29,9 @@ export RSI_ATLAS_NOTARY_KEY_ID="XXXX"
 export RSI_ATLAS_NOTARY_ISSUER="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 ```
 
-Until these exist **and** `script/sign_and_notarize.sh` records stapled notarization
-output for the exact staged `.app`, criteria 112–134 stay **Not proven**.
+Until the repository, owner, and external gates above close **and**
+`script/sign_and_notarize.sh` records stapled notarization output for the exact staged `.app`,
+criteria 112–134 stay **Not proven**.
 
 ## Not claimed
 

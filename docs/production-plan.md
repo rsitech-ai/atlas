@@ -4,37 +4,43 @@
 
 - Target user: an individual quantitative crypto researcher first; a small crypto hedge-fund research team second.
 - Primary job: turn local and explicitly collected crypto evidence into reproducible, inspectable research.
-- Core workflow: acquire evidence, investigate a material question, inspect lineage, and publish a
-  cited result. The current checkpoint implements local runtime readiness plus raw, durable,
-  fail-closed PDF admission only.
+- Core workflow: acquire evidence, investigate a material question, inspect lineage, and produce a
+  cited draft for human review. The exact-head development state is development-complete and partially
+  runtime-proven; it is not production, package, signing, notarization, or clean-install proof.
 - Business model: a professional research workstation; commercialization is outside the foundation slice.
 - Supported macOS versions: macOS 15 or newer on Apple Silicon; the reference hardware has 24–36 GB unified memory.
-- Offline behavior: strict offline is the default. The current engine exposes a development endpoint only on `127.0.0.1` and enables no remote collector, model, telemetry exporter, update check, or remote resource.
-- Data handled: runtime health metadata plus explicitly selected local PDF bytes, their SHA-256
-  identity, strict safety/admission evidence, workspace/actor/trace context, and append-only history.
-  No parser, embedding, prompt, or model receives document bytes in this checkpoint.
+- Offline behavior: Strict Offline is the default; authenticated Unix-domain IPC is the native
+  default. Development loopback TCP requires `RSI_ATLAS_ALLOW_LOOPBACK_TCP=1`; monitored HTTPS
+  collection requires an explicit allowlist. No remote model, telemetry exporter, or update check
+  is enabled by default.
+- Data handled: runtime health metadata; explicitly selected local PDF bytes and their SHA-256
+  identity; safety/admission, derivation, chunk, index, retrieval, workspace/actor/trace, and
+  append-only history. Development implementations remain governed and fail closed where their
+  production evidence is not sealed.
 - Privacy posture: zero egress for private data, prompts, embeddings, traces, reports, and evaluations.
 - V1 scope: the approved design in `docs/superpowers/specs/2026-07-18-rsi-atlas-design.md`, delivered through independently verifiable vertical slices.
-- Explicitly out of scope for this checkpoint: promoted PDF profiling, parsing/OCR,
-  canonicalization, chunking/indexing, retrieval, qualified model execution, collectors, LangGraph,
-  report generation, XPC, signing, notarization, updates, backup, and release recovery.
+- Explicitly out of scope for production readiness: owner-sealed parser/model/evaluation promotion,
+  production OCR and reranking, calibrated judges, live provider qualification, complete native
+  research surfaces, signed embedded runtime packaging, Developer ID signing, notarization,
+  Gatekeeper clean-install, and release recovery proof.
 
 ## Architecture
 
 - Scene model: SwiftUI `WindowGroup` with a foreground native app lifecycle.
-- Window roles: independent Command Center windows are supported; specialist and auxiliary window
-  roles are not implemented.
-- Layout model: native sidebar/detail `NavigationSplitView` with live Command Center and Evidence
-  destinations.
-- State ownership: scene-owned `CommandCenterStore` and `DocumentImportStore`; both use
-  latest-request-wins behavior, explicit loading/failure states, and retry without fabricated
-  evidence.
+- Window roles: independent Command Center windows are supported; the native sidebar has Command
+  Center, Evidence, Research, Comparison, and Chunks destinations.
+- Layout model: native sidebar/detail `NavigationSplitView` with live Command Center, Evidence,
+  Research, Comparison, and Chunks destinations.
+- State ownership: scene-owned `CommandCenterStore`, `DocumentImportStore`, `ResearchCanvasStore`,
+  `ComparisonTimelineStore`, and `ChunkInspectorStore` use explicit loading/failure states and do
+  not fabricate evidence.
 - Persistence: immutable content-addressed artifacts, hash-locked PostgreSQL migrations, pgvector,
   append-only acquisition/decision/duplicate/outbox evidence, and metadata-only trace JSONL persist
   below an exact owner-private data root.
-- Services: typed Swift loopback clients consume `GET /v1/system/status` and file-backed
-  `POST .../documents:admit`; Python shares runtime probes with `atlas doctor` and exposes a direct
-  owner-private `atlas import-pdf` CLI boundary.
+- Services: typed Swift clients use authenticated Unix-domain IPC by default; loopback TCP is an
+  opt-in development path only. They consume local runtime, evidence, research, comparison, and
+  chunk contracts; Python shares runtime probes with `atlas doctor` and exposes owner-private CLI
+  boundaries.
 - App Intents / Foundation Models / advanced capabilities: not enabled.
 - Folder/module structure: Swift contract/client/store code is separated from SwiftUI; Python contracts are separated from deterministic services and transport adapters.
 
@@ -43,7 +49,10 @@
 - Project type: Python uv workspace plus a SwiftPM macOS GUI executable.
 - Build command: `swift build --package-path apps/macos --product RSIAtlas`.
 - Run command: `./script/build_and_run.sh`.
-- `script/build_and_run.sh` status: implemented with an explicitly labeled per-user `launchctl` engine job, loopback readiness checks, `.app` staging, foreground launch, and canonical debug/log/telemetry/verify modes.
+- `script/build_and_run.sh` status: implemented with an explicitly labeled per-user `launchctl`
+  engine job, local readiness checks, `.app` staging, foreground launch, canonical
+  debug/log/telemetry/verify modes, and authenticated release-IPC mode. Release-IPC operation is
+  development evidence, not a signed package or clean-install proof.
 - Codex Run action status: `.codex/environments/environment.toml` points to the project-local script.
 
 ## Design System
@@ -54,9 +63,8 @@
 - Native structures: `WindowGroup`, `NavigationSplitView`, sidebar list, toolbar, keyboard shortcut, progress, list sections, and `ContentUnavailableView`.
 - Adaptive states: runtime loading/healthy/failure and Evidence empty/uploading/awaiting-review/
   rejected/duplicate/failure states are implemented. Password presentation is contract-tested for a
-  future authoritative profiler but runtime-unreachable in Phase 2A; encrypted markers remain
-  unknown and quarantined. Parsed research, retrieval, report, and long-data states remain outside
-  this checkpoint.
+  future authoritative profiler; encrypted markers remain unknown and quarantined. Development
+  research, retrieval, report, and long-data surfaces do not close their production acceptance gates.
 - Visual style: restrained native graphite/system surfaces with semantic status accents; no custom chrome or decorative animation.
 - Motion rules: no decorative motion; system progress behavior only.
 - Accessibility requirements: semantic labels and identifiers, separate remediation rows, keyboard
@@ -66,19 +74,20 @@
 
 ## Test Strategy
 
-- Unit tests: 827 PostgreSQL-configured Python tests and 43 Swift tests cover Phase 1 plus strict
-  acquisition/admission contracts, bounded streaming and responses, immutable raw publication,
-  append-only persistence, duplicate/concurrency/replay isolation, hard-kill staging recovery,
-  latest-request permutations, transport cancellation, and native accessibility presentation.
+- Unit tests: exact-head full-regression evidence is recorded in the iteration log below. Its test
+  counts are development evidence only and do not replace release-artifact, signing, notarization,
+  or clean-install verification.
 - Integration tests or mocks: real PostgreSQL 17.10/pgvector 0.8.5 integration runs alongside
   FastAPI `TestClient`; Swift injects a real data-loading boundary and decodes the shared fixture.
-- UI/manual smoke: expected degraded-only-model baseline; PostgreSQL/engine fault recovery; clean,
-  malformed, rejected-signature, encrypted-marker, and exact-duplicate imports; same-request retry;
-  truthful raw hash and quarantine copy; keyboard and VoiceOver order; 1120×760 and 860×600 content
-  layouts; Light/Dark, increased contrast, large text, Reduce Motion, and a second window.
+- UI/manual smoke: historical development observations include degraded-only-model baseline;
+  PostgreSQL/engine fault recovery; clean, malformed, rejected-signature, encrypted-marker, and
+  exact-duplicate imports; same-request retry; truthful raw hash and quarantine copy; keyboard and
+  VoiceOver order; 1120×760 and 860×600 content layouts; Light/Dark, increased contrast, large
+  text, Reduce Motion, and a second window. Current foreground runtime proof is partial, not a
+  production-release claim.
 - Release smoke: not in scope; the staged app is an unsigned local debug artifact.
-- Commands: `uv lock --check`, `uv run ruff check packages services infra`,
-  `uv run ruff format --check packages services infra`, `uv run mypy packages services infra`,
+- Commands: `uv lock --check`, `uv run ruff check packages services infra script tests`,
+  `uv run ruff format --check packages services infra script tests`, `uv run mypy packages services infra`,
   `RSI_ATLAS_TEST_DATABASE_URL="$(./infra/local/postgres.sh test-url)" uv run pytest -q`,
   `swift test --package-path apps/macos`, debug/release Swift product builds, and
   `./script/build_and_run.sh --verify` when the host resource probe is nominal.
@@ -95,14 +104,20 @@
 ## Distribution Readiness
 
 - Bundle ID: `ai.rsitech.RSIAtlas` for the local staged bundle.
-- Signing team: unconfigured.
-- Sandbox/entitlements: unconfigured; release capability work remains blocked on a reviewed process matrix.
+- Signing team: unconfigured for Developer ID distribution.
+- Sandbox/entitlements: `docs/release/entitlement-matrix.md` is a draft; signed-artifact hardened
+  runtime and entitlement validation remain open.
 - Privacy manifest: not created because this slice is not a release candidate.
 - Privacy disclosures: not prepared.
 - Assets: no custom app icon, screenshots, or marketing assets.
 - Metadata: not prepared.
 - Review notes: not applicable; the approved design selects Developer ID distribution outside the Mac App Store.
-- Known blockers: embedded Python, local PostgreSQL packaging, XPC/Unix-socket release transport, sandbox/hardened runtime, nested signing, notarization (needs Apple secrets), entitlement matrix, clean install, upgrade, rollback; Keychain-wrapped backup keys. Development SBOM + fail-closed unsigned release checks and filesystem backup/Safe Mode exist but are not release evidence.
+- Known blockers: embedded Python and local PostgreSQL packaging, sandbox/hardened runtime and
+  entitlement validation, nested signing, Developer ID/notary credentials, notarization, clean
+  install, upgrade, rollback, and Keychain-wrapped backup keys. Authenticated Unix-domain IPC is
+  implemented, but it is not package, signing, notarization, or clean-install evidence. Development
+  SBOM + fail-closed unsigned release checks and filesystem backup/Safe Mode exist but are not
+  release evidence.
 
 ## Iteration Log
 
@@ -127,3 +142,4 @@
 | 2026-07-19 | Must-have closure drive | Sealed promotion gates + fixtures; authenticated UDS release IPC (TCP behind flag); signing/notarization fail-closed scripts; multi-specialist extractive; heuristic triage + calibration; local model load/unload/OOM; reorg/WS honesty; injection suite; Codex qualify probe; Report Studio/matrix shells; OTel Swift→publication JSONL bridge. **No acceptance row marked Proven without owner secrets/corpus.** | Focused suites green; Swift **44**; release_check fail-closed. | Apple signing secrets; owner-sealed corpus; live Codex App Server; Swift UDS client; Docling. |
 | 2026-07-19 | Native UDS client + development sealed packages | Swift `LocalEngineHTTP` defaults to authenticated AF_UNIX IPC (TCP only behind `RSI_ATLAS_ALLOW_LOOPBACK_TCP=1`); Command Center / Evidence / Research / Comparison / Chunks wired through it. Expanded `sealed_holdout_v1` v1.1; synthetic path emits distinct `development_sealed_package` (never PRODUCTION Proven); `run_sealed_promotion.py --development-package` offline E2E. | Focused sealed/IPC **203** + Swift **49** green. | Apple signing secrets; owner-sealed corpus for Section 33 Proven; live Codex App Server; Docling. |
 | 2026-07-19 | E2E gate remediation (dev) | Refreshed PDF parser dependency-governance baseline hashes to current `pyproject.toml`/`uv.lock`; rewrote collector API test for auto-wired `CollectorServices`; ruff format + RUF012 ClassVar on ctypes `_fields_`; simplified Codex qualify probe for mypy. **Section 33 remains Not proven.** | Python **1180** passed / **1** skipped (occasional `test_start_runs_preflight_then_parse_for_quarantine` flake under full load); Swift **50**; ruff/mypy green. | Re-run full suite twice before claiming green; owner-sealed corpus for Section 33 Proven; Apple signing secrets; Docling. |
+| 2026-07-20 | Exact-head development regression (`18275db`) | Reviewer ran `script/codex_full_regression.sh` end-to-end at exact commit `18275db`: the repository regression suite, Swift tests, Swift product build, lock, Ruff, strict mypy, and PDF parser dependency governance all completed. This is development evidence only. | **1225 passed, 1 skipped**; **50 Swift tests passed**; Swift `RSIAtlas` product built; lock/Ruff/mypy/parser governance passed. | Production, package, signing, notarization, and Gatekeeper clean-install proof remain open; no acceptance criterion moves to Proven. |

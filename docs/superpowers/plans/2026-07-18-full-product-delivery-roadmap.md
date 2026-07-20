@@ -6,7 +6,11 @@
 
 RSI Atlas is complete only when all 134 normative acceptance criteria in Section 33 and all 20 evidence rows in Appendix D have current authoritative proof against the built release artifact. Green unit tests, source presence, or a narrow smoke cannot close a broader criterion.
 
-## Current evidence boundary
+## Historical evidence boundary
+
+> **Historical ledger (2026-07-19):** The phase ranges below preserve the evidence recorded when
+> this roadmap was last updated. They are not an exact-head readiness assertion. Consult the live
+> production plan and acceptance matrix for current development evidence and unresolved release gates.
 
 The reviewed Phase 1 chain through `647c25b`, Phase 2A chain through `113110c`, Phase 2B
 development chain through `6383861` (re-review approve-with-nits), Phase 2C development chain

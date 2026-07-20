@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+env:
+  UV_PYTHON: "3.12"
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -27,10 +30,12 @@ jobs:
         run: uv lock --check
       - name: Ruff
         run: |
-          uv run ruff check packages services infra
-          uv run ruff format --check packages services infra
+          uv run ruff check packages services infra script tests
+          uv run ruff format --check packages services infra script tests
       - name: Mypy
         run: uv run mypy packages services infra
+      - name: PDF parser dependency governance
+        run: uv run python script/audit_pdf_parser_dependencies.py verify
 
   python-unit:
     name: Python unit (no Postgres)
@@ -66,14 +71,22 @@ jobs:
           --ignore=infra/security/tests
 
   swift-macos:
-    name: Swift package tests
+    name: Swift package and document-worker containment tests
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Sync workspace
+        run: uv sync --frozen
+      - name: macOS security and document-worker containment
+        run: uv run pytest -q infra/security/tests
       - name: Swift test
         run: swift test --package-path apps/macos
       - name: Swift build product
         run: swift build --package-path apps/macos --product RSIAtlas
 
-  # Release signing/notarization is intentionally not CI-gated: it needs owner Apple secrets.
-  # Optional future job: run script/release_check.py (unsigned; always release_ready=false).
+  # Full PostgreSQL integration is intentionally not CI-gated: it needs the project-owned
+  # Unix-socket PostgreSQL 17.10/pgvector runtime. Signed release checks are also excluded:
+  # Apple Developer credentials, packaging, notarization, and clean-install proof remain owner gates.

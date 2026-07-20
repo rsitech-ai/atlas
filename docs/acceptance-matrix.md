@@ -2,6 +2,12 @@
 
 This is the live completion ledger for the normative criteria in Section 33 and the verification evidence in Appendix D of the approved specification. `Not proven` means current evidence is missing, partial, indirect, stale, or narrower than the criterion. A criterion moves to `Proven` only with a current source, automated check, and runtime or release artifact where the requirement demands one.
 
+## Exact-head development evidence
+
+| Date | Evidence | Acceptance impact |
+| --- | --- | --- |
+| 2026-07-20 | A reviewer ran `script/codex_full_regression.sh` end-to-end at exact commit `18275db`: **1225 passed, 1 skipped**; **50 Swift tests passed**; the Swift `RSIAtlas` product built; lock, Ruff, strict mypy, and PDF parser dependency governance passed. | Development-complete / partially runtime-proven only. Every Section 33 and Appendix D status remains **Not proven**; production, package, signing, notarization, and clean-install evidence remain open. |
+
 ## Section 33
 
 | Criteria | Area | Current status | Current evidence | Closing evidence |

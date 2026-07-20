@@ -1,6 +1,13 @@
 import RSIAtlasCore
 import SwiftUI
 
+enum RuntimePresentationCopy {
+    static let statusSummary =
+        "Local runtime health, integrity, privacy, and resource evidence. This is not production or release readiness."
+    static let modelExecutionBoundary =
+        "Production-qualified model execution remains disabled; development candidates do not close production acceptance."
+}
+
 struct CommandCenterView: View {
     @Bindable var store: CommandCenterStore
 
@@ -48,9 +55,9 @@ struct CommandCenterView: View {
                         .accessibilityIdentifier(RuntimeAccessibility.profile)
                 }
             }
-            Text("Live readiness, integrity, privacy, and resource evidence for the local runtime.")
+            Text(RuntimePresentationCopy.statusSummary)
                 .foregroundStyle(.secondary)
-            Text("Model execution remains disabled until a provider is evaluated and approved.")
+            Text(RuntimePresentationCopy.modelExecutionBoundary)
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }

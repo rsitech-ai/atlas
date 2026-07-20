@@ -328,7 +328,7 @@ class RuntimeServices:
     ) -> None:
         configured = tuple(probes)
         if tuple(probe.component_id for probe in configured) != COMPONENT_IDS:
-            raise ValueError("runtime services require the exact Phase 1 probes")
+            raise ValueError("runtime services require the exact runtime probes")
         self._probes = configured
         self._clock = clock
 
@@ -510,8 +510,8 @@ def _configuration_failure_probes() -> tuple[RuntimeProbe, ...]:
         ),
         "model_registry": _observation(
             HealthState.DEGRADED,
-            "No qualified local model or provider is available in Phase 1.",
-            "Model execution remains disabled until evaluation and approval are implemented.",
+            "No production-qualified local model or provider is active.",
+            "Select and admit a provider only after governed evaluation and owner approval.",
         ),
         "contract_api": _observation(
             HealthState.HEALTHY,
@@ -680,12 +680,12 @@ def _check_model_registry() -> ProbeObservation:
         or provider.capabilities
         or provider.health.state is not ProviderHealthState.UNAVAILABLE
     ):
-        raise RuntimeError("Phase 1 model boundary is invalid")
+        raise RuntimeError("runtime model boundary is invalid")
     provider.unload()
     return _observation(
         HealthState.DEGRADED,
-        "No qualified local model or provider is available in Phase 1.",
-        "Model execution remains disabled until evaluation and approval are implemented.",
+        "No production-qualified local model or provider is active.",
+        "Select and admit a provider only after governed evaluation and owner approval.",
     )
 
 
