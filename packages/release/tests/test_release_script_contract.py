@@ -39,7 +39,8 @@ def test_runtime_preflight_cli_fails_closed_for_native_shell(tmp_path: Path) -> 
 
     assert result.returncode == 1
     assert "embedded_python_missing" in result.stdout
-    assert "runtime_complete=false" in result.stdout
+    assert "runtime_ready_for_signing=false" in result.stdout
+    assert "runtime_dependency_closure_unverified" in result.stdout
 
 
 def test_signing_script_is_inside_out_and_archives_after_stapling() -> None:

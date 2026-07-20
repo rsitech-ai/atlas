@@ -7,6 +7,7 @@ import os
 import plistlib
 import re
 import shutil
+import struct
 import tempfile
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -27,18 +28,15 @@ REQUIRED_RUNTIME_COMPONENTS: Final[Mapping[str, Path]] = MappingProxyType(
         ),
     }
 )
+RUNTIME_DEPENDENCY_CLOSURE_BLOCKER: Final = "runtime_dependency_closure_unverified"
 _VERSION_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 _BUILD_PATTERN = re.compile(r"^[1-9][0-9]*$")
-_MACH_O_MAGICS: Final[frozenset[bytes]] = frozenset(
+_EXPECTED_MACH_O_FILE_TYPES: Final[Mapping[str, frozenset[int]]] = MappingProxyType(
     {
-        b"\xca\xfe\xba\xbe",
-        b"\xbe\xba\xfe\xca",
-        b"\xca\xfe\xba\xbf",
-        b"\xbf\xba\xfe\xca",
-        b"\xce\xfa\xed\xfe",
-        b"\xfe\xed\xfa\xce",
-        b"\xcf\xfa\xed\xfe",
-        b"\xfe\xed\xfa\xcf",
+        "embedded_python_missing": frozenset({2}),
+        "engine_launcher_missing": frozenset({2}),
+        "postgresql_missing": frozenset({2}),
+        "pgvector_missing": frozenset({6, 8}),
     }
 )
 _EXECUTABLE_RUNTIME_BLOCKERS: Final[frozenset[str]] = frozenset(
@@ -50,18 +48,52 @@ _EXECUTABLE_RUNTIME_BLOCKERS: Final[frozenset[str]] = frozenset(
 )
 
 
-def _is_mach_o(path: Path) -> bool:
+def _mach_o_file_type(path: Path) -> int | None:
     try:
         with path.open("rb") as handle:
-            return handle.read(4) in _MACH_O_MAGICS
-    except OSError:
-        return False
+            header = handle.read(32)
+            if len(header) != 32 or header[:4] != b"\xcf\xfa\xed\xfe":
+                return None
+            cpu_type, _, file_type, command_count, commands_size, _, _ = struct.unpack(
+                "<iiIIIII", header[4:]
+            )
+            if (
+                cpu_type != 0x0100000C
+                or not 1 <= command_count <= 4096
+                or commands_size < command_count * 8
+                or commands_size > 16 * 1024 * 1024
+            ):
+                return None
+            commands = handle.read(commands_size)
+    except (OSError, struct.error):
+        return None
+    if len(commands) != commands_size:
+        return None
+    offset = 0
+    for _ in range(command_count):
+        if offset + 8 > commands_size:
+            return None
+        _, command_size = struct.unpack_from("<II", commands, offset)
+        if command_size < 8 or command_size % 8 != 0 or offset + command_size > commands_size:
+            return None
+        offset += command_size
+    return file_type if offset == commands_size else None
 
 
-def inspect_runtime_completeness(bundle_path: Path) -> tuple[str, ...]:
-    """Return stable blocker codes for absent or empty embedded runtime components."""
+def _has_symlink_in_component_path(bundle_path: Path, relative_path: Path) -> bool:
+    candidate = bundle_path
+    if candidate.is_symlink():
+        return True
+    for part in relative_path.parts:
+        candidate /= part
+        if candidate.is_symlink():
+            return True
+    return False
+
+
+def inspect_runtime_entrypoints(bundle_path: Path) -> tuple[str, ...]:
+    """Validate required in-bundle ARM64 Mach-O entrypoints without claiming they can launch."""
     blockers: list[str] = []
-    bundle_is_symlink = bundle_path.is_symlink()
     bundle_root = bundle_path.resolve()
     for blocker, relative_path in REQUIRED_RUNTIME_COMPONENTS.items():
         component = bundle_path / relative_path
@@ -72,12 +104,11 @@ def inspect_runtime_completeness(bundle_path: Path) -> tuple[str, ...]:
         except (FileNotFoundError, ValueError):
             pass
         if (
-            bundle_is_symlink
-            or component.is_symlink()
+            _has_symlink_in_component_path(bundle_path, relative_path)
             or not contained
             or not component.is_file()
             or component.stat().st_size == 0
-            or not _is_mach_o(component)
+            or _mach_o_file_type(component) not in _EXPECTED_MACH_O_FILE_TYPES[blocker]
             or (blocker in _EXECUTABLE_RUNTIME_BLOCKERS and component.stat().st_mode & 0o111 == 0)
         ):
             blockers.append(blocker)
@@ -130,14 +161,15 @@ def _write_staged_bundle(
         encoding="utf-8",
     )
 
-    blockers = inspect_runtime_completeness(staged_bundle)
+    entrypoint_blockers = inspect_runtime_entrypoints(staged_bundle)
     manifest = {
-        "blockers": list(blockers),
+        "blockers": [*entrypoint_blockers, RUNTIME_DEPENDENCY_CLOSURE_BLOCKER],
         "build_number": build_number,
         "bundle_identifier": "ai.rsitech.RSIAtlas",
         "executable_sha256": sha256(executable.read_bytes()).hexdigest(),
-        "honesty_label": "complete_runtime" if not blockers else "incomplete_runtime",
-        "runtime_complete": not blockers,
+        "honesty_label": "runtime_unverified",
+        "runtime_dependency_closure_verified": False,
+        "runtime_entrypoints_present": not entrypoint_blockers,
         "schema_version": "rsi-atlas.release-assembly.v1",
         "version": version,
     }
@@ -156,7 +188,7 @@ def assemble_release_app(
     repo_root: Path,
     created_at: datetime | None = None,
 ) -> Path:
-    """Atomically stage the versioned native shell without overstating runtime completeness."""
+    """Atomically stage the versioned native shell without claiming runtime dependency closure."""
     if destination_bundle.suffix != ".app":
         raise ValueError("destination must end in .app")
     if _VERSION_PATTERN.fullmatch(version) is None:

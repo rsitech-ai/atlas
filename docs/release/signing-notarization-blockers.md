@@ -7,7 +7,7 @@ signing, notarization, or clean-install evidence.
 
 | Gate class | Remaining blocker | Required closure evidence |
 | --- | --- | --- |
-| Repository | The versioned native shell is reproducibly assembled, but embedded Python, the engine launcher, PostgreSQL, and pgvector are absent. | All four fixed runtime paths present inside the bundle without symlinks; assembly manifest records `runtime_complete=true`. |
+| Repository | The versioned native shell is reproducibly assembled, but embedded Python, the engine launcher, PostgreSQL, and pgvector are absent. Runtime entrypoint presence alone is not dependency closure or launch proof. | All four fixed paths contain parseable thin ARM64 Mach-O code of the expected executable/library type, every path ancestor is non-symlinked, dependency closure is verified, and isolated launch smokes pass. |
 | Owner | `Developer ID Application: Rafal Sikora (2NY8A789TN)` is installed with its private key. Apple notary API credentials remain owner-controlled and absent. | Owner supplies only the notary key reference, key ID, and issuer locally without committing them. |
 | External | Apple notarization processing and a clean-user Gatekeeper install are external/runtime outcomes. | Stapled notarization record and clean-machine install evidence for the exact signed `.app`. |
 
@@ -20,7 +20,7 @@ signing, notarization, or clean-install evidence.
 | Entitlement matrix | `docs/release/entitlement-matrix.md` | Draft; includes Unix domain IPC policy |
 | Native-shell assembler | `script/assemble_release_app.py --build-number <positive integer>` | Writes version/build metadata, legal files, SBOM, executable hash, and an honesty manifest; does not claim a complete runtime |
 | Packaging helper | `script/package_release.sh` | Builds and atomically stages the shell before the fail-closed release check |
-| Runtime preflight | `script/check_release_runtime.py --bundle dist/RSIAtlas.app` | Rejects absent, empty, external, or symlinked required runtime components before signing |
+| Runtime preflight | `script/check_release_runtime.py --bundle dist/RSIAtlas.app` | Validates non-symlinked thin ARM64 Mach-O entrypoints but always retains `runtime_dependency_closure_unverified`; signing remains blocked in this slice |
 | Nested signing workflow | `script/sign_and_notarize.sh` | Signs Mach-O code and nested bundles inside-out with hardened runtime/timestamps only after runtime preflight; workflow is unproven until executed with a complete bundle and owner credentials |
 
 ## Local release inputs

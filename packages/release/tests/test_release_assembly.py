@@ -60,12 +60,14 @@ def test_assemble_release_app_writes_versioned_honest_bundle(tmp_path: Path) -> 
             "engine_launcher_missing",
             "postgresql_missing",
             "pgvector_missing",
+            "runtime_dependency_closure_unverified",
         ],
         "build_number": "1",
         "bundle_identifier": "ai.rsitech.RSIAtlas",
         "executable_sha256": sha256(source.read_bytes()).hexdigest(),
-        "honesty_label": "incomplete_runtime",
-        "runtime_complete": False,
+        "honesty_label": "runtime_unverified",
+        "runtime_dependency_closure_verified": False,
+        "runtime_entrypoints_present": False,
         "schema_version": "rsi-atlas.release-assembly.v1",
         "version": "0.1.0",
     }
@@ -172,5 +174,5 @@ def test_assemble_release_app_cli_stages_supplied_binary(tmp_path: Path) -> None
 
     assert result.returncode == 0, result.stderr
     assert destination.is_dir()
-    assert "runtime_complete=false" in result.stdout
+    assert "runtime_entrypoints_present=false" in result.stdout
     assert "embedded_python_missing" in result.stdout

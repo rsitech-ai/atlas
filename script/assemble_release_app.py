@@ -75,9 +75,10 @@ def main() -> int:
     manifest_path = bundle / "Contents" / "Resources" / "release-assembly.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     blockers = ",".join(manifest["blockers"])
-    runtime_complete = str(manifest["runtime_complete"]).lower()
+    entrypoints_present = str(manifest["runtime_entrypoints_present"]).lower()
     print(f"assembled {bundle}")
-    print(f"runtime_complete={runtime_complete}")
+    print(f"runtime_entrypoints_present={entrypoints_present}")
+    print("runtime_dependency_closure_verified=false")
     print(f"blockers={blockers}")
     return 0
 

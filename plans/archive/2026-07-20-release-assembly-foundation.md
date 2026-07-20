@@ -28,19 +28,21 @@
 - Desired behavior:
   - `assemble_release_app(...)` creates `Contents/MacOS/RSIAtlas`, a versioned `Info.plist`, legal
     notices, CycloneDX SBOM, and `Contents/Resources/release-assembly.json`.
-  - `inspect_runtime_completeness(...)` requires fixed in-bundle entry points for embedded Python,
-    the engine launcher, PostgreSQL, and pgvector and returns stable blocker codes.
+  - `inspect_runtime_entrypoints(...)` requires fixed in-bundle entry points for embedded Python,
+    the engine launcher, PostgreSQL, and pgvector and returns stable blocker codes without claiming
+    dependency closure or launchability.
   - The release checker propagates those blocker codes and refuses readiness.
-  - The signing helper verifies runtime completeness before changing signatures, signs discovered
-    nested Mach-O code inside-out with hardened runtime and timestamping, verifies each signature,
-    notarizes, staples, recreates the final archive, and writes a SHA-256 checksum.
+  - The signing helper requires a future dependency-closure and launch-proof gate before changing
+    signatures. Once that gate exists, it signs discovered nested Mach-O code inside-out with
+    hardened runtime and timestamping, verifies each signature, notarizes, staples, recreates the
+    final archive, and writes a SHA-256 checksum.
 - Non-goals: embedding CPython/PostgreSQL in this slice, creating notary credentials, App Store
   upload, publishing an unnotarized artifact, or weakening resource/model/owner-sealed gates.
 
 ## Risks and Failure Modes
 
 - A visually complete shell can be mistaken for a standalone product; the assembly manifest and
-  release checker must retain explicit `runtime_complete=false` truth.
+  release checker must distinguish entrypoint presence from dependency closure and launch proof.
 - Signing order can invalidate outer signatures; inventory nested Mach-O code and sign deepest
   paths first, then the main executable, then the app.
 - Reassembly can overwrite an unrelated path; accept only an output path ending in `.app`, stage in
@@ -50,13 +52,13 @@
 
 ## Milestones
 
-### M1. Runtime completeness contract
+### M1. Runtime entrypoint contract
 
 - Goal: make the first package blocker machine-readable and regression-protected.
 - Files / systems: create `packages/release/src/rsi_atlas_release/assembly.py`; modify
   `packages/release/src/rsi_atlas_release/__init__.py` and `checks.py`; extend
   `packages/release/tests/test_release_checks.py`.
-- Changes: define `REQUIRED_RUNTIME_COMPONENTS`, `inspect_runtime_completeness(bundle_path)`, and
+- Changes: define `REQUIRED_RUNTIME_COMPONENTS`, `inspect_runtime_entrypoints(bundle_path)`, and
   stable blockers `embedded_python_missing`, `engine_launcher_missing`, `postgresql_missing`, and
   `pgvector_missing`; propagate them into `ReleaseCheckReport.blockers`.
 - Verification: write the missing-runtime and complete-fixture tests first; observe the focused test
@@ -86,7 +88,8 @@
 - Goal: prevent shallow signing and ensure the downloadable archive is the stapled artifact.
 - Files / systems: modify `script/sign_and_notarize.sh`; add
   `packages/release/tests/test_signing_script_contract.py`; update release docs.
-- Changes: preflight runtime completeness; enumerate Mach-O files; sign deepest nested code first
+- Changes: preflight runtime entrypoints and dependency closure; enumerate Mach-O files; sign
+  deepest nested code first
   with `--options runtime --timestamp`; sign app last; verify nested and outer signatures; submit a
   temporary notarization archive; staple and validate; recreate the final archive; emit SHA-256.
 - Verification: contract tests first fail against `--deep`; shell syntax passes; missing runtime
@@ -126,7 +129,8 @@
 - 2026-07-20: Build a truthful app-shell assembler and exact runtime blockers before attempting to
   embed large runtimes; this is independently reviewable and prevents misleading release assets.
 - 2026-07-20: Use the installed Developer ID Application identity for Team `2NY8A789TN` only after
-  runtime completeness passes; no certificate download is needed.
+  runtime entrypoints, dependency closure, and isolated launch proof pass; no certificate download
+  is needed.
 - 2026-07-20: Keep notarization and public download blocked until an App Store Connect API private
   key is locally available and end-to-end artifact proof passes.
 
@@ -155,6 +159,13 @@
   `1` shell records the four runtime blockers and release checking exits 1 as designed.
 - 2026-07-20: Plan archived for PR review. PR state, independent verdict, and exact merge evidence
   are recorded in GitHub rather than by changing the reviewed code head after verification.
+- 2026-07-20: Independent PR review held publication because magic-byte-only checks accepted
+  truncated placeholders and an in-bundle symlinked ancestor escaped the no-symlink claim.
+  Remediation parses the complete thin ARM64 Mach-O header/load-command region, enforces executable
+  versus dylib file types and executable modes, checks every path ancestor for symlinks, renames the
+  result to entrypoint presence, and retains `runtime_dependency_closure_unverified` unconditionally.
+  Twenty-three release tests now cover the boundary. The newly assembled real shell fails release
+  and signing preflight without mutation, with entrypoint and dependency-closure truth printed.
 
 ## Rollback / Recovery
 
