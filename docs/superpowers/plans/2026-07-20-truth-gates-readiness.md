@@ -193,6 +193,6 @@
 
   Update the dated ledger with the final commit, exact commands/results, remaining ONNX skip, and unchanged production/release blockers.
 
-- [ ] **Step 5: Independent whole-branch review**
+- [x] **Step 5: Independent whole-branch review**
 
   Review the full branch diff for false readiness claims, capability bypasses, unsafe persistence, missing red-green evidence, and test gaps. Fix all Critical/Important findings and re-run affected checks.
