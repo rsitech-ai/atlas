@@ -54,7 +54,7 @@ public struct LocalEngineHTTP: Sendable {
                 maximumResponseBytes: maximumResponseBytes
             )
         case let .unixDomain(socketPath):
-            guard let token = configuration.token, !token.isEmpty else {
+            guard let token = configuration.currentToken(), !token.isEmpty else {
                 throw LocalEngineHTTPError.authenticationRequired
             }
             _ = token
@@ -86,7 +86,7 @@ public struct LocalEngineHTTP: Sendable {
             try mapStatus(http.statusCode)
             return (data, http)
         case let .unixDomain(socketPath):
-            guard configuration.token != nil else {
+            guard configuration.currentToken() != nil else {
                 throw LocalEngineHTTPError.authenticationRequired
             }
             let body = try Data(contentsOf: fileURL)
@@ -103,7 +103,7 @@ public struct LocalEngineHTTP: Sendable {
     }
 
     private func applyAuth(_ request: inout URLRequest) {
-        guard let token = configuration.token, !token.isEmpty else { return }
+        guard let token = configuration.currentToken(), !token.isEmpty else { return }
         if request.value(forHTTPHeaderField: "Authorization") == nil {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }

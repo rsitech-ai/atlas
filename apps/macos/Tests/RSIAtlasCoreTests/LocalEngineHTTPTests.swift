@@ -57,6 +57,38 @@ struct LocalEngineConfigurationTests {
 
 struct LocalEngineHTTPTests {
     @Test
+    func unixDomainLoadsTokenCreatedAfterConfiguration() async throws {
+        let root = privateIPCRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let socketPath = root.appending(path: "engine.sock")
+        let tokenPath = root.appending(path: "engine.token")
+        let token = "late-token-\(UUID().uuidString)-pad-to-32-chars"
+        let configuration = LocalEngineConfiguration(
+            mode: .unixDomain(socketPath: socketPath),
+            tokenPath: tokenPath,
+            token: nil
+        )
+        try token.write(to: tokenPath, atomically: true, encoding: .utf8)
+        let server = try UnixHTTPTestServer(
+            socketPath: socketPath.path,
+            expectedAuthorization: "Bearer \(token)",
+            responseStatus: 200,
+            responseBody: #"{"ok":true}"#
+        )
+        try await server.start()
+        defer { server.stop() }
+
+        let http = LocalEngineHTTP(configuration: configuration)
+        let request = URLRequest(
+            url: configuration.httpBaseURL.appending(path: "v1/system/status")
+        )
+        let (data, response) = try await http.perform(request, maximumResponseBytes: 1_024)
+
+        #expect(response.statusCode == 200)
+        #expect(String(data: data, encoding: .utf8) == #"{"ok":true}"#)
+    }
+
+    @Test
     func unixDomainConnectsWithBearerToken() async throws {
         let root = privateIPCRoot()
         defer { try? FileManager.default.removeItem(at: root) }

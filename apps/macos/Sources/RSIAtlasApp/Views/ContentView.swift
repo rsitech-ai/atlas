@@ -57,5 +57,8 @@ struct ContentView: View {
             }
         }
         .navigationTitle(selection?.title ?? "RSI Atlas")
+        .onReceive(NotificationCenter.default.publisher(for: .rsiAtlasEngineReady)) { _ in
+            Task { await store.reload() }
+        }
     }
 }
