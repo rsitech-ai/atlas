@@ -1,8 +1,12 @@
+from datetime import UTC, datetime
+from pathlib import Path
 from uuid import UUID
 
+import pytest
 from fastapi.testclient import TestClient
 from rsi_atlas_contracts import ArtifactCommandContext
 from rsi_atlas_engine.api import create_app
+from rsi_atlas_engine.ingestion import DocumentIngestionServices
 from rsi_atlas_ingestion.processing_pipeline import (
     CanonicalPageEvidence,
     ChunkSetEvidence,
@@ -10,6 +14,7 @@ from rsi_atlas_ingestion.processing_pipeline import (
     DocumentProcessingStatus,
     RetrievalIndexSummary,
 )
+from rsi_atlas_recovery import SafeModeBlocked, SafeModeController, SafeModeStore
 
 
 class FakeProcessingService:
@@ -364,3 +369,88 @@ def test_processing_rejects_invalid_page_bounds() -> None:
         headers=_headers(workspace_id),
     )
     assert response.status_code == 422
+
+
+def test_safe_mode_blocks_processing_start_but_keeps_status_readable(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("RSI_ATLAS_DATA_ROOT", str(tmp_path / "runtime"))
+    processing = FakeProcessingService()
+    client = TestClient(
+        create_app(
+            status_factory=lambda: (_ for _ in ()).throw(RuntimeError("unused")),
+            document_admission_service=object(),  # type: ignore[arg-type]
+            import_staging_area=object(),  # type: ignore[arg-type]
+            document_processing_service=processing,
+        )
+    )
+    workspace_id = UUID("44444444-4444-4444-8444-444444444444")
+    acquisition_id = UUID("55555555-5555-4555-8555-555555555555")
+    headers = _headers(workspace_id)
+    assert (
+        client.post("/v1/recovery/safe-mode:enter", json={"reason": "operator"}).status_code == 200
+    )
+
+    blocked = client.post(
+        f"/v1/workspaces/{workspace_id}/acquisitions/{acquisition_id}/processing:start",
+        headers=headers,
+    )
+    assert blocked.status_code == 423
+    assert blocked.json() == {"detail": "Safe Mode blocks parser_workers."}
+    assert processing.started == []
+
+    chunk_set_id = "chunkset:" + ("d" * 64)
+    indexing = client.post(
+        f"/v1/workspaces/{workspace_id}/chunk-sets/{chunk_set_id}/indexing:start",
+        headers=headers,
+    )
+    assert indexing.status_code == 423
+    assert indexing.json() == {"detail": "Safe Mode blocks models."}
+    assert processing.indexed == []
+
+    status = client.get(
+        f"/v1/workspaces/{workspace_id}/acquisitions/{acquisition_id}/processing",
+        headers=headers,
+    )
+    assert status.status_code == 200
+    assert status.json()["state"] == "idle"
+    index_versions = client.get(
+        f"/v1/workspaces/{workspace_id}/chunk-sets/{chunk_set_id}/index-versions",
+        headers=headers,
+    )
+    assert index_versions.status_code == 200
+
+
+def test_composed_processing_service_guards_direct_start_calls(
+    tmp_path: Path,
+) -> None:
+    processing = FakeProcessingService()
+    controller = SafeModeController(SafeModeStore(tmp_path / "runtime"))
+    services = DocumentIngestionServices(
+        admission_service=object(),  # type: ignore[arg-type]
+        staging_area=object(),  # type: ignore[arg-type]
+        processing_service=processing,  # type: ignore[arg-type]
+        safe_mode=controller,
+    )
+    controller.enter(reason="operator", entered_at=datetime(2026, 7, 20, tzinfo=UTC))
+    context = ArtifactCommandContext(
+        tenant_id=UUID("11111111-1111-4111-8111-111111111111"),
+        workspace_id=UUID("44444444-4444-4444-8444-444444444444"),
+        actor_id=UUID("22222222-2222-4222-8222-222222222222"),
+        trace_id=UUID("33333333-3333-4333-8333-333333333333"),
+    )
+    acquisition_id = UUID("55555555-5555-4555-8555-555555555555")
+
+    with pytest.raises(SafeModeBlocked, match="parser_workers"):
+        services.processing_service.start(context=context, acquisition_id=acquisition_id)
+    assert processing.started == []
+    with pytest.raises(SafeModeBlocked, match="models"):
+        services.processing_service.start_indexing(
+            context=context,
+            chunk_set_id="chunkset:" + ("d" * 64),
+        )
+    assert processing.indexed == []
+    assert (
+        services.processing_service.status(context=context, acquisition_id=acquisition_id).state
+        == "idle"
+    )

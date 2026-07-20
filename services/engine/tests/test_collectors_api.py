@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from uuid import UUID
 
 from fastapi.testclient import TestClient
@@ -13,6 +14,9 @@ from rsi_atlas_contracts import (
     ProviderQualityState,
 )
 from rsi_atlas_engine.api import create_app
+from rsi_atlas_engine.phase6 import Phase6Service
+from rsi_atlas_recovery import SafeModeController, SafeModeStore
+from rsi_atlas_security.ipc import ensure_ipc_token
 
 TENANT_ID = UUID("00000000-0000-4000-8000-000000000001")
 WORKSPACE_ID = UUID("00000000-0000-4000-8000-000000000002")
@@ -131,3 +135,74 @@ def test_default_create_app_auto_wires_collectors() -> None:
         body = response.json()
         assert body["envelope"] is not None
         assert body["observation"] is not None or body["quarantine"] is not None
+
+
+def test_safe_mode_blocks_collector_mutation_but_keeps_observations_readable(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("RSI_ATLAS_DATA_ROOT", str(tmp_path / "runtime"))
+    collectors = FakeCollectorService()
+    client = TestClient(
+        create_app(
+            status_factory=lambda: (_ for _ in ()).throw(RuntimeError("unused")),
+            collector_service=collectors,
+        )
+    )
+    assert (
+        client.post("/v1/recovery/safe-mode:enter", json={"reason": "operator"}).status_code == 200
+    )
+
+    blocked = client.post(
+        f"/v1/workspaces/{WORKSPACE_ID}/collectors:import-fixture",
+        headers=_headers(),
+        json={"fixture_name": "bitcoin_block.json"},
+    )
+    assert blocked.status_code == 423
+    assert blocked.json() == {"detail": "Safe Mode blocks collectors."}
+
+    listed = client.get(
+        f"/v1/workspaces/{WORKSPACE_ID}/observations",
+        headers=_headers(),
+        params={"as_of": "2026-07-19T12:00:00Z"},
+    )
+    assert listed.status_code == 200
+    assert listed.json() == {"observations": []}
+
+
+def test_injected_phase6_service_cannot_bypass_persisted_safe_mode(
+    tmp_path: Path, monkeypatch
+) -> None:
+    data_root = tmp_path / "runtime"
+    monkeypatch.setenv("RSI_ATLAS_DATA_ROOT", str(data_root))
+    data_root.mkdir(mode=0o700)
+    token = ensure_ipc_token(data_root / "ipc" / "engine.token")
+    durable = SafeModeController(SafeModeStore(data_root))
+    durable.enter(reason="persisted", entered_at=NOW)
+    collectors = FakeCollectorService()
+    client = TestClient(
+        create_app(
+            status_factory=lambda: (_ for _ in ()).throw(RuntimeError("unused")),
+            collector_service=collectors,
+            phase6_service=Phase6Service(safe_mode=SafeModeController()),
+        )
+    )
+
+    current = client.get("/v1/recovery/safe-mode")
+    assert current.status_code == 200
+    assert current.json()["active"] is True
+    blocked = client.post(
+        f"/v1/workspaces/{WORKSPACE_ID}/collectors:import-fixture",
+        headers=_headers(),
+        json={"fixture_name": "bitcoin_block.json"},
+    )
+    assert blocked.status_code == 423
+    assert blocked.json() == {"detail": "Safe Mode blocks collectors."}
+    assert collectors._observations == {}
+
+    exited = client.post(
+        "/v1/recovery/safe-mode:exit",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert exited.status_code == 200
+    assert exited.json()["active"] is False
+    assert SafeModeController(SafeModeStore(data_root)).state.active is False

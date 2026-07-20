@@ -1,7 +1,7 @@
 import os
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager, suppress
-from datetime import datetime
+from datetime import UTC, datetime
 from json import dumps
 from pathlib import Path
 from typing import Any, Protocol
@@ -26,6 +26,7 @@ from rsi_atlas_contracts import (
     RetrievalPlan,
     ReviewAction,
     ReviewDecision,
+    SafeModeCapability,
     SemanticTriageRequest,
     SpecialistFinding,
     SystemStatus,
@@ -38,7 +39,9 @@ from rsi_atlas_ingestion.processing_pipeline import (
     DocumentProcessingStatus,
     RetrievalIndexSummary,
 )
+from rsi_atlas_recovery import SafeModeBlocked, SafeModeController
 from rsi_atlas_research.workflow import workflow_id_for_query
+from rsi_atlas_security.ipc import load_ipc_token, tokens_match
 from rsi_atlas_storage import (
     AcquisitionConflictError,
     DatabaseSettings,
@@ -61,6 +64,11 @@ from rsi_atlas_engine.monitoring import (
 from rsi_atlas_engine.phase6 import Phase6Service
 from rsi_atlas_engine.research import ResearchFacade, ResearchServices
 from rsi_atlas_engine.runtime import RuntimePaths, RuntimeServices
+from rsi_atlas_engine.safe_mode import (
+    apply_or_verify_migrations,
+    runtime_data_root,
+    runtime_safe_mode,
+)
 
 _DATABASE_CONNECT_TIMEOUT_SECONDS = 1
 _DATABASE_STATEMENT_TIMEOUT_MS = 10_000
@@ -68,7 +76,7 @@ _DATABASE_LOCK_TIMEOUT_MS = 5_000
 _DATABASE_TRANSACTION_TIMEOUT_MS = 15_000
 
 
-def _database_from_environment() -> PostgresDatabase:
+def _database_from_environment(safe_mode: SafeModeController | None = None) -> PostgresDatabase:
     paths = RuntimePaths.from_environment()
     socket_directory = paths.data_root / "postgres" / "socket"
     conninfo = f"host='{socket_directory}' port=5432 user='atlas' dbname='atlas'"
@@ -80,7 +88,8 @@ def _database_from_environment() -> PostgresDatabase:
         transaction_timeout_ms=_DATABASE_TRANSACTION_TIMEOUT_MS,
     )
     database = PostgresDatabase(settings)
-    MigrationRunner(database, paths.migration_root).apply_all()
+    controller = safe_mode or runtime_safe_mode()
+    apply_or_verify_migrations(MigrationRunner(database, paths.migration_root), controller)
     return database
 
 
@@ -227,11 +236,13 @@ def create_app(
     configured_collectors: CollectorServices | None = None
     configured_monitoring: InMemoryMonitoringService | None = None
     shared_database: PostgresDatabase | None = None
+    operational_safe_mode = runtime_safe_mode()
+    configured_phase6 = phase6_service or Phase6Service(safe_mode=operational_safe_mode)
 
     def resolve_database() -> PostgresDatabase:
         nonlocal shared_database
         if shared_database is None:
-            shared_database = _database_from_environment()
+            shared_database = _database_from_environment(operational_safe_mode)
         return shared_database
 
     def resolve_ingestion() -> tuple[
@@ -241,7 +252,9 @@ def create_app(
         if document_admission_service is not None and import_staging_area is not None:
             return document_admission_service, import_staging_area, document_processing_service
         if configured_ingestion is None:
-            configured_ingestion = DocumentIngestionServices.from_environment()
+            configured_ingestion = DocumentIngestionServices.from_environment(
+                safe_mode=operational_safe_mode
+            )
         return (
             configured_ingestion.admission_service,
             configured_ingestion.staging_area,
@@ -261,7 +274,9 @@ def create_app(
         if research_service is not None:
             return research_service
         if configured_research is None:
-            configured_research = ResearchFacade(ResearchServices.from_environment())
+            configured_research = ResearchFacade(
+                ResearchServices.from_environment(safe_mode=operational_safe_mode)
+            )
         return configured_research
 
     def resolve_collectors() -> CollectorPort:
@@ -281,7 +296,16 @@ def create_app(
         return configured_monitoring
 
     def resolve_phase6() -> Phase6Service:
-        return phase6_service or Phase6Service()
+        return configured_phase6
+
+    def require_capability(capability: SafeModeCapability) -> None:
+        try:
+            operational_safe_mode.require(capability)
+        except SafeModeBlocked as error:
+            raise HTTPException(
+                status_code=423,
+                detail=f"Safe Mode blocks {capability.value}.",
+            ) from error
 
     @asynccontextmanager
     async def lifespan(_application: FastAPI) -> AsyncIterator[None]:
@@ -303,11 +327,22 @@ def create_app(
         if require_ipc_auth is not None
         else os.environ.get("RSI_ATLAS_IPC_AUTH", "").strip().lower() in {"1", "true", "yes", "on"}
     )
+    resolved_token_path = ipc_token_path or (runtime_data_root() / "ipc" / "engine.token")
     if auth_enabled:
-        token_path = ipc_token_path or (
-            RuntimePaths.from_environment().data_root / "ipc" / "engine.token"
-        )
-        application.add_middleware(IpcAuthMiddleware, token_path=token_path, enabled=True)
+        application.add_middleware(IpcAuthMiddleware, token_path=resolved_token_path, enabled=True)
+
+    def require_owner_token(request: Request) -> None:
+        expected = load_ipc_token(resolved_token_path)
+        if expected is None:
+            raise HTTPException(status_code=503, detail="IPC token is not configured.")
+        authorization = request.headers.get("authorization")
+        provided = None
+        if authorization and authorization.lower().startswith("bearer "):
+            provided = authorization[7:].strip()
+        elif request.headers.get("x-rsi-atlas-token"):
+            provided = request.headers.get("x-rsi-atlas-token")
+        if not tokens_match(provided=provided, expected=expected):
+            raise HTTPException(status_code=401, detail="IPC authentication failed.")
 
     @application.get("/v1/system/status", response_model=SystemStatus)
     def system_status() -> SystemStatus:
@@ -415,6 +450,7 @@ def create_app(
         acquisition_id: UUID,
     ) -> DocumentProcessingStatus:
         context = _workspace_context(request, workspace_id)
+        require_capability(SafeModeCapability.PARSER_WORKERS)
         try:
             processing = await run_in_threadpool(resolve_processing)
             return await run_in_threadpool(
@@ -577,6 +613,7 @@ def create_app(
         if not chunk_set_id.startswith("chunkset:"):
             raise HTTPException(status_code=422, detail="Chunk set id is invalid.")
         context = _workspace_context(request, workspace_id)
+        require_capability(SafeModeCapability.MODELS)
         try:
             processing = await run_in_threadpool(resolve_processing)
             return await run_in_threadpool(
@@ -675,6 +712,7 @@ def create_app(
         workspace_id: UUID,
     ) -> dict[str, object]:
         context = _workspace_context(request, workspace_id)
+        require_capability(SafeModeCapability.MODELS)
         try:
             query = ResearchQuery.model_validate_json(await request.body())
             if query.context.workspace_id != context.workspace_id:
@@ -700,6 +738,7 @@ def create_app(
         workspace_id: UUID,
     ) -> dict[str, object]:
         context = _workspace_context(request, workspace_id)
+        require_capability(SafeModeCapability.MODELS)
         try:
             body = await request.json()
             query = ResearchQuery.model_validate_json(dumps(body["query"]))
@@ -733,6 +772,7 @@ def create_app(
         workspace_id: UUID,
     ) -> dict[str, object]:
         context = _workspace_context(request, workspace_id)
+        require_capability(SafeModeCapability.MODELS)
         try:
             body = await request.json()
             query = ResearchQuery.model_validate_json(dumps(body["query"]))
@@ -806,6 +846,7 @@ def create_app(
         workspace_id: UUID,
     ) -> dict[str, object]:
         context = _workspace_context(request, workspace_id)
+        require_capability(SafeModeCapability.WORKFLOW_RESUMPTION)
         try:
             body = await request.json()
             query = ResearchQuery.model_validate_json(dumps(body["query"]))
@@ -833,6 +874,7 @@ def create_app(
         workflow_id: UUID,
     ) -> dict[str, object]:
         context = _workspace_context(request, workspace_id)
+        require_capability(SafeModeCapability.WORKFLOW_RESUMPTION)
         try:
             body = await request.json()
             query = ResearchQuery.model_validate_json(dumps(body["query"]))
@@ -915,6 +957,7 @@ def create_app(
         workspace_id: UUID,
     ) -> dict[str, object]:
         context = _workspace_context(request, workspace_id)
+        require_capability(SafeModeCapability.COLLECTORS)
         try:
             body = await request.json()
             fixture_name = str(body["fixture_name"])
@@ -1335,11 +1378,11 @@ def create_app(
     @application.post("/v1/recovery/safe-mode:enter")
     async def safe_mode_enter(request: Request) -> dict[str, object]:
         try:
-            service = await run_in_threadpool(resolve_phase6)
             body = await request.json()
             state = await run_in_threadpool(
-                service.enter_safe_mode,
+                operational_safe_mode.enter,
                 reason=str(body.get("reason", "operator")),
+                entered_at=datetime.now(tz=UTC),
             )
             return state.model_dump(mode="json")
         except (ValidationError, KeyError, TypeError, ValueError) as error:
@@ -1349,8 +1392,19 @@ def create_app(
 
     @application.get("/v1/recovery/safe-mode")
     async def safe_mode_get() -> dict[str, object]:
-        service = await run_in_threadpool(resolve_phase6)
-        return (await run_in_threadpool(service.safe_mode_state)).model_dump(mode="json")
+        await run_in_threadpool(operational_safe_mode.is_disabled, SafeModeCapability.COLLECTORS)
+        return operational_safe_mode.state.model_dump(mode="json")
+
+    @application.post("/v1/recovery/safe-mode:exit")
+    async def safe_mode_exit(request: Request) -> dict[str, object]:
+        require_owner_token(request)
+        try:
+            state = await run_in_threadpool(operational_safe_mode.exit)
+            if state.active:
+                raise RuntimeError("Safe Mode exit did not persist inactive state")
+            return state.model_dump(mode="json")
+        except Exception as error:
+            raise HTTPException(status_code=503, detail="Safe Mode is unavailable.") from error
 
     @application.post("/v1/release:check")
     async def release_check(request: Request) -> dict[str, object]:

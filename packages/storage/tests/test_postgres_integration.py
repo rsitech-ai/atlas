@@ -98,6 +98,7 @@ def test_migrations_enable_vector_and_are_idempotent(
 
     runner.apply_all()
     runner.apply_all()
+    runner.verify_all_applied()
 
     assert postgres_database.fetch_value(
         "SELECT extversion FROM pg_extension WHERE extname = 'vector'"
@@ -147,6 +148,32 @@ def test_migration_bytes_are_hash_locked(
 
     with pytest.raises(MigrationIntegrityError, match="checksum"):
         MigrationRunner(postgres_database, migration_directory).apply_all()
+
+    with pytest.raises(MigrationIntegrityError, match="checksum"):
+        MigrationRunner(postgres_database, migration_directory).verify_all_applied()
+
+
+def test_migration_verification_does_not_create_schema(
+    postgres_database: PostgresDatabase,
+) -> None:
+    database_name = f"atlas_verify_only_{uuid4().hex}"
+    with postgres_database.connect(autocommit=True) as connection:
+        connection.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database_name)))
+    settings = DatabaseSettings.from_conninfo(
+        f"host={postgres_database.settings.socket_directory} "
+        f"user={postgres_database.settings.user} dbname={database_name}"
+    )
+    fresh_database = PostgresDatabase(settings)
+
+    try:
+        with pytest.raises(MigrationIntegrityError, match="not fully applied"):
+            MigrationRunner(fresh_database, Path("migrations")).verify_all_applied()
+        assert fresh_database.fetch_value("SELECT to_regnamespace('atlas_meta')") is None
+    finally:
+        with postgres_database.connect(autocommit=True) as connection:
+            connection.execute(
+                sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(database_name))
+            )
 
 
 def test_artifact_metadata_requires_verified_bytes(

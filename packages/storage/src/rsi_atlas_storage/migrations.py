@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from psycopg import Connection
+from psycopg.errors import UndefinedTable
 
 from rsi_atlas_storage.database import PostgresDatabase, Row
 
@@ -39,6 +40,15 @@ class MigrationRunner:
     def expected_versions(self) -> tuple[str, ...]:
         return tuple(migration.version for migration in self._load_migrations())
 
+    def verify_all_applied(self, *, connection: Connection[Row] | None = None) -> None:
+        """Verify the exact migration ledger without locks, DDL, or migration SQL."""
+        migrations = self._load_migrations()
+        if connection is not None:
+            self._verify(connection, migrations)
+            return
+        with self._database.connect() as owned_connection:
+            self._verify(owned_connection, migrations)
+
     @staticmethod
     def _apply(connection: Connection[Row], migrations: tuple[Migration, ...]) -> None:
         with connection.cursor() as cursor:
@@ -73,6 +83,35 @@ class MigrationRunner:
                         VALUES (%s, %s, %s)
                         """,
                     (migration.version, migration.name, migration.checksum),
+                )
+
+    @staticmethod
+    def _verify(connection: Connection[Row], migrations: tuple[Migration, ...]) -> None:
+        with connection.cursor() as cursor:
+            try:
+                cursor.execute(
+                    """
+                        SELECT version, name, checksum
+                        FROM atlas_meta.schema_migrations
+                        ORDER BY version
+                    """
+                )
+            except UndefinedTable as error:
+                raise MigrationIntegrityError("migrations are not fully applied") from error
+            applied = tuple(cursor.fetchall())
+
+        expected_versions = tuple(migration.version for migration in migrations)
+        applied_versions = tuple(str(row[0]) for row in applied)
+        if applied_versions != expected_versions:
+            raise MigrationIntegrityError("migrations are not fully applied")
+        for migration, row in zip(migrations, applied, strict=True):
+            if row[1] != migration.name:
+                raise MigrationIntegrityError(
+                    f"migration {migration.version} name does not match applied migration"
+                )
+            if row[2] != migration.checksum:
+                raise MigrationIntegrityError(
+                    f"migration {migration.version} checksum does not match applied bytes"
                 )
 
     def _load_migrations(self) -> tuple[Migration, ...]:
