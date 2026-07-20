@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,7 @@ from rsi_atlas_document_worker.protocol import WorkerResponseStatus
 from rsi_atlas_ingestion.worker_runner import (
     DocumentWorkerRunner,
     DocumentWorkerRunnerError,
+    _drain_process_output,
 )
 
 
@@ -60,6 +62,31 @@ def test_runner_kills_process_group_and_cleans_partial_outputs(tmp_path: Path) -
     assert process.poll() is not None
     DocumentWorkerRunner._cleanup_partial_outputs(run_dir)
     assert not (run_dir / "partial.out").exists()
+
+
+def test_runner_drains_output_larger_than_pipe_capacity_while_child_runs() -> None:
+    payload_size = 128 * 1024
+    process = subprocess.Popen(
+        [sys.executable, "-c", f"import os; os.write(1, b'x' * {payload_size})"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+    assert process.stdout is not None
+    assert process.stderr is not None
+
+    stdout, stderr = _drain_process_output(
+        process,
+        stdout_fd=process.stdout.fileno(),
+        stderr_fd=process.stderr.fileno(),
+        max_stdout_bytes=payload_size,
+        max_stderr_bytes=1024,
+        deadline=time.monotonic() + 5,
+    )
+
+    assert process.returncode == 0
+    assert stdout == b"x" * payload_size
+    assert stderr == b""
 
 
 def test_concurrent_runs_isolate_directories(tmp_path: Path) -> None:
