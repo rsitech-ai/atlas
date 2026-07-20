@@ -6,6 +6,7 @@ This is the live completion ledger for the normative criteria in Section 33 and 
 
 | Date | Evidence | Acceptance impact |
 | --- | --- | --- |
+| 2026-07-20 | At exact commit `4f42b8d17e28`, lock, Ruff check/format, strict mypy, parser governance, and diff checks passed; two complete PostgreSQL-backed runs each passed at **1227 passed, 1 skipped**; **51 Swift tests passed**; the Swift product built; authenticated release IPC returned `ipc_ready mode=unix_domain status=200`. `build_and_run.sh --verify` was also attempted and correctly stopped at the resource-policy gate because current free host memory was below 4 GiB; swap and thermal limits were nominal. The one skip is the optional ONNX artifact/runtime test. | Stronger repository and authenticated development-runtime evidence only. The resource-blocked development baseline is not recorded as a pass, and release IPC is not signed-package evidence. Every Section 33 and Appendix D status remains **Not proven**. |
 | 2026-07-20 | A reviewer ran `script/codex_full_regression.sh` end-to-end at exact commit `18275db`: **1225 passed, 1 skipped**; **50 Swift tests passed**; the Swift `RSIAtlas` product built; lock, Ruff, strict mypy, and PDF parser dependency governance passed. | Development-complete / partially runtime-proven only. Every Section 33 and Appendix D status remains **Not proven**; production, package, signing, notarization, and clean-install evidence remain open. |
 
 ## Section 33

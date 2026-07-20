@@ -177,19 +177,19 @@
 - Modify: `docs/production-plan.md`
 - Modify: `docs/acceptance-matrix.md`
 
-- [ ] **Step 1: Run static and contract gates**
+- [x] **Step 1: Run static and contract gates**
 
   Run lock, Ruff check/format, strict mypy, parser governance, and `git diff --check`.
 
-- [ ] **Step 2: Run full Python/PostgreSQL twice and Swift once**
+- [x] **Step 2: Run full Python/PostgreSQL twice and Swift once**
 
   Run `RSI_ATLAS_TEST_DATABASE_URL="$(./infra/local/postgres.sh test-url)" uv run pytest -q` twice, then `swift test` and the Swift product build.
 
-- [ ] **Step 3: Run real development and release-IPC smokes**
+- [x] **Step 3: Run real development and release-IPC smokes**
 
   Run `./script/build_and_run.sh --verify`; then run the authenticated release-IPC readiness smoke without claiming signing or packaging proof.
 
-- [ ] **Step 4: Record only observed evidence**
+- [x] **Step 4: Record only observed evidence**
 
   Update the dated ledger with the final commit, exact commands/results, remaining ONNX skip, and unchanged production/release blockers.
 
