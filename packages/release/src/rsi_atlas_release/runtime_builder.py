@@ -222,6 +222,7 @@ def _install_python_packages(
     )
     for candidate in site_packages.rglob("direct_url.json"):
         candidate.unlink()
+    shutil.rmtree(site_packages / "bin", ignore_errors=True)
     return [f"{wheel.name}:{hashlib.sha256(wheel.read_bytes()).hexdigest()}" for wheel in wheels]
 
 
