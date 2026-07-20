@@ -14,6 +14,7 @@ from rsi_atlas_contracts import SAFE_MODE_DISABLED_CAPABILITIES, SafeModeCapabil
 
 _STATE_MODE = 0o600
 _MAX_STATE_BYTES = 16 * 1024
+_EXIT_GUARD_NAME = "safe-mode.exit-guard"
 _DIRECTORY_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
 _READ_FLAGS = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC
 _WRITE_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC
@@ -47,6 +48,8 @@ class SafeModeStore:
             return _unreadable_state()
 
         try:
+            if _exit_guard_present(directory_fd):
+                return _unreadable_state()
             try:
                 file_fd = os.open(self.path.name, _READ_FLAGS, dir_fd=directory_fd)
             except FileNotFoundError:
@@ -74,11 +77,22 @@ class SafeModeStore:
         return self.save(state)
 
     def exit(self) -> SafeModeState:
-        state = _inactive_state()
-        return self.save(state)
+        try:
+            if not self._create_exit_guard():
+                return _unreadable_state()
+            self._save_once(_inactive_state())
+        except OSError:
+            return _unreadable_state()
+        try:
+            self._remove_exit_guard()
+        except OSError:
+            return self.load()
+        return _inactive_state()
 
     def save(self, state: SafeModeState) -> SafeModeState:
         """Atomically replace the state file after fully syncing a private temp file."""
+        if not state.active:
+            return self.exit()
         try:
             self._save_once(state)
         except _PostReplaceSyncFailure:
@@ -124,6 +138,36 @@ class SafeModeStore:
     def _open_directory(self) -> int:
         return os.open(self.path.parent, _DIRECTORY_FLAGS)
 
+    def _create_exit_guard(self) -> bool:
+        """Durably mark an exit in progress before replacing active state."""
+        self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        directory_fd = self._open_directory()
+        guard_fd: int | None = None
+        try:
+            try:
+                guard_fd = os.open(_EXIT_GUARD_NAME, _WRITE_FLAGS, _STATE_MODE, dir_fd=directory_fd)
+            except FileExistsError:
+                return False
+            _write_all(guard_fd, b"safe-mode-exit-guard\n")
+            os.fchmod(guard_fd, _STATE_MODE)
+            os.fsync(guard_fd)
+            os.close(guard_fd)
+            guard_fd = None
+            os.fsync(directory_fd)
+            return True
+        finally:
+            if guard_fd is not None:
+                os.close(guard_fd)
+            os.close(directory_fd)
+
+    def _remove_exit_guard(self) -> None:
+        directory_fd = self._open_directory()
+        try:
+            os.unlink(_EXIT_GUARD_NAME, dir_fd=directory_fd)
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+
 
 class SafeModeController:
     def __init__(self, store: SafeModeStore | None = None) -> None:
@@ -145,8 +189,10 @@ class SafeModeController:
         return self._state
 
     def exit(self) -> SafeModeState:
-        state = _inactive_state()
-        self._set_state(state)
+        if self._store is not None:
+            self._state = self._store.exit()
+        else:
+            self._state = _inactive_state()
         return self._state
 
     def is_disabled(self, capability: SafeModeCapability) -> bool:
@@ -179,6 +225,17 @@ def _unreadable_state() -> SafeModeState:
         entered_at=datetime.now(UTC),
         reason="safe_mode_state_unreadable",
     )
+
+
+def _exit_guard_present(directory_fd: int) -> bool:
+    try:
+        guard_fd = os.open(_EXIT_GUARD_NAME, _READ_FLAGS, dir_fd=directory_fd)
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return True
+    os.close(guard_fd)
+    return True
 
 
 def _trusted_file(metadata: os.stat_result) -> bool:

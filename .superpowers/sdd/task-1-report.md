@@ -210,3 +210,67 @@ $ git diff --check
 - The post-replace path returns a fail-closed `SafeModeState` even though the
   requested exit was inactive. Its deterministic test verifies the controller
   and a fresh store load are both active after the recovery rewrite.
+
+## Second Review Fix — 2026-07-20
+
+### Failure Closed
+
+The earlier recovery rewrite could itself fail with ENOSPC after the inactive
+primary state had replaced the active one. Its exception was suppressed and a
+fresh store then read inactive. That was a fail-open double-failure path.
+
+### Transition Design
+
+- `SafeModeStore.exit()` first creates, file-syncs, and directory-syncs the
+  fixed owner-private `safe-mode.exit-guard` marker beside the primary state.
+- Any present or unreadable guard marker makes `load()` resolve to active Safe
+  Mode. This check is descriptor-safe and non-blocking.
+- Only after the marker is durable does exit replace and directory-sync the
+  inactive primary state. A failure at that point leaves the already-durable
+  marker in place; no recovery temporary state allocation is attempted.
+- The marker is removed only after the inactive primary state has synced. If
+  marker cleanup errors, loading decides from the marker when it remains; if
+  removal was already visible, the previously directory-synced inactive state
+  is the durable result.
+
+### RED — ENOSPC double-failure regression
+
+```text
+$ uv run pytest packages/recovery/tests/test_safe_mode_store.py -q
+...........F                                                             [100%]
+...
+E       AssertionError: assert False is True
+E        +  where False = SafeModeState(active=False, ...).active
+1 failed, 11 passed in 0.19s
+```
+
+The test injected a directory `fsync` failure immediately after the inactive
+replacement, then ENOSPC on any recovery temporary-state open. The controller
+returned active, but a fresh store read inactive.
+
+### GREEN — guard-marker verification
+
+```text
+$ uv run pytest packages/recovery/tests/test_safe_mode_store.py packages/recovery/tests/test_backup_restore.py -q
+................                                                         [100%]
+16 passed in 0.17s
+
+$ uv run ruff check packages/recovery/src/rsi_atlas_recovery/safe_mode.py packages/recovery/tests/test_safe_mode_store.py
+All checks passed!
+
+$ uv run pytest packages/recovery -q
+..................                                                       [100%]
+18 passed in 0.16s
+
+$ git diff --check
+<no output; success>
+```
+
+### Second Review Self-Review
+
+- The double-failure regression observes the real primary replacement, fails
+  that directory sync once, and arms ENOSPC for any later `.safe-mode-*`
+  allocation. It proves a fresh store and `controller.require(MODELS)` stay
+  blocked and asserts no recovery temporary file is attempted.
+- All direct inactive `SafeModeStore.save()` calls route through the guarded
+  exit transition, preventing callers from bypassing the marker protocol.

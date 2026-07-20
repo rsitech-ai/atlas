@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import os
 import stat
 from datetime import UTC, datetime
@@ -179,3 +180,55 @@ def test_failed_exit_directory_sync_restores_fail_closed_state(
     _assert_fail_closed(outcome)
     _assert_fail_closed(controller.state)
     _assert_fail_closed(store.load())
+
+
+def test_exit_guard_blocks_after_sync_failure_and_recovery_enospc(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _store(tmp_path / "data")
+    controller = safe_mode.SafeModeController(store)
+    controller.enter(reason="integrity_failure", entered_at=NOW)
+    actual_fsync = safe_mode.os.fsync
+    actual_open = safe_mode.os.open
+    actual_replace = safe_mode.os.replace
+    inactive_state_replaced = False
+    directory_sync_failed = False
+    recovery_temp_open_attempted = False
+
+    def record_inactive_replacement(source, destination, *args, **kwargs) -> None:
+        nonlocal inactive_state_replaced
+        actual_replace(source, destination, *args, **kwargs)
+        if destination == store.path.name:
+            inactive_state_replaced = True
+
+    def fail_directory_sync_after_inactive_replacement(fd: int) -> None:
+        nonlocal directory_sync_failed
+        if (
+            inactive_state_replaced
+            and stat.S_ISDIR(safe_mode.os.fstat(fd).st_mode)
+            and not directory_sync_failed
+        ):
+            directory_sync_failed = True
+            raise OSError("directory sync failed after inactive replacement")
+        actual_fsync(fd)
+
+    def reject_recovery_temp_after_sync_failure(path, flags, mode=0o777, *, dir_fd=None) -> int:
+        nonlocal recovery_temp_open_attempted
+        if directory_sync_failed and str(path).startswith(".safe-mode-"):
+            recovery_temp_open_attempted = True
+            raise OSError(errno.ENOSPC, "no space for recovery temporary state")
+        return actual_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(safe_mode.os, "replace", record_inactive_replacement)
+    monkeypatch.setattr(safe_mode.os, "fsync", fail_directory_sync_after_inactive_replacement)
+    monkeypatch.setattr(safe_mode.os, "open", reject_recovery_temp_after_sync_failure)
+
+    outcome = controller.exit()
+
+    assert inactive_state_replaced is True
+    assert directory_sync_failed is True
+    _assert_fail_closed(outcome)
+    _assert_fail_closed(store.load())
+    with pytest.raises(safe_mode.SafeModeBlocked, match="models"):
+        controller.require(SafeModeCapability.MODELS)
+    assert recovery_temp_open_attempted is False
