@@ -83,21 +83,11 @@ class RedactionStatus(StrEnum):
 
 
 class PatchTestSuite(StrEnum):
-    CODEX_PATCH_QUALITY = "codex_patch_quality"
+    REPOSITORY_FULL_REGRESSION = "repository_full_regression"
 
 
 PATCH_TEST_SUITE_ARGV: Mapping[PatchTestSuite, tuple[str, ...]] = MappingProxyType(
-    {
-        PatchTestSuite.CODEX_PATCH_QUALITY: (
-            "uv",
-            "run",
-            "pytest",
-            "packages/contracts/tests/test_codex.py",
-            "packages/engineering/tests/test_engineering.py",
-            "services/engine/tests/test_phase6_api.py",
-            "-q",
-        )
-    }
+    {PatchTestSuite.REPOSITORY_FULL_REGRESSION: ("./script/codex_full_regression.sh",)}
 )
 
 
@@ -160,6 +150,7 @@ class CandidatePatch(DocumentContractModel):
     patch_id: str = Field(pattern=_PATCH_ID_PATTERN)
     bundle_id: str = Field(pattern=_BUNDLE_ID_PATTERN)
     diff_hash: str = Field(pattern=_SHA256_PATTERN)
+    base_commit: str | None = Field(default=None, pattern=_BASE_COMMIT_PATTERN)
     status: CandidatePatchStatus = CandidatePatchStatus.CANDIDATE
     auto_applied: StrictBool = False
     created_at: datetime
@@ -173,6 +164,14 @@ class CandidatePatch(DocumentContractModel):
     def _no_auto_apply(self) -> Self:
         if self.auto_applied:
             raise ValueError("candidate patches cannot be auto-applied")
+        expected_id = candidate_patch_id(
+            bundle_id=self.bundle_id,
+            diff_hash=self.diff_hash,
+            base_commit=self.base_commit,
+            created_at=self.created_at,
+        )
+        if self.patch_id != expected_id:
+            raise ValueError("patch_id must match the canonical candidate patch payload")
         return self
 
 
@@ -240,6 +239,7 @@ class PatchQualityGateResult(DocumentContractModel):
     gate_id: str = Field(pattern=_GATE_ID_PATTERN)
     patch_id: str = Field(pattern=_PATCH_ID_PATTERN)
     diff_hash: str = Field(pattern=_SHA256_PATTERN)
+    base_commit: str | None = Field(pattern=_BASE_COMMIT_PATTERN)
     checks: tuple[PatchQualityCheck, ...] = Field(min_length=1)
     passed: StrictBool
     blocking_failures: tuple[str, ...] = ()
@@ -263,11 +263,12 @@ class PatchQualityGateResult(DocumentContractModel):
         evidence_matches = bool(self.test_evidence) and all(
             evidence.patch_id == self.patch_id
             and evidence.diff_hash == self.diff_hash
+            and evidence.base_commit == self.base_commit
             and evidence.passed
             and evidence.exit_code == 0
             for evidence in self.test_evidence
         )
-        if self.passed and not evidence_matches:
+        if self.passed and (self.base_commit is None or not evidence_matches):
             raise ValueError("passed gate requires matching successful test evidence")
         return self
 
@@ -297,10 +298,17 @@ def reproduction_bundle_id(*, failure_summary: str, diff_seed: str, created_at: 
     return "codexbundle:" + sha256(body.encode("utf-8")).hexdigest()
 
 
-def candidate_patch_id(*, bundle_id: str, diff_hash: str, created_at: datetime) -> str:
+def candidate_patch_id(
+    *,
+    bundle_id: str,
+    diff_hash: str,
+    created_at: datetime,
+    base_commit: str | None = None,
+) -> str:
     body = _canonical_json(
         {
             "bundle_id": bundle_id,
+            "base_commit": base_commit,
             "created_at": created_at.isoformat().replace("+00:00", "Z"),
             "diff_hash": diff_hash,
         }

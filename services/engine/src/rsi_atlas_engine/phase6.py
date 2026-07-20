@@ -89,7 +89,12 @@ class Phase6Service:
             worktree_hint="tmp/codex-worktrees/loopback",
             created_at=now,
         )
-        patch = build_candidate_patch(bundle, diff_text=diff_text, created_at=now)
+        patch = build_candidate_patch(
+            bundle,
+            diff_text=diff_text,
+            created_at=now,
+            base_commit=None,
+        )
         gated, gate = run_patch_quality_gate(
             patch,
             diff_text=diff_text,

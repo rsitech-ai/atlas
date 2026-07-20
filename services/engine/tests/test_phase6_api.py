@@ -41,7 +41,11 @@ def test_phase6_evaluation_codex_backup_safe_mode_release(tmp_path: Path, monkey
     assert gate_body["bundle"]["sanitized_inputs"]["api_key"] == "[REDACTED]"
     assert gate_body["patch"]["auto_applied"] is False
     assert gate_body["patch"]["status"] == "gate_failed"
+    assert gate_body["patch"]["base_commit"] is None
     assert gate_body["gate"]["passed"] is False
+    assert gate_body["gate"]["base_commit"] is None
+    assert "base_commit_match" in gate_body["gate"]["blocking_failures"]
+    assert "trusted_worktree_base" in gate_body["gate"]["blocking_failures"]
     assert "unit_test_evidence" in gate_body["gate"]["blocking_failures"]
     assert gate_body["gate"]["test_evidence"] == []
     assert gate_body["authority_denials"][0]["denied"] is True
@@ -94,6 +98,7 @@ def test_codex_gate_ignores_caller_claimed_test_evidence_and_preserves_denials(
             "actual_behavior": "fail",
             "diff_text": "--- a\n+++ b\n+return True\n",
             "passed": True,
+            "base_commit": "a" * 40,
             "argv": ["pytest", "-q"],
             "test_evidence": [
                 {
@@ -108,7 +113,9 @@ def test_codex_gate_ignores_caller_claimed_test_evidence_and_preserves_denials(
     assert response.status_code == 200
     body = response.json()
     assert body["patch"]["status"] == "gate_failed"
+    assert body["patch"]["base_commit"] is None
     assert body["gate"]["passed"] is False
+    assert body["gate"]["base_commit"] is None
     assert body["gate"]["test_evidence"] == []
     assert "unit_test_evidence" in body["gate"]["blocking_failures"]
     assert {denial["action"] for denial in body["authority_denials"]} == {
