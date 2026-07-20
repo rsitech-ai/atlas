@@ -8,7 +8,7 @@
 ## Current State
 
 - Relevant paths: `packages/release`, `script/assemble_release_app.py`, `script/check_release_runtime.py`, `script/package_release.sh`, and `script/sign_and_notarize.sh`.
-- Existing behavior: public main `7b0a8e9` atomically assembles a versioned native shell and refuses signing because all four runtime entrypoints and dependency closure are absent.
+- Existing baseline: public main `7b0a8e9` atomically assembles a versioned native shell and refuses signing because all four runtime entrypoints and dependency closure are absent. This branch closes those repository-local runtime gates; signing/notarization remain downstream.
 - Available inputs: uv-managed CPython 3.12.10 arm64, Homebrew PostgreSQL 17.10 arm64, Homebrew pgvector 0.8.5, Xcode/clang, and the lockfile. The production wheel set requires hash-locked registry acquisition; copying `.venv` is prohibited because it contains dev tools and absolute editable paths.
 - Constraints: release output must not rely on Homebrew, system Python, user site packages, current working directory, or repo paths. Never weaken signing preflight. Notary credentials remain an owner/external gate.
 
@@ -23,8 +23,8 @@
 - Python wheels can contain native extensions and dev/editable artifacts; build only the no-dev lock set and reject `.pth`, source-tree paths, pip, pytest, mypy, and Ruff.
 - A stale verification file could outlive runtime mutation; live preflight must recompute closure and launch evidence.
 - PostgreSQL/pgvector smoke can leave processes or temporary clusters; use a private temporary root and guaranteed fast-stop cleanup.
-- Installed wheels currently contain repository-relative assumptions for migrations, Safe Mode, Phase 6, evaluation fixtures, calibration data, and the document-worker Seatbelt profile. Release resource roots must be explicit and proven with the repository unavailable.
-- The Swift app does not yet launch or supervise `RSIAtlasEngine`; a help smoke alone cannot prove a usable downloadable application.
+- Installed wheels contained repository-relative assumptions for operational migrations and the document-worker Seatbelt profile. The release now supplies a validated explicit resource root containing only those operational files; development evaluation/calibration fixtures remain excluded.
+- The Swift app now supervises `RSIAtlasEngine`, waits for authenticated readiness, and performs interrupt-first bounded shutdown. Actual staged-app readiness and normal-quit database cleanup are required evidence, not a help-only smoke.
 - Semantic versions do not identify immutable uv/Homebrew builds. Record source hashes, receipts, revisions/bottle metadata, dependency graph, wheel hashes, and a clean exact Git tree; refuse dirty/mutable inputs.
 - Python/PostgreSQL trees contain internal symlinks and Mach-O variants. Materialize only contained targets, reject loops/special files, and model all dyld load kinds and loader contexts rather than flattening by basename.
 - Smokes and signing mutate different parts of an artifact. Force disposable write roots and no bytecode, prove pre/post-smoke tree identity, and keep pre-sign closure evidence separate from final signed provenance.
@@ -87,13 +87,16 @@
 - 2026-07-20: Treat the installed Homebrew/uv runtimes only as pinned build inputs. The final candidate must contain and resolve its own runtime files.
 - 2026-07-20: Keep signing and notarization downstream of live closure and launch checks.
 - 2026-07-20: Independent architecture review made resource-root, provenance, complete dyld semantics, artifact-derived SBOM/license coverage, mutation-free verification, release-native PostgreSQL lifecycle, and actual Swift lifecycle supervision mandatory completion gates rather than follow-up polish.
+- 2026-07-21: Keep the embedded artifact inventory pre-sign and self-exclude only its own JSON and the assembly manifest. After Apple mutates signatures and stapling state, bind the final archive, notary log, code identity, and exact Git commit/tree in a separate checksummed provenance record.
 
 ## Progress Log
 
 - 2026-07-20: Confirmed toolchain versions and sizes; production Python dependency install is 41 packages / about 54 MiB before CPython, and requires hash-locked wheel acquisition.
 - 2026-07-20: Runtime payload validation and isolated Python module/native launcher entrypoints are under TDD; the broader architecture review expanded the completion bar before dependency copying begins.
 - 2026-07-20: M1/M2 foundation passes 40 release/entrypoint tests: atomic payload copying, recursive path-injection/special-file rejection, isolated module entrypoint, native ARM64 launcher, pinned no-dev wheel build, local tool version checks, Git/tree and source/receipt/wheel provenance, and third-party legal inputs.
-- 2026-07-20: Next: commit the clean-input builder foundation, run it against the real installed toolchains, and use the exact failure signal to drive resource/relocation work.
+- 2026-07-21: M1-M4 implemented. Live closure found 167 Mach-O images / 385 loads with every non-system load resolving in-bundle; isolated Python/PostgreSQL/pgvector, authenticated engine IPC, and normal app quit smokes passed without payload mutation or leaked processes.
+- 2026-07-21: Artifact inventory verification passes against the staged app with exact file hashes, installed Python distributions, CPython/PostgreSQL/pgvector, all seven relocated native providers, and no missing license evidence. Release check now reads and verifies the embedded inventory instead of creating an unrelated `dist/sbom.cdx.json`.
+- 2026-07-21: Next: exact-head full regression, final independent review, PR/merge, then stop at the owner notary-credential gate rather than publishing an unnotarized download.
 
 ## Rollback / Recovery
 

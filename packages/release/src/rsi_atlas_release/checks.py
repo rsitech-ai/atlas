@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import os
+import plistlib
 from datetime import UTC, datetime
+from hashlib import sha256
 from pathlib import Path
 
 from rsi_atlas_contracts import (
     ReleaseCheckReport,
     ReleaseClaim,
+    SbomDocument,
     SigningStatus,
     release_check_id,
 )
@@ -20,7 +23,33 @@ from rsi_atlas_release.assembly import (
     validate_runtime_payload,
 )
 from rsi_atlas_release.inventory import inventory_staged_bundle
-from rsi_atlas_release.sbom import build_sbom_from_lock
+from rsi_atlas_release.sbom import verify_artifact_sbom
+
+
+def _validate_embedded_sbom(
+    *, bundle: Path, lock_path: Path, require_release: bool
+) -> tuple[bool, str | None]:
+    sbom_path = bundle / "Contents" / "Resources" / "sbom.cdx.json"
+    if not sbom_path.is_file() or not lock_path.is_file():
+        return False, "sbom_missing"
+    try:
+        document = SbomDocument.model_validate_json(sbom_path.read_text(encoding="utf-8"))
+        if document.source_lock_hash != sha256(lock_path.read_bytes()).hexdigest():
+            raise ValueError("SBOM lock hash does not match")
+        if require_release:
+            if not document.files or document.artifact_tree_sha256 is None:
+                return False, "artifact_sbom_required"
+            plist = plistlib.loads((bundle / "Contents" / "Info.plist").read_bytes())
+            version = str(plist["CFBundleShortVersionString"])
+            verify_artifact_sbom(
+                bundle,
+                document,
+                lock_path=lock_path,
+                version=version,
+            )
+    except (KeyError, OSError, TypeError, ValueError, plistlib.InvalidFileException):
+        return False, "sbom_invalid"
+    return True, None
 
 
 def run_release_check(
@@ -33,18 +62,18 @@ def run_release_check(
     """Always report unsigned/notarization_blocked unless secrets exist (they don't in CI)."""
     now = created_at or datetime.now(tz=UTC)
     lock_path = repo_root / "uv.lock"
-    sbom_present = False
-    sbom_path = repo_root / "dist" / "sbom.cdx.json"
-    if lock_path.is_file():
-        sbom = build_sbom_from_lock(lock_path, created_at=now)
-        sbom_path.parent.mkdir(parents=True, exist_ok=True)
-        sbom_path.write_bytes(sbom.model_dump_json(indent=2).encode("utf-8"))
-        sbom_present = True
     bundle = repo_root / "dist" / "RSIAtlas.app"
+    sbom_present, sbom_blocker = _validate_embedded_sbom(
+        bundle=bundle,
+        lock_path=lock_path,
+        require_release=require_release,
+    )
     inventory = inventory_staged_bundle(bundle)
     signing_identity = os.environ.get("RSI_ATLAS_SIGNING_IDENTITY", "").strip()
     notarization_key = os.environ.get("RSI_ATLAS_NOTARY_KEY", "").strip()
     blockers: list[str] = []
+    if sbom_blocker is not None:
+        blockers.append(sbom_blocker)
     entrypoint_blockers = inspect_runtime_entrypoints(bundle)
     blockers.extend(entrypoint_blockers)
     if entrypoint_blockers:
@@ -68,8 +97,6 @@ def run_release_check(
         blockers.append("notarization_blocked")
     else:
         blockers.append("notarization_unverified")
-    if not sbom_present:
-        blockers.append("sbom_missing")
     entitlement_matrix = repo_root / "docs" / "release" / "entitlement-matrix.md"
     entitlement_present = entitlement_matrix.is_file()
     if not entitlement_present:

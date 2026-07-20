@@ -12,6 +12,7 @@ from rsi_atlas_contracts.release import (
     ReleaseClaim,
     SbomComponent,
     SbomDocument,
+    SbomFile,
     SigningStatus,
     release_check_id,
     sbom_id,
@@ -30,6 +31,14 @@ def test_unsigned_inventory_requires_honesty_label() -> None:
         component_count=1,
     )
     assert inv.signing_status is SigningStatus.UNSIGNED_DEVELOPMENT
+    embedded = PackageInventory(
+        bundle_path="dist/RSIAtlas.app",
+        signing_status=SigningStatus.UNSIGNED_DEVELOPMENT,
+        python_embedded=True,
+        honesty_label="unsigned_with_embedded_runtime",
+        component_count=2,
+    )
+    assert embedded.python_embedded is True
     with pytest.raises(ValidationError, match="unsigned"):
         PackageInventory(
             bundle_path="dist/RSIAtlas.app",
@@ -75,8 +84,25 @@ def test_sbom_document_shape() -> None:
         sbom_id=sbom_id(source_lock_hash=LOCK, created_at=NOW),
         bom_format="CycloneDX",
         spec_version="1.5",
-        components=(SbomComponent(name="rsi-atlas-contracts", version="0.1.0"),),
+        components=(
+            SbomComponent(
+                name="rsi-atlas-contracts",
+                version="0.1.0",
+                sha256=LOCK,
+                license_files=("Contents/Resources/Legal/LICENSE",),
+            ),
+        ),
         created_at=NOW,
         source_lock_hash=LOCK,
+        artifact_tree_sha256=LOCK,
+        files=(SbomFile(path="Contents/MacOS/RSIAtlas", sha256=LOCK),),
+        excluded_paths=("Contents/Resources/sbom.cdx.json",),
     )
     assert doc.bom_format == "CycloneDX"
+    assert doc.files[0].sha256 == LOCK
+
+
+@pytest.mark.parametrize("path", ("/absolute", "../escape", "Contents/../escape"))
+def test_sbom_rejects_non_bundle_relative_paths(path: str) -> None:
+    with pytest.raises(ValidationError, match="bundle-relative"):
+        SbomFile(path=path, sha256=LOCK)

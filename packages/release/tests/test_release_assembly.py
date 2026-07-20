@@ -13,7 +13,8 @@ from hashlib import sha256
 from pathlib import Path
 
 import pytest
-from rsi_atlas_release import assemble_release_app
+from rsi_atlas_contracts import SbomDocument
+from rsi_atlas_release import assemble_release_app, verify_artifact_sbom
 
 NOW = datetime(2026, 7, 20, 21, 0, tzinfo=UTC)
 ROOT = Path(__file__).resolve().parents[3]
@@ -86,14 +87,60 @@ def _runtime_payload_fixture(path: Path) -> Path:
     package.mkdir(parents=True)
     (package / "__init__.py").write_text("", encoding="utf-8")
     (package / "pipeline.py").write_text("", encoding="utf-8")
+    dist_info = site_packages / "rsi_atlas_engine-0.1.0.dist-info"
+    licenses = dist_info / "licenses"
+    licenses.mkdir(parents=True)
+    (dist_info / "METADATA").write_text(
+        "Metadata-Version: 2.4\n"
+        "Name: rsi-atlas-engine\n"
+        "Version: 0.1.0\n"
+        "License-Expression: Apache-2.0\n",
+        encoding="utf-8",
+    )
+    (licenses / "LICENSE").write_text("Apache License 2.0\n", encoding="utf-8")
+    (dist_info / "RECORD").write_text(
+        "rsi_atlas_engine/__init__.py,,\n"
+        "rsi_atlas_engine/pipeline.py,,\n"
+        "rsi_atlas_engine-0.1.0.dist-info/METADATA,,\n"
+        "rsi_atlas_engine-0.1.0.dist-info/licenses/LICENSE,,\n"
+        "rsi_atlas_engine-0.1.0.dist-info/RECORD,,\n",
+        encoding="utf-8",
+    )
     legal = path / "Contents" / "Resources" / "Legal" / "third-party"
     legal.mkdir(parents=True)
     (legal / "CPython-LICENSE.txt").write_text("PSF license\n", encoding="utf-8")
     (legal / "PostgreSQL-COPYRIGHT.txt").write_text("PostgreSQL license\n", encoding="utf-8")
     (legal / "pgvector-LICENSE.txt").write_text("PostgreSQL license\n", encoding="utf-8")
+    native_legal = legal / "native" / "gettext"
+    native_legal.mkdir(parents=True)
+    (native_legal / "COPYING").write_text("GPL compatible runtime license\n", encoding="utf-8")
+    native_runtime = path / "Contents" / "Resources" / "runtime" / "native" / "gettext" / "1.0"
+    native_runtime.mkdir(parents=True)
+    (native_runtime / "libintl.dylib").write_bytes(b"fixture-native-provider")
     provenance = path / "Contents" / "Resources" / "runtime-build-inputs.json"
     provenance.write_text(
-        '{"schema_version":"rsi-atlas.runtime-build-inputs.v1"}\n',
+        json.dumps(
+            {
+                "macho_closure": {
+                    "providers": [
+                        {
+                            "files": ["lib/libintl.8.dylib"],
+                            "formula": "gettext",
+                            "licenses": ["COPYING"],
+                            "receipt_sha256": "0" * 64,
+                            "version": "1.0",
+                        }
+                    ]
+                },
+                "pgvector": {"version": "0.8.5"},
+                "postgresql": {"version": "17.10"},
+                "python": {"version": "3.12.10"},
+                "schema_version": "rsi-atlas.runtime-build-inputs.v1",
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        + "\n",
         encoding="utf-8",
     )
     app_resources = path / "Contents" / "Resources" / "app"
@@ -250,6 +297,53 @@ def test_assemble_release_app_copies_validated_runtime_payload(tmp_path: Path) -
     assert (
         destination / "Contents" / "Resources" / "app" / "security" / "document-worker.sb"
     ).is_file()
+    sbom_path = destination / "Contents" / "Resources" / "sbom.cdx.json"
+    sbom = SbomDocument.model_validate_json(sbom_path.read_text(encoding="utf-8"))
+    verify_artifact_sbom(
+        destination,
+        sbom,
+        lock_path=repo_root / "uv.lock",
+        version="0.1.0",
+    )
+    names = {component.name for component in sbom.components}
+    assert {"cpython", "postgresql", "pgvector", "homebrew-gettext"} <= names
+    assert "rsi-atlas-engine" in names
+    assert sbom.files
+    assert sbom.artifact_tree_sha256 is not None
+    inventoried_paths = {entry.path for entry in sbom.files}
+    assert "Contents/Resources/release-assembly.json" in inventoried_paths
+    assert "Contents/Resources/sbom.cdx.json" not in inventoried_paths
+
+
+def test_artifact_sbom_detects_bundle_mutation(tmp_path: Path) -> None:
+    repo_root = _repo_fixture(tmp_path / "repo")
+    source = tmp_path / "RSIAtlas"
+    source.write_bytes(b"release-swift-binary")
+    payload = _runtime_payload_fixture(tmp_path / "runtime-payload")
+    destination = tmp_path / "dist" / "RSIAtlas.app"
+    assemble_release_app(
+        source_executable=source,
+        destination_bundle=destination,
+        version="0.1.0",
+        build_number="8",
+        repo_root=repo_root,
+        runtime_payload=payload,
+        created_at=NOW,
+    )
+    sbom = SbomDocument.model_validate_json(
+        (destination / "Contents" / "Resources" / "sbom.cdx.json").read_text(encoding="utf-8")
+    )
+    (destination / "Contents" / "Resources" / "app" / "unexpected.txt").write_text(
+        "mutation\n", encoding="utf-8"
+    )
+
+    with pytest.raises(ValueError, match="does not match"):
+        verify_artifact_sbom(
+            destination,
+            sbom,
+            lock_path=repo_root / "uv.lock",
+            version="0.1.0",
+        )
 
 
 def test_runtime_payload_rejects_missing_migration_before_replacement(tmp_path: Path) -> None:

@@ -14,7 +14,12 @@ from rsi_atlas_release.runtime_builder import (
     build_runtime_payload,
     compile_engine_launcher,
 )
-from rsi_atlas_release.sbom import build_sbom_from_lock, parse_uv_lock_components
+from rsi_atlas_release.sbom import (
+    build_sbom_from_artifact,
+    build_sbom_from_lock,
+    parse_uv_lock_components,
+    verify_artifact_sbom,
+)
 
 __all__ = [
     "REQUIRED_RUNTIME_COMPONENTS",
@@ -22,6 +27,7 @@ __all__ = [
     "RuntimeBuildInputs",
     "assemble_release_app",
     "build_runtime_payload",
+    "build_sbom_from_artifact",
     "build_sbom_from_lock",
     "compile_engine_launcher",
     "inspect_runtime_entrypoints",
@@ -29,4 +35,5 @@ __all__ = [
     "parse_uv_lock_components",
     "run_release_check",
     "validate_runtime_payload",
+    "verify_artifact_sbom",
 ]

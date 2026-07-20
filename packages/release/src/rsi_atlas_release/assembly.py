@@ -22,7 +22,7 @@ from rsi_atlas_release.macho import (
     remove_non_system_rpaths,
     verify_macho_closure,
 )
-from rsi_atlas_release.sbom import build_sbom_from_lock
+from rsi_atlas_release.sbom import build_sbom_from_artifact, build_sbom_from_lock
 
 REQUIRED_RUNTIME_COMPONENTS: Final[Mapping[str, Path]] = MappingProxyType(
     {
@@ -299,11 +299,6 @@ def _write_staged_bundle(
 
     shutil.copy2(repo_root / "LICENSE", legal / "LICENSE")
     shutil.copy2(repo_root / "NOTICE", legal / "NOTICE")
-    sbom = build_sbom_from_lock(repo_root / "uv.lock", created_at=created_at)
-    (resources / "sbom.cdx.json").write_text(
-        sbom.model_dump_json(indent=2) + "\n",
-        encoding="utf-8",
-    )
     if runtime_payload is not None:
         _copy_runtime_payload(runtime_payload=runtime_payload, staged_bundle=staged_bundle)
 
@@ -331,6 +326,19 @@ def _write_staged_bundle(
     }
     (resources / "release-assembly.json").write_text(
         json.dumps(manifest, ensure_ascii=False, separators=(",", ":"), sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    if runtime_payload is None:
+        sbom = build_sbom_from_lock(repo_root / "uv.lock", created_at=created_at)
+    else:
+        sbom = build_sbom_from_artifact(
+            staged_bundle,
+            lock_path=repo_root / "uv.lock",
+            version=version,
+            created_at=created_at,
+        )
+    (resources / "sbom.cdx.json").write_text(
+        sbom.model_dump_json(indent=2) + "\n",
         encoding="utf-8",
     )
 
