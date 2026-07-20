@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shlex
+import time
 from pathlib import Path
 
 import pytest
@@ -38,13 +39,56 @@ def _assert_partial_output_is_cleaned(run_directory: Path) -> None:
     assert sorted(path.name for path in run_directory.iterdir()) == ["document-worker.rendered.sb"]
 
 
-def test_runner_rejects_stdout_limit_plus_one_and_cleans_partial_output(tmp_path: Path) -> None:
+def _assert_worker_group_is_gone(leader_pid_path: Path, child_pid_path: Path) -> None:
+    leader_pid = int(leader_pid_path.read_text(encoding="utf-8"))
+    child_pid = int(child_pid_path.read_text(encoding="utf-8"))
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        try:
+            os.kill(leader_pid, 0)
+            leader_alive = True
+        except ProcessLookupError:
+            leader_alive = False
+        try:
+            os.kill(child_pid, 0)
+            child_alive = True
+        except ProcessLookupError:
+            child_alive = False
+        try:
+            os.killpg(leader_pid, 0)
+            group_alive = True
+        except ProcessLookupError:
+            group_alive = False
+        if not leader_alive and not child_alive and not group_alive:
+            break
+        time.sleep(0.02)
+    else:
+        pytest.fail("worker process group remained alive after runner failure")
+    with pytest.raises(ProcessLookupError):
+        os.kill(leader_pid, 0)
+    with pytest.raises(ProcessLookupError):
+        os.kill(child_pid, 0)
+    with pytest.raises(ProcessLookupError):
+        os.killpg(leader_pid, 0)
+
+
+def test_runner_rejects_stdout_at_exact_limit_plus_one_and_kills_worker_group(
+    tmp_path: Path,
+) -> None:
+    leader_pid_path = tmp_path / "overflow-leader.pid"
+    child_pid_path = tmp_path / "overflow-child.pid"
     worker = _write_executable(
         tmp_path / "overflow-worker",
-        """#!/bin/sh
+        f"""#!/bin/sh
+sleep 30 &
+child_pid=$!
+printf '%s\\n' "$$" > {shlex.quote(str(leader_pid_path))}
+printf '%s\\n' "$child_pid" > {shlex.quote(str(child_pid_path))}
 cat >/dev/null
 printf partial > partial.out
-dd if=/dev/zero bs=65536 count=4 2>/dev/null
+dd if=/dev/zero bs=65536 count=1 2>/dev/null
+printf x
+wait "$child_pid"
 """,
     )
     run_directory = tmp_path / "run-overflow"
@@ -64,18 +108,23 @@ dd if=/dev/zero bs=65536 count=4 2>/dev/null
         )
 
     assert raised.value.code == "worker_output_too_large"
+    _assert_worker_group_is_gone(leader_pid_path, child_pid_path)
     _assert_partial_output_is_cleaned(run_directory)
 
 
 def test_runner_times_out_kills_worker_group_and_cleans_partial_output(tmp_path: Path) -> None:
-    pid_path = tmp_path / "worker.pid"
+    leader_pid_path = tmp_path / "timeout-leader.pid"
+    child_pid_path = tmp_path / "timeout-child.pid"
     worker = _write_executable(
         tmp_path / "timeout-worker",
         f"""#!/bin/sh
-printf '%s\\n' "$$" > {shlex.quote(str(pid_path))}
+sleep 30 &
+child_pid=$!
+printf '%s\\n' "$$" > {shlex.quote(str(leader_pid_path))}
+printf '%s\\n' "$child_pid" > {shlex.quote(str(child_pid_path))}
 printf partial > partial.out
 cat >/dev/null
-sleep 30
+wait "$child_pid"
 """,
     )
     run_directory = tmp_path / "run-timeout"
@@ -94,6 +143,5 @@ sleep 30
         )
 
     assert raised.value.code == "worker_timeout"
-    with pytest.raises(ProcessLookupError):
-        os.kill(int(pid_path.read_text(encoding="utf-8")), 0)
+    _assert_worker_group_is_gone(leader_pid_path, child_pid_path)
     _assert_partial_output_is_cleaned(run_directory)
