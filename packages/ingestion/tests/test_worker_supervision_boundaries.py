@@ -145,3 +145,42 @@ wait "$child_pid"
     assert raised.value.code == "worker_timeout"
     _assert_worker_group_is_gone(leader_pid_path, child_pid_path)
     _assert_partial_output_is_cleaned(run_directory)
+
+
+def test_runner_timeout_escalates_when_descendant_ignores_sigterm(tmp_path: Path) -> None:
+    leader_pid_path = tmp_path / "ignoring-leader.pid"
+    child_pid_path = tmp_path / "ignoring-child.pid"
+    worker = _write_executable(
+        tmp_path / "ignoring-term-worker",
+        f"""#!/bin/sh
+trap 'exit 0' TERM
+(
+    trap '' TERM
+    exec sleep 30
+) &
+child_pid=$!
+printf '%s\\n' "$$" > {shlex.quote(str(leader_pid_path))}
+printf '%s\\n' "$child_pid" > {shlex.quote(str(child_pid_path))}
+printf partial > partial.out
+cat >/dev/null
+wait "$child_pid"
+""",
+    )
+    run_directory = tmp_path / "run-ignoring-term"
+
+    runner = DocumentWorkerRunner(
+        python_executable=worker,
+        sandbox_executable=_sandbox_shim(tmp_path),
+        timeout_seconds=1,
+    )
+
+    with pytest.raises(DocumentWorkerRunnerError) as raised:
+        runner.run_echo_hash(
+            artifact_path=_artifact(tmp_path),
+            run_directory=run_directory,
+            run_id="worker-ignoring-term-001",
+        )
+
+    assert raised.value.code == "worker_timeout"
+    _assert_worker_group_is_gone(leader_pid_path, child_pid_path)
+    _assert_partial_output_is_cleaned(run_directory)
