@@ -90,7 +90,12 @@ class Phase6Service:
             created_at=now,
         )
         patch = build_candidate_patch(bundle, diff_text=diff_text, created_at=now)
-        gated, gate = run_patch_quality_gate(patch, diff_text=diff_text, created_at=now)
+        gated, gate = run_patch_quality_gate(
+            patch,
+            diff_text=diff_text,
+            created_at=now,
+            test_evidence=(),
+        )
         denials = [
             authority_denial(action).model_dump(mode="json")
             for action in (

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from hashlib import sha256
 
 import pytest
+import rsi_atlas_contracts as contracts
 from pydantic import ValidationError
 from rsi_atlas_contracts.codex import (
     BLOCKED_CODEX_AUTHORITY,
@@ -26,6 +28,16 @@ from rsi_atlas_contracts.codex import (
 
 NOW = datetime(2026, 7, 19, 15, 0, tzinfo=UTC)
 DIFF = "b" * 64
+BASE_COMMIT = "a" * 40
+CODEX_PATCH_QUALITY_ARGV = (
+    "uv",
+    "run",
+    "pytest",
+    "packages/contracts/tests/test_codex.py",
+    "packages/engineering/tests/test_engineering.py",
+    "services/engine/tests/test_phase6_api.py",
+    "-q",
+)
 
 
 def _bundle() -> SanitizedReproductionBundle:
@@ -44,6 +56,40 @@ def _bundle() -> SanitizedReproductionBundle:
         redaction_status=RedactionStatus.CLEAN,
         worktree_hint="tmp/codex-worktrees/demo",
         created_at=NOW,
+    )
+
+
+def _test_evidence(
+    *,
+    patch_id: str,
+    diff_hash: str = DIFF,
+    passed: bool = True,
+    exit_code: int = 0,
+    started_at: datetime = NOW,
+    completed_at: datetime = NOW + timedelta(seconds=2),
+    stdout_bytes: int = 0,
+    argv: tuple[str, ...] = CODEX_PATCH_QUALITY_ARGV,
+):
+    suite_id = contracts.PatchTestSuite.CODEX_PATCH_QUALITY
+    payload = {
+        "patch_id": patch_id,
+        "diff_hash": diff_hash,
+        "base_commit": BASE_COMMIT,
+        "suite_id": suite_id,
+        "argv": argv,
+        "passed": passed,
+        "exit_code": exit_code,
+        "started_at": started_at,
+        "completed_at": completed_at,
+        "stdout_sha256": sha256(b"").hexdigest(),
+        "stdout_bytes": stdout_bytes,
+        "stderr_sha256": sha256(b"").hexdigest(),
+        "stderr_bytes": 0,
+        "runner_version": "rsi-atlas-trusted-runner/1.0.0",
+    }
+    return contracts.PatchTestEvidence(
+        evidence_id=contracts.patch_test_evidence_id(**payload),
+        **payload,
     )
 
 
@@ -110,12 +156,13 @@ def test_quality_gate_blocking_failures_must_match() -> None:
     result = PatchQualityGateResult(
         gate_id=gate_id,
         patch_id=patch_id,
+        diff_hash=DIFF,
         checks=(
             PatchQualityCheck(name="secret_scan", passed=True),
-            PatchQualityCheck(name="unit_stub", passed=False, detail="failed"),
+            PatchQualityCheck(name="unit_test_evidence", passed=False, detail="failed"),
         ),
         passed=False,
-        blocking_failures=("unit_stub",),
+        blocking_failures=("unit_test_evidence",),
         created_at=NOW,
     )
     assert result.passed is False
@@ -123,9 +170,126 @@ def test_quality_gate_blocking_failures_must_match() -> None:
         PatchQualityGateResult(
             gate_id=gate_id,
             patch_id=patch_id,
-            checks=(PatchQualityCheck(name="unit_stub", passed=False, detail="failed"),),
+            diff_hash=DIFF,
+            checks=(PatchQualityCheck(name="unit_test_evidence", passed=False, detail="failed"),),
             passed=False,
             blocking_failures=("secret_scan",),
+            created_at=NOW,
+        )
+
+
+def test_patch_test_evidence_accepts_exact_allowlisted_suite_command() -> None:
+    bundle = _bundle()
+    patch_id = candidate_patch_id(bundle_id=bundle.bundle_id, diff_hash=DIFF, created_at=NOW)
+
+    evidence = _test_evidence(patch_id=patch_id)
+
+    assert evidence.patch_id == patch_id
+    assert evidence.base_commit == BASE_COMMIT
+    assert evidence.argv == CODEX_PATCH_QUALITY_ARGV
+
+
+def test_patch_test_evidence_id_binds_base_commit_and_execution_payload() -> None:
+    bundle = _bundle()
+    patch_id = candidate_patch_id(bundle_id=bundle.bundle_id, diff_hash=DIFF, created_at=NOW)
+    evidence = _test_evidence(patch_id=patch_id)
+    payload = evidence.model_dump(mode="python")
+
+    payload["base_commit"] = "d" * 40
+    with pytest.raises(ValidationError, match="evidence_id"):
+        contracts.PatchTestEvidence(**payload)
+
+
+def test_patch_test_evidence_requires_full_lowercase_base_commit() -> None:
+    bundle = _bundle()
+    patch_id = candidate_patch_id(bundle_id=bundle.bundle_id, diff_hash=DIFF, created_at=NOW)
+    evidence = _test_evidence(patch_id=patch_id)
+    payload = evidence.model_dump(mode="python")
+
+    payload["base_commit"] = "ABC123"
+    with pytest.raises(ValidationError):
+        contracts.PatchTestEvidence(**payload)
+
+
+def test_patch_test_evidence_rejects_unknown_suite_and_wrong_argv() -> None:
+    bundle = _bundle()
+    patch_id = candidate_patch_id(bundle_id=bundle.bundle_id, diff_hash=DIFF, created_at=NOW)
+
+    with pytest.raises(ValidationError):
+        _test_evidence(patch_id=patch_id, argv=("pytest", "-q"))
+    with pytest.raises(ValidationError):
+        contracts.PatchTestEvidence(
+            evidence_id="patchtestevidence:" + "c" * 64,
+            patch_id=patch_id,
+            diff_hash=DIFF,
+            base_commit=BASE_COMMIT,
+            suite_id="caller_chosen_suite",
+            argv=CODEX_PATCH_QUALITY_ARGV,
+            passed=True,
+            exit_code=0,
+            started_at=NOW,
+            completed_at=NOW + timedelta(seconds=2),
+            stdout_sha256=sha256(b"").hexdigest(),
+            stdout_bytes=0,
+            stderr_sha256=sha256(b"").hexdigest(),
+            stderr_bytes=0,
+            runner_version="rsi-atlas-trusted-runner/1.0.0",
+        )
+
+
+def test_patch_test_evidence_rejects_inconsistent_exit_semantics() -> None:
+    bundle = _bundle()
+    patch_id = candidate_patch_id(bundle_id=bundle.bundle_id, diff_hash=DIFF, created_at=NOW)
+
+    with pytest.raises(ValidationError, match="exit code"):
+        _test_evidence(patch_id=patch_id, passed=True, exit_code=1)
+
+
+def test_patch_test_evidence_requires_utc_ordered_bounded_timestamps() -> None:
+    bundle = _bundle()
+    patch_id = candidate_patch_id(bundle_id=bundle.bundle_id, diff_hash=DIFF, created_at=NOW)
+
+    with pytest.raises(ValidationError, match="UTC"):
+        _test_evidence(patch_id=patch_id, started_at=NOW.replace(tzinfo=None))
+    with pytest.raises(ValidationError, match="completed_at"):
+        _test_evidence(
+            patch_id=patch_id,
+            started_at=NOW + timedelta(seconds=3),
+            completed_at=NOW + timedelta(seconds=2),
+        )
+
+
+def test_patch_test_evidence_rejects_oversized_captured_output() -> None:
+    bundle = _bundle()
+    patch_id = candidate_patch_id(bundle_id=bundle.bundle_id, diff_hash=DIFF, created_at=NOW)
+
+    with pytest.raises(ValidationError):
+        _test_evidence(patch_id=patch_id, stdout_bytes=1_048_577)
+
+
+def test_passed_gate_requires_matching_successful_evidence_in_audit_result() -> None:
+    bundle = _bundle()
+    patch_id = candidate_patch_id(bundle_id=bundle.bundle_id, diff_hash=DIFF, created_at=NOW)
+    evidence = _test_evidence(patch_id=patch_id)
+    check = PatchQualityCheck(name="unit_test_evidence", passed=True)
+
+    with pytest.raises(ValidationError, match="test evidence"):
+        PatchQualityGateResult(
+            gate_id=patch_gate_id(patch_id=patch_id, created_at=NOW),
+            patch_id=patch_id,
+            diff_hash=DIFF,
+            checks=(check,),
+            passed=True,
+            created_at=NOW,
+        )
+    with pytest.raises(ValidationError, match="test evidence"):
+        PatchQualityGateResult(
+            gate_id=patch_gate_id(patch_id=patch_id, created_at=NOW),
+            patch_id=patch_id,
+            diff_hash="d" * 64,
+            checks=(check,),
+            passed=True,
+            test_evidence=(evidence,),
             created_at=NOW,
         )
 

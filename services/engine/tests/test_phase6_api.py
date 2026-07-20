@@ -40,6 +40,10 @@ def test_phase6_evaluation_codex_backup_safe_mode_release(tmp_path: Path, monkey
     gate_body = gate.json()
     assert gate_body["bundle"]["sanitized_inputs"]["api_key"] == "[REDACTED]"
     assert gate_body["patch"]["auto_applied"] is False
+    assert gate_body["patch"]["status"] == "gate_failed"
+    assert gate_body["gate"]["passed"] is False
+    assert "unit_test_evidence" in gate_body["gate"]["blocking_failures"]
+    assert gate_body["gate"]["test_evidence"] == []
     assert gate_body["authority_denials"][0]["denied"] is True
 
     source = tmp_path / "ws"
@@ -73,6 +77,47 @@ def test_phase6_evaluation_codex_backup_safe_mode_release(tmp_path: Path, monkey
     assert report["release_ready"] is False
     assert "notarization_blocked" in report["blockers"]
     assert report["signing_status"] == "unsigned_development"
+
+
+def test_codex_gate_ignores_caller_claimed_test_evidence_and_preserves_denials(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("RSI_ATLAS_DATA_ROOT", str(tmp_path / "runtime"))
+    client = TestClient(create_app(phase6_service=Phase6Service()))
+
+    response = client.post(
+        "/v1/engineering/codex:gate",
+        json={
+            "failure_summary": "schema fail",
+            "raw_inputs": {"query": "ok"},
+            "expected_behavior": "pass",
+            "actual_behavior": "fail",
+            "diff_text": "--- a\n+++ b\n+return True\n",
+            "passed": True,
+            "argv": ["pytest", "-q"],
+            "test_evidence": [
+                {
+                    "passed": True,
+                    "exit_code": 0,
+                    "runner_version": "caller/999",
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["patch"]["status"] == "gate_failed"
+    assert body["gate"]["passed"] is False
+    assert body["gate"]["test_evidence"] == []
+    assert "unit_test_evidence" in body["gate"]["blocking_failures"]
+    assert {denial["action"] for denial in body["authority_denials"]} == {
+        "merge",
+        "push",
+        "deploy",
+        "promote_evaluation",
+    }
+    assert all(denial["denied"] is True for denial in body["authority_denials"])
 
 
 def test_default_app_caches_safe_mode_and_reloads_it_after_recreation(

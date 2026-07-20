@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from hashlib import sha256
 
 from rsi_atlas_contracts import (
@@ -11,10 +11,13 @@ from rsi_atlas_contracts import (
     CandidatePatchStatus,
     PatchQualityCheck,
     PatchQualityGateResult,
+    PatchTestEvidence,
     SanitizedReproductionBundle,
     candidate_patch_id,
     patch_gate_id,
 )
+
+MAX_TEST_EVIDENCE_AGE = timedelta(minutes=15)
 
 _SECRET_IN_DIFF = re.compile(
     r"(password\s*=|api[_-]?key|BEGIN PRIVATE KEY|sk-live-|AKIA)",
@@ -46,9 +49,22 @@ def run_patch_quality_gate(
     *,
     diff_text: str,
     created_at: datetime,
-    unit_stub_passed: bool = True,
+    test_evidence: tuple[PatchTestEvidence, ...] = (),
 ) -> tuple[CandidatePatch, PatchQualityGateResult]:
     """Run deterministic checks; never auto-apply the patch."""
+    observed_diff_hash = sha256(diff_text.encode("utf-8")).hexdigest()
+    diff_hash_matches = observed_diff_hash == patch.diff_hash
+    evidence_matches = bool(test_evidence) and all(
+        evidence.patch_id == patch.patch_id
+        and evidence.diff_hash == patch.diff_hash
+        and evidence.diff_hash == observed_diff_hash
+        and evidence.passed
+        and evidence.exit_code == 0
+        and evidence.started_at >= patch.created_at
+        and evidence.completed_at <= created_at
+        and created_at - evidence.completed_at <= MAX_TEST_EVIDENCE_AGE
+        for evidence in test_evidence
+    )
     checks = [
         PatchQualityCheck(
             name="schema_shape",
@@ -56,14 +72,19 @@ def run_patch_quality_gate(
             detail="patch id shape",
         ),
         PatchQualityCheck(
+            name="diff_hash_match",
+            passed=diff_hash_matches,
+            detail="submitted diff sha256 matches candidate patch",
+        ),
+        PatchQualityCheck(
             name="secret_scan",
             passed=_SECRET_IN_DIFF.search(diff_text) is None,
             detail="diff secret scan",
         ),
         PatchQualityCheck(
-            name="unit_stub",
-            passed=unit_stub_passed,
-            detail="development unit-test stub hook",
+            name="unit_test_evidence",
+            passed=evidence_matches,
+            detail="trusted diff-bound test evidence",
         ),
         PatchQualityCheck(
             name="no_auto_apply",
@@ -85,9 +106,11 @@ def run_patch_quality_gate(
     result = PatchQualityGateResult(
         gate_id=patch_gate_id(patch_id=patch.patch_id, created_at=created_at),
         patch_id=patch.patch_id,
+        diff_hash=observed_diff_hash,
         checks=tuple(checks),
         passed=passed,
         blocking_failures=failed,
+        test_evidence=test_evidence,
         created_at=created_at,
     )
     return gated, result
