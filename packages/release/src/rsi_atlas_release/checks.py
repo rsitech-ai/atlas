@@ -14,6 +14,7 @@ from rsi_atlas_contracts import (
 )
 from rsi_atlas_security.ipc import IpcTransportMode, resolve_ipc_bind
 
+from rsi_atlas_release.assembly import inspect_runtime_completeness
 from rsi_atlas_release.inventory import inventory_staged_bundle
 from rsi_atlas_release.sbom import build_sbom_from_lock
 
@@ -40,6 +41,7 @@ def run_release_check(
     signing_identity = os.environ.get("RSI_ATLAS_SIGNING_IDENTITY", "").strip()
     notarization_key = os.environ.get("RSI_ATLAS_NOTARY_KEY", "").strip()
     blockers: list[str] = []
+    blockers.extend(inspect_runtime_completeness(bundle))
     signing_status = SigningStatus.UNSIGNED_DEVELOPMENT
     notarization_status = SigningStatus.NOTARIZATION_BLOCKED
     if not signing_identity:
