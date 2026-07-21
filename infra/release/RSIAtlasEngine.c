@@ -96,20 +96,21 @@ int main(int argc, char *argv[]) {
         return fail();
     }
 
-    const size_t fixed_count = 5;
+    const size_t fixed_count = 6;
     char **arguments = calloc((size_t)argc + fixed_count, sizeof(char *));
     if (arguments == NULL) {
         return fail();
     }
     arguments[0] = python;
     arguments[1] = "-I";
-    arguments[2] = "-s";
-    arguments[3] = "-m";
-    arguments[4] = "rsi_atlas_engine";
+    arguments[2] = "-B";
+    arguments[3] = "-s";
+    arguments[4] = "-m";
+    arguments[5] = "rsi_atlas_engine";
     for (int index = 1; index < argc; ++index) {
-        arguments[index + 4] = argv[index];
+        arguments[index + 5] = argv[index];
     }
-    arguments[argc + 4] = NULL;
+    arguments[argc + 5] = NULL;
 
     execv(python, arguments);
     free(arguments);

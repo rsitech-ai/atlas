@@ -50,6 +50,8 @@ def test_runtime_preflight_cli_fails_closed_for_native_shell(tmp_path: Path) -> 
 
     assert result.returncode == 1
     assert "embedded_python_missing" in result.stdout
+    assert "artifact_sbom_invalid" in result.stdout
+    assert "artifact_sbom_verified=false" in result.stdout
     assert "runtime_ready_for_signing=false" in result.stdout
     assert "runtime_dependency_closure_unverified" in result.stdout
 
@@ -68,3 +70,10 @@ def test_signing_script_is_inside_out_and_archives_after_stapling() -> None:
     assert "--timestamp" in script
     assert "stapler validate" in script
     assert "shasum -a 256" in script
+
+
+def test_runtime_preflight_verifies_artifact_inventory_before_signing() -> None:
+    script = (ROOT / "script" / "check_release_runtime.py").read_text(encoding="utf-8")
+
+    assert "verify_artifact_sbom" in script
+    assert 'blockers.append("artifact_sbom_invalid")' in script

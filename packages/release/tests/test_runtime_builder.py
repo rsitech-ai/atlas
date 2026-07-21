@@ -52,6 +52,7 @@ def test_native_launcher_uses_only_in_bundle_isolated_python(tmp_path: Path) -> 
     assert result.returncode == 0, result.stderr
     assert capture.read_text(encoding="utf-8").splitlines() == [
         "-I",
+        "-B",
         "-s",
         "-m",
         "rsi_atlas_engine",
