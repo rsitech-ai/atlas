@@ -2,15 +2,18 @@ import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Literal
 from uuid import UUID
 
 from rsi_atlas_contracts import ArtifactCommandContext, SafeModeCapability
+from rsi_atlas_contracts.runtime_resources import RuntimeResources
 from rsi_atlas_ingestion import DocumentAdmissionService
 from rsi_atlas_ingestion.canonical_service import CanonicalizationService
 from rsi_atlas_ingestion.parser_service import ParserService
 from rsi_atlas_ingestion.preflight_service import PreflightService
 from rsi_atlas_ingestion.processing_pipeline import DocumentProcessingService
+from rsi_atlas_ingestion.worker_runner import DocumentWorkerRunner
 from rsi_atlas_recovery import SafeModeController
 from rsi_atlas_storage import (
     AcquisitionRepository,
@@ -79,6 +82,10 @@ class DocumentIngestionServices:
     ) -> "DocumentIngestionServices":
         values = os.environ if environ is None else environ
         paths = RuntimePaths.from_environment(environ=values)
+        resources = RuntimeResources.resolve(
+            environ=values,
+            development_fallback=Path(__file__).resolve().parents[4],
+        )
         staging_parent = paths.data_root / "staging"
         staging_names = {"api": "imports", "cli": "cli-imports"}
         try:
@@ -116,13 +123,16 @@ class DocumentIngestionServices:
             acquisition_repository=acquisition_repository,
             clock=clock,
         )
+        document_worker = DocumentWorkerRunner(profile_template=resources.document_worker_profile)
         preflight = PreflightService(
             admissions=acquisition_repository,
             processing=processing_repository,
+            runner=document_worker,
         )
         parser = ParserService(
             admissions=acquisition_repository,
             processing=processing_repository,
+            runner=document_worker,
         )
         canonicalizer = CanonicalizationService(
             admissions=acquisition_repository,

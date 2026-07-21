@@ -104,25 +104,27 @@
 ## Distribution Readiness
 
 - Bundle ID: `ai.rsitech.RSIAtlas` for the local staged bundle.
-- Signing team: unconfigured for Developer ID distribution.
-- Sandbox/entitlements: `docs/release/entitlement-matrix.md` is a draft; signed-artifact hardened
-  runtime and entitlement validation remain open.
+- Signing team: Developer ID team `2NY8A789TN`; the usable local identity is installed, but the
+  exact candidate remains unsigned.
+- Sandbox/entitlements: the repository matrix is reviewed for authenticated UDS and no release TCP
+  API; signed-artifact hardened-runtime and entitlement validation remain open.
 - Privacy manifest: not created because this slice is not a release candidate.
 - Privacy disclosures: not prepared.
 - Assets: no custom app icon, screenshots, or marketing assets.
 - Metadata: not prepared.
 - Review notes: not applicable; the approved design selects Developer ID distribution outside the Mac App Store.
-- Known blockers: embedded Python and local PostgreSQL packaging, sandbox/hardened runtime and
-  entitlement validation, nested signing, Developer ID/notary credentials, notarization, clean
-  install, upgrade, rollback, and Keychain-wrapped backup keys. Authenticated Unix-domain IPC is
-  implemented, but it is not package, signing, notarization, or clean-install evidence. Development
-  SBOM + fail-closed unsigned release checks and filesystem backup/Safe Mode exist but are not
-  release evidence.
+- Repository-local packaging is closed for embedded CPython, PostgreSQL, pgvector, the engine,
+  explicit operational resources, native dependency relocation, lifecycle supervision, and the
+  pre-sign artifact/license inventory. Remaining release blockers are the private notary API key,
+  exact nested Developer ID signing, Apple acceptance/stapling, Gatekeeper and clean-user launch,
+  signed-release zero-egress, upgrade/rollback, and Keychain-wrapped backup keys.
 
 ## Iteration Log
 
 | Date | Gate | Change | Verification | Next blocker |
 | --- | --- | --- | --- | --- |
+| 2026-07-21 | Runtime final-review remediation | Added explicit Python no-bytecode launch, artifact-inventory signing preflight, authenticated-token wait, and lock/identity-based PostgreSQL orphan recovery. | At code commit `d303660`: **1313 passed, 1 skipped** Python; **55 Swift tests**; Swift build; lock/Ruff/format/mypy/parser governance. Independent re-review approved; immutable normal app launch and actual engine-crash/restart smokes passed. | Private notary API credentials; exact nested sign/notarize/staple/Gatekeeper/clean-user proof; hosted Actions billing. |
+| 2026-07-21 | Embedded direct-download runtime closure | Added isolated CPython/PostgreSQL/pgvector, recursively relocated native providers, explicit runtime resources, app-managed engine/database lifecycle, artifact-derived inventory/license evidence, and fail-closed final provenance. Fixed collector startup errors being mislabeled as client input. | At code commit `641f12912700`: **1308 passed, 1 skipped** Python; **55 Swift tests**; Swift build; lock/Ruff/format/mypy/parser governance. Live unsigned app readiness and clean quit passed. | Private notary API credentials; exact nested sign/notarize/staple/Gatekeeper/clean-user proof; hosted Actions billing; model/provider and owner-sealed acceptance gates. |
 | 2026-07-18 | Foundation contract | Added strict Python and Swift status contracts, deterministic diagnostics, CLI, and loopback API. | Final gate: 11 Python tests, 8 Swift tests, Ruff, strict mypy, uv lock check, and Swift product build passed. | Add persistence and artifact-store diagnostics in a separate slice. |
 | 2026-07-18 | Native shell | Added a native sidebar/detail Command Center with loading, healthy, failure, retry, and keyboard refresh behavior. | Foreground accessibility and visual inspection proved healthy state, engine-down state via `⌘R`, and same-window recovery through Retry. | Minimum-window drag could not be established through the current UI-control surface; compact layout remains unverified. |
 | 2026-07-18 | Runtime lifecycle | Replaced shell-owned background execution with an explicitly labeled per-user `launchctl` job and condition-based shutdown. | A separate shell confirmed the engine remained `running` and returned the healthy 3-component contract after `build_and_run.sh --verify` exited. | Replace development loopback transport with authenticated release IPC in a separate security milestone. |

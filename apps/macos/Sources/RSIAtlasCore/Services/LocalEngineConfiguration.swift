@@ -27,6 +27,10 @@ public struct LocalEngineConfiguration: Sendable, Equatable {
         if case .unixDomain = mode { true } else { false }
     }
 
+    public func currentToken() -> String? {
+        token ?? Self.loadToken(at: tokenPath)
+    }
+
     public init(mode: Mode, tokenPath: URL, token: String?) {
         self.mode = mode
         self.tokenPath = tokenPath

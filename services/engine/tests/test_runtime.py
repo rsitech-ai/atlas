@@ -197,6 +197,20 @@ def test_missing_data_root_is_bootstrapped_owner_private(tmp_path: Path) -> None
     assert data_root.stat().st_mode & 0o777 == 0o700
 
 
+def test_data_root_cannot_alias_read_only_resource_root(tmp_path: Path) -> None:
+    resource_root = tmp_path / "resources"
+    resource_root.mkdir(mode=0o700)
+    (resource_root / "migrations").mkdir()
+
+    with pytest.raises(ValueError, match="separate"):
+        RuntimePaths.from_data_root(resource_root, repository_root=resource_root)
+
+    nested_data = resource_root / "writable-data"
+    with pytest.raises(ValueError, match="separate"):
+        RuntimePaths.from_data_root(nested_data, repository_root=resource_root)
+    assert not nested_data.exists()
+
+
 def test_missing_data_root_rejects_symlinked_parent(tmp_path: Path) -> None:
     real_parent = tmp_path / "real"
     real_parent.mkdir(mode=0o700)

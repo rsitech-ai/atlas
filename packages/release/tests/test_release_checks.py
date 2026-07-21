@@ -38,6 +38,25 @@ def _runtime_component_payload(relative_path: Path) -> bytes:
     return _thin_arm64_mach_o(file_type=6 if relative_path.suffix == ".dylib" else 2)
 
 
+def _development_release_fixture(root: Path) -> Path:
+    lock = root / "uv.lock"
+    lock.write_bytes((ROOT / "uv.lock").read_bytes())
+    entitlement = root / "docs" / "release" / "entitlement-matrix.md"
+    entitlement.parent.mkdir(parents=True)
+    entitlement.write_text("Release transport: Unix domain socket.\n", encoding="utf-8")
+    governance = root / "docs" / "dependency-governance" / "embedding-model-approval.md"
+    governance.parent.mkdir(parents=True)
+    governance.write_text("approved\n", encoding="utf-8")
+    runner = root / "script" / "run_engine.py"
+    runner.parent.mkdir(parents=True)
+    runner.write_text("# release IPC runner\n", encoding="utf-8")
+    sbom_path = root / "dist" / "RSIAtlas.app" / "Contents" / "Resources" / "sbom.cdx.json"
+    sbom_path.parent.mkdir(parents=True)
+    sbom = build_sbom_from_lock(lock, created_at=NOW)
+    sbom_path.write_text(sbom.model_dump_json(), encoding="utf-8")
+    return root
+
+
 def test_sbom_from_repo_lock() -> None:
     doc = build_sbom_from_lock(ROOT / "uv.lock", created_at=NOW)
     names = {component.name for component in doc.components}
@@ -45,22 +64,45 @@ def test_sbom_from_repo_lock() -> None:
     assert doc.bom_format == "CycloneDX"
 
 
-def test_inventory_unsigned() -> None:
-    inv = inventory_staged_bundle(ROOT / "dist" / "RSIAtlas.app")
+def test_inventory_reports_embedded_python_without_claiming_signing(tmp_path: Path) -> None:
+    python = (
+        tmp_path
+        / "RSIAtlas.app"
+        / "Contents"
+        / "Resources"
+        / "runtime"
+        / "python"
+        / "bin"
+        / "python3"
+    )
+    python.parent.mkdir(parents=True)
+    python.write_bytes(b"embedded-runtime")
+
+    inv = inventory_staged_bundle(tmp_path / "RSIAtlas.app")
+
     assert inv.signing_status is SigningStatus.UNSIGNED_DEVELOPMENT
     assert "unsigned" in inv.honesty_label
+    assert inv.python_embedded is True
 
 
-def test_release_check_fail_closed() -> None:
-    report = run_release_check(repo_root=ROOT, require_release=True, created_at=NOW)
+def test_release_check_fail_closed(tmp_path: Path) -> None:
+    report = run_release_check(
+        repo_root=_development_release_fixture(tmp_path),
+        require_release=True,
+        created_at=NOW,
+    )
     assert report.release_ready is False
     assert report.claim is ReleaseClaim.RELEASE_CANDIDATE
     assert "notarization_blocked" in report.blockers
     assert "unsigned" in report.blockers
 
 
-def test_development_check_not_ready() -> None:
-    report = run_release_check(repo_root=ROOT, require_release=False, created_at=NOW)
+def test_development_check_not_ready(tmp_path: Path) -> None:
+    report = run_release_check(
+        repo_root=_development_release_fixture(tmp_path),
+        require_release=False,
+        created_at=NOW,
+    )
     assert report.claim is ReleaseClaim.DEVELOPMENT_ONLY
     assert report.release_ready is False
     assert report.sbom_present is True

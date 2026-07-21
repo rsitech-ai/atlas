@@ -16,9 +16,12 @@ from rsi_atlas_storage.database import Row
 def runtime_data_root(environ: Mapping[str, str] | None = None) -> Path:
     """Resolve the configured local runtime root without mutating the filesystem."""
     values = os.environ if environ is None else environ
-    repository_root = Path(__file__).resolve().parents[4]
     raw_data_root = values.get("RSI_ATLAS_DATA_ROOT")
-    return Path(raw_data_root) if raw_data_root is not None else repository_root / ".local"
+    return (
+        Path(raw_data_root)
+        if raw_data_root is not None
+        else Path.home() / "Library" / "Application Support" / "ai.rsitech.RSIAtlas"
+    )
 
 
 def runtime_safe_mode(environ: Mapping[str, str] | None = None) -> SafeModeController:

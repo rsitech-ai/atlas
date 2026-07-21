@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from hashlib import sha256
 from json import dumps
+from pathlib import PurePosixPath
 from typing import Self
 
 from pydantic import Field, StrictBool, StrictInt, field_validator, model_validator
@@ -28,6 +29,13 @@ def _canonical_json(payload: object) -> str:
     return dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
+def _require_bundle_relative_path(value: str, *, field_name: str) -> str:
+    path = PurePosixPath(value)
+    if not value or path.is_absolute() or ".." in path.parts or value != path.as_posix():
+        raise ValueError(f"{field_name} must be a canonical bundle-relative path")
+    return value
+
+
 class SigningStatus(StrEnum):
     UNSIGNED_DEVELOPMENT = "unsigned_development"
     SIGNED_DEVELOPER_ID = "signed_developer_id"
@@ -44,6 +52,26 @@ class SbomComponent(DocumentContractModel):
     name: str = Field(pattern=_IDENTIFIER_PATTERN)
     version: str = Field(min_length=1, max_length=64)
     purl: str | None = Field(default=None, max_length=256)
+    sha256: str | None = Field(default=None, pattern=_SHA256_PATTERN)
+    license_expression: str | None = Field(default=None, min_length=1, max_length=256)
+    license_files: tuple[str, ...] = ()
+
+    @field_validator("license_files")
+    @classmethod
+    def _license_paths(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        for path in value:
+            _require_bundle_relative_path(path, field_name="license_files")
+        return value
+
+
+class SbomFile(DocumentContractModel):
+    path: str = Field(min_length=1, max_length=1024)
+    sha256: str = Field(pattern=_SHA256_PATTERN)
+
+    @field_validator("path")
+    @classmethod
+    def _path(cls, value: str) -> str:
+        return _require_bundle_relative_path(value, field_name="path")
 
 
 class SbomDocument(DocumentContractModel):
@@ -53,6 +81,16 @@ class SbomDocument(DocumentContractModel):
     components: tuple[SbomComponent, ...] = Field(min_length=1)
     created_at: datetime
     source_lock_hash: str = Field(pattern=_SHA256_PATTERN)
+    artifact_tree_sha256: str | None = Field(default=None, pattern=_SHA256_PATTERN)
+    files: tuple[SbomFile, ...] = ()
+    excluded_paths: tuple[str, ...] = ()
+
+    @field_validator("excluded_paths")
+    @classmethod
+    def _excluded_paths(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        for path in value:
+            _require_bundle_relative_path(path, field_name="excluded_paths")
+        return value
 
     @field_validator("created_at")
     @classmethod
@@ -69,11 +107,11 @@ class PackageInventory(DocumentContractModel):
 
     @model_validator(mode="after")
     def _unsigned_honesty(self) -> Self:
-        if self.signing_status is SigningStatus.UNSIGNED_DEVELOPMENT:
-            if "unsigned" not in self.honesty_label.lower():
-                raise ValueError("unsigned inventory must label honesty as unsigned")
-            if self.python_embedded:
-                raise ValueError("development inventory cannot claim embedded Python yet")
+        if (
+            self.signing_status is SigningStatus.UNSIGNED_DEVELOPMENT
+            and "unsigned" not in self.honesty_label.lower()
+        ):
+            raise ValueError("unsigned inventory must label honesty as unsigned")
         if (
             self.signing_status is SigningStatus.NOTARIZED
             and "unsigned" in self.honesty_label.lower()

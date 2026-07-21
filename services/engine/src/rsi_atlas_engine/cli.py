@@ -19,6 +19,7 @@ from rsi_atlas_ingestion import StagedPDFEvidence
 from rsi_atlas_engine.import_staging import ImportStagingArea, ImportStagingError
 from rsi_atlas_engine.ingestion import DocumentIngestionServices
 from rsi_atlas_engine.runtime import RuntimeServices
+from rsi_atlas_engine.server import serve_release
 
 
 class _AdmissionServicePort(Protocol):
@@ -43,6 +44,13 @@ class _DocumentIngestionPort(Protocol):
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="atlas", description="RSI Atlas local tooling")
     commands = parser.add_subparsers(dest="command", required=True)
+    serve = commands.add_parser("serve", help="Run the embedded local release engine")
+    serve.add_argument(
+        "--release-ipc",
+        action="store_true",
+        required=True,
+        help="Require authenticated Unix-domain release IPC",
+    )
     doctor = commands.add_parser("doctor", help="Inspect the local RSI Atlas runtime")
     doctor.add_argument("--json", action="store_true", help="Emit the versioned JSON contract")
     import_pdf = commands.add_parser("import-pdf", help="Admit one local PDF as evidence")
@@ -70,6 +78,8 @@ def main(
     ingestion_factory: Callable[[], _DocumentIngestionPort] | None = None,
 ) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "serve":
+        return serve_release()
     if args.command == "import-pdf":
         return _import_pdf(
             args,

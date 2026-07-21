@@ -57,6 +57,7 @@ def main() -> int:
     parser.add_argument("--repo-root", type=Path, default=default_root)
     parser.add_argument("--source-executable", type=Path)
     parser.add_argument("--destination", type=Path)
+    parser.add_argument("--runtime-payload", type=Path)
     parser.add_argument("--version")
     parser.add_argument("--build-number", required=True)
     args = parser.parse_args()
@@ -71,14 +72,16 @@ def main() -> int:
         version=version,
         build_number=args.build_number,
         repo_root=repo_root,
+        runtime_payload=args.runtime_payload,
     )
     manifest_path = bundle / "Contents" / "Resources" / "release-assembly.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     blockers = ",".join(manifest["blockers"])
     entrypoints_present = str(manifest["runtime_entrypoints_present"]).lower()
+    closure_verified = str(manifest["runtime_dependency_closure_verified"]).lower()
     print(f"assembled {bundle}")
     print(f"runtime_entrypoints_present={entrypoints_present}")
-    print("runtime_dependency_closure_verified=false")
+    print(f"runtime_dependency_closure_verified={closure_verified}")
     print(f"blockers={blockers}")
     return 0
 

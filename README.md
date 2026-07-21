@@ -8,7 +8,7 @@ security or confidentiality-sensitive reports can be sent to
 
 | Status | Detail |
 | --- | --- |
-| Maturity | **Dev-complete / not production Proven** — phases 1–6 implemented with tests; standalone packaging, signed-artifact verification, notarization, sealed embedding promotion, and related proofs remain open |
+| Maturity | **Repo-ready / unsigned runtime-proven** — phases 1–6 and a self-contained direct-download candidate are implemented; signed-artifact, notarization, clean-install, and owner-sealed model proofs remain open |
 | Platform | macOS 15+, Apple Silicon, Swift 6, Python 3.11+ |
 | License | [Apache-2.0](LICENSE) — see [NOTICE](NOTICE) for third-party notes |
 | Maintainer | [RSI Tech](https://rsitech.ai) |
@@ -23,14 +23,14 @@ Acceptance honesty: [`docs/acceptance-matrix.md`](docs/acceptance-matrix.md).
 - Versioned Python runtime contracts, content-addressed artifact store, PostgreSQL 17 + pgvector over an **owner-only Unix socket**
 - Fail-closed document admission (quarantine / reject / duplicate-link; never silent promote)
 - Governed Tier-0 PDF parse (`pypdf` / `pdfminer.six`); **Docling blocked**
-- Chunking, hybrid retrieval, cited report drafts, offline collectors, monitoring, backup/restore, SBOM / unsigned release checks
-- Native SwiftUI Command Center + Evidence / Research / Comparison surfaces bound to loopback (or release Unix IPC) APIs
+- Chunking, hybrid retrieval, cited report drafts, offline collectors, monitoring, backup/restore, and an artifact-derived release inventory
+- Native SwiftUI Command Center + Evidence / Research / Comparison surfaces; the release app supervises its bundled engine and PostgreSQL over authenticated Unix IPC
 
 ## What is still blocked or candidate-only
 
-- Standalone release assembly and **Developer ID signing / notarization / stapling**. A usable
-  Developer ID identity is installed locally, but no self-contained signed artifact or notary
-  credential evidence exists; see `docs/release/signing-notarization-blockers.md`.
+- **Developer ID signing / notarization / stapling** of the self-contained candidate. A usable
+  Developer ID identity is installed locally, but private notary API credentials and exact signed
+  artifact evidence are absent; see `docs/release/signing-notarization-blockers.md`.
 - Docling; system Tesseract OCR when absent (fail-closed)
 - Sealed-holdout **PRODUCTION** embedding promotion, neural cross-encoder, calibrated semantic triage
 - Keychain-wrapped backup keys; WebSocket collectors; LangGraph; XPC
@@ -41,7 +41,8 @@ Acceptance honesty: [`docs/acceptance-matrix.md`](docs/acceptance-matrix.md).
 - Apple Silicon Mac, macOS 15+
 - Xcode command-line tools (Swift 6)
 - Python 3.11+ and [uv](https://docs.astral.sh/uv/)
-- Homebrew PostgreSQL **17.10** and pgvector **0.8.5**
+- Homebrew PostgreSQL **17.10** and pgvector **0.8.5** for development and release construction;
+  the assembled app does not depend on Homebrew at runtime
 
 ## Quick start
 

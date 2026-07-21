@@ -26,6 +26,7 @@ from rsi_atlas_contracts import (
     SystemStatus,
     ThermalState,
 )
+from rsi_atlas_contracts.runtime_resources import RuntimeResources
 from rsi_atlas_models import (
     ModelRegistry,
     ResourceArbiter,
@@ -127,9 +128,19 @@ class RuntimePaths:
         repository_root: Path | None = None,
     ) -> RuntimePaths:
         values = os.environ if environ is None else environ
-        root = repository_root or Path(__file__).resolve().parents[4]
+        root = (
+            repository_root
+            or RuntimeResources.resolve(
+                environ=values,
+                development_fallback=Path(__file__).resolve().parents[4],
+            ).root
+        )
         raw_data_root = values.get("RSI_ATLAS_DATA_ROOT")
-        data_root = Path(raw_data_root) if raw_data_root is not None else root / ".local"
+        data_root = (
+            Path(raw_data_root)
+            if raw_data_root is not None
+            else Path.home() / "Library" / "Application Support" / "ai.rsitech.RSIAtlas"
+        )
         return cls.from_data_root(data_root, repository_root=root)
 
     @classmethod
@@ -146,10 +157,18 @@ class RuntimePaths:
         rendered = str(data_root)
         if "'" in rendered or any(ord(character) < 32 for character in rendered):
             raise ValueError("runtime data root contains unsupported characters")
-        cls._ensure_owner_private_directory(data_root)
-        root = repository_root or Path(__file__).resolve().parents[4]
+        root = (
+            repository_root
+            or RuntimeResources.resolve(
+                development_fallback=Path(__file__).resolve().parents[4]
+            ).root
+        )
         if not root.is_absolute() or not (root / "migrations").is_dir():
             raise ValueError("runtime repository root is invalid")
+        normalized_data_root = data_root.resolve(strict=False)
+        if normalized_data_root == root or normalized_data_root.is_relative_to(root):
+            raise ValueError("runtime data root must be separate from read-only resources")
+        cls._ensure_owner_private_directory(data_root)
         return cls(
             repository_root=root,
             data_root=data_root,
