@@ -77,3 +77,4 @@ def test_runtime_preflight_verifies_artifact_inventory_before_signing() -> None:
 
     assert "verify_artifact_sbom" in script
     assert 'blockers.append("artifact_sbom_invalid")' in script
+    assert "args.bundle.resolve(strict=True)" in script

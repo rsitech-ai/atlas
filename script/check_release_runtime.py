@@ -22,11 +22,12 @@ def main() -> int:
     parser.add_argument("--bundle", type=Path, required=True)
     args = parser.parse_args()
     repo_root = Path(__file__).resolve().parents[1]
-    entrypoint_blockers = inspect_runtime_entrypoints(args.bundle)
+    bundle = args.bundle.resolve(strict=True)
+    entrypoint_blockers = inspect_runtime_entrypoints(bundle)
     closure_verified = False
     if not entrypoint_blockers:
         try:
-            validate_runtime_payload(args.bundle)
+            validate_runtime_payload(bundle)
             closure_verified = True
         except ValueError:
             blockers = [*entrypoint_blockers, "runtime_payload_invalid"]
@@ -38,11 +39,11 @@ def main() -> int:
         blockers.append(RUNTIME_DEPENDENCY_CLOSURE_BLOCKER)
     artifact_sbom_verified = False
     try:
-        sbom_path = args.bundle / "Contents" / "Resources" / "sbom.cdx.json"
+        sbom_path = bundle / "Contents" / "Resources" / "sbom.cdx.json"
         sbom = SbomDocument.model_validate_json(sbom_path.read_text(encoding="utf-8"))
-        plist = plistlib.loads((args.bundle / "Contents" / "Info.plist").read_bytes())
+        plist = plistlib.loads((bundle / "Contents" / "Info.plist").read_bytes())
         verify_artifact_sbom(
-            args.bundle,
+            bundle,
             sbom,
             lock_path=repo_root / "uv.lock",
             version=str(plist["CFBundleShortVersionString"]),
@@ -54,7 +55,7 @@ def main() -> int:
     payload = {
         "artifact_sbom_verified": artifact_sbom_verified,
         "blockers": blockers,
-        "bundle": args.bundle.as_posix(),
+        "bundle": bundle.as_posix(),
         "runtime_dependency_closure_verified": closure_verified,
         "runtime_entrypoints_present": not entrypoint_blockers,
         "runtime_ready_for_signing": runtime_ready,
