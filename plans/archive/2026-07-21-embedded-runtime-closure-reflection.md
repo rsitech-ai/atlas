@@ -26,14 +26,14 @@
 
 ## Evidence
 
-- **First meaningful failure signal:** Native entrypoints existed but transitive Mach-O loads still resolved to Homebrew paths; later, engine termination did not initially prove PostgreSQL cleanup.
+- **First meaningful failure signal:** Native entrypoints existed but transitive Mach-O loads still resolved to Homebrew paths; later, independent review proved bundle bytecode mutation and a daemonized PostgreSQL orphan after engine `SIGKILL`.
 - **Commands or runtime checks:** Focused release tests; live closure scan; isolated CPython/PostgreSQL/pgvector smoke; authenticated UDS status; staged app launch and normal quit; artifact-inventory rebuild and mutation test.
 - **What the evidence ruled in or out:** Entrypoint presence, hard-coded closure flags, help-only smokes, and a lock-universe SBOM are insufficient release evidence.
 
 ## Decision
 
-- **Root cause or remaining unknown:** Packaging originally modeled named files rather than the runtime dependency/lifecycle graph. Apple notarization and clean-user behavior remain unknown until owner credentials are supplied.
-- **Retained fix / direction:** Preserve native provider structure, recompute closure live, make resources explicit, supervise engine/database lifecycle in the app, and derive the embedded inventory from the staged pre-sign artifact.
+- **Root cause or remaining unknown:** Packaging originally modeled named files rather than the runtime dependency/lifecycle graph. Python isolated mode ignored the bytecode environment flag, and `pg_ctl` detached PostgreSQL from engine process ownership. Apple notarization and clean-user behavior remain unknown until owner credentials are supplied.
+- **Retained fix / direction:** Preserve native provider structure, recompute closure live, pass explicit Python no-bytecode flags, make resources explicit, supervise orderly lifecycle in the app, recover only identity-matched database orphans under an owner lock, and derive the embedded inventory from the staged pre-sign artifact.
 - **Why alternatives were rejected:** Flattening lost loader/provider identity; copying `.venv` included editable/dev state; embedding post-sign provenance would invalidate the signature it describes.
 - **Residual risk:** Developer ID nested signing may expose entitlement or hardened-runtime incompatibilities; hosted CI cannot start while billing is blocked.
 - **Rollback trigger:** Any unresolved live load, payload mutation, orphaned database, inventory mismatch, non-accepted notarization, Gatekeeper rejection, or exact-head regression failure.

@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import fcntl
+import json
 import os
 import stat
 import subprocess
+import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from hashlib import sha256
 from pathlib import Path
 from typing import Protocol
+
+_OWNER_SCHEMA = "rsi-atlas.embedded-postgres-owner.v1"
 
 
 class CommandRunner(Protocol):
@@ -40,6 +46,7 @@ class EmbeddedPostgres:
     data_root: Path
     runner: CommandRunner = field(default=_run_command, repr=False)
     _started_here: bool = field(default=False, init=False, repr=False)
+    _lock_descriptor: int | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         self.runtime_root = self.runtime_root.resolve(strict=False)
@@ -74,6 +81,14 @@ class EmbeddedPostgres:
     @property
     def socket_directory(self) -> Path:
         return self.postgres_root / "socket"
+
+    @property
+    def ownership_path(self) -> Path:
+        return self.postgres_root / "owner.json"
+
+    @property
+    def ownership_lock_path(self) -> Path:
+        return self.postgres_root / "owner.lock"
 
     @property
     def _executables(self) -> dict[str, Path]:
@@ -115,6 +130,156 @@ class EmbeddedPostgres:
             if directory.is_symlink() or stat.S_IMODE(directory.stat().st_mode) != 0o700:
                 raise ValueError("PostgreSQL runtime directory must be owner-private")
 
+    def _acquire_ownership_lock(self) -> None:
+        if self._lock_descriptor is not None:
+            raise RuntimeError("PostgreSQL ownership lock is already held")
+        flags = os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW
+        descriptor = os.open(self.ownership_lock_path, flags, 0o600)
+        try:
+            metadata = os.fstat(descriptor)
+            if (
+                metadata.st_uid != os.getuid()
+                or not stat.S_ISREG(metadata.st_mode)
+                or stat.S_IMODE(metadata.st_mode) != 0o600
+            ):
+                raise ValueError("PostgreSQL ownership lock must be owner-private")
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except Exception:
+            os.close(descriptor)
+            raise
+        self._lock_descriptor = descriptor
+
+    def _release_ownership_lock(self) -> None:
+        if self._lock_descriptor is None:
+            return
+        os.close(self._lock_descriptor)
+        self._lock_descriptor = None
+
+    def _owner_base(self) -> dict[str, object]:
+        executable = self._executables["postgres"]
+        return {
+            "data_directory": str(self.data_directory.resolve(strict=False)),
+            "postgres_sha256": sha256(executable.read_bytes()).hexdigest(),
+            "schema_version": _OWNER_SCHEMA,
+            "socket_directory": str(self.socket_directory.resolve(strict=False)),
+        }
+
+    def _write_owner(
+        self,
+        *,
+        state: str,
+        postmaster_pid: int | None = None,
+        postmaster_started_at: int | None = None,
+    ) -> None:
+        document = {
+            **self._owner_base(),
+            "postmaster_pid": postmaster_pid,
+            "postmaster_started_at": postmaster_started_at,
+            "state": state,
+        }
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=".owner.",
+            suffix=".tmp",
+            dir=self.postgres_root,
+        )
+        temporary = Path(temporary_name)
+        try:
+            os.fchmod(descriptor, 0o600)
+            payload = (
+                json.dumps(document, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+                + "\n"
+            ).encode("utf-8")
+            remaining = memoryview(payload)
+            while remaining:
+                written = os.write(descriptor, remaining)
+                if written <= 0:
+                    raise OSError("failed to write PostgreSQL owner record")
+                remaining = remaining[written:]
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+        try:
+            os.replace(temporary, self.ownership_path)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    def _read_owner(self) -> dict[str, object]:
+        path = self.ownership_path
+        if path.is_symlink() or not path.is_file():
+            raise RuntimeError("running PostgreSQL has no trusted RSI Atlas owner")
+        metadata = path.stat(follow_symlinks=False)
+        if (
+            metadata.st_uid != os.getuid()
+            or stat.S_IMODE(metadata.st_mode) != 0o600
+            or metadata.st_size > 4096
+        ):
+            raise RuntimeError("running PostgreSQL owner record is not trusted")
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            raise RuntimeError("running PostgreSQL owner record is invalid") from error
+        if not isinstance(document, dict):
+            raise RuntimeError("running PostgreSQL owner record is invalid")
+        return document
+
+    def _postmaster_identity(self) -> tuple[int, int]:
+        path = self.data_directory / "postmaster.pid"
+        try:
+            metadata = path.stat(follow_symlinks=False)
+        except OSError as error:
+            raise RuntimeError("running PostgreSQL postmaster identity is invalid") from error
+        if (
+            path.is_symlink()
+            or not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_uid != os.getuid()
+            or metadata.st_size > 4096
+        ):
+            raise RuntimeError("running PostgreSQL postmaster identity is invalid")
+        lines = path.read_text(encoding="utf-8").splitlines()
+        try:
+            pid = int(lines[0])
+            data_directory = Path(lines[1]).resolve(strict=True)
+            started_at = int(lines[2])
+            port = int(lines[3])
+            socket_directory = Path(lines[4]).resolve(strict=True)
+        except (IndexError, OSError, ValueError) as error:
+            raise RuntimeError("running PostgreSQL postmaster identity is invalid") from error
+        if (
+            pid <= 1
+            or data_directory != self.data_directory.resolve(strict=True)
+            or port != 5432
+            or socket_directory != self.socket_directory.resolve(strict=True)
+        ):
+            raise RuntimeError("running PostgreSQL postmaster identity does not match")
+        return pid, started_at
+
+    def _recover_owned_orphan(self) -> None:
+        owner = self._read_owner()
+        pid, started_at = self._postmaster_identity()
+        expected = self._owner_base()
+        if any(owner.get(key) != value for key, value in expected.items()):
+            raise RuntimeError("running PostgreSQL belongs to another runtime")
+        state = owner.get("state")
+        if state not in {"starting", "running"}:
+            raise RuntimeError("running PostgreSQL owner state is invalid")
+        if state == "running" and (
+            owner.get("postmaster_pid") != pid or owner.get("postmaster_started_at") != started_at
+        ):
+            raise RuntimeError("running PostgreSQL owner identity changed")
+        self._run(
+            [
+                str(self._executables["pg_ctl"]),
+                "--pgdata",
+                str(self.data_directory),
+                "--mode=fast",
+                "--wait",
+                "stop",
+            ]
+        )
+        if self._is_running():
+            raise RuntimeError("owned PostgreSQL orphan did not stop")
+        self.ownership_path.unlink(missing_ok=True)
+
     def _is_running(self) -> bool:
         if not (self.data_directory / "PG_VERSION").is_file():
             return False
@@ -126,51 +291,61 @@ class EmbeddedPostgres:
 
     def start(self) -> None:
         self._prepare_directories()
-        if not (self.data_directory / "PG_VERSION").is_file():
+        self._acquire_ownership_lock()
+        try:
+            if not (self.data_directory / "PG_VERSION").is_file():
+                self._run(
+                    [
+                        str(self._executables["initdb"]),
+                        f"--pgdata={self.data_directory}",
+                        "--username=atlas",
+                        "--auth-local=trust",
+                        "--auth-host=reject",
+                        "--encoding=UTF8",
+                        "--no-locale",
+                        "--data-checksums",
+                    ]
+                )
+            control = self._run(
+                [str(self._executables["pg_controldata"]), str(self.data_directory)]
+            )
+            checksum_lines = [
+                line.partition(":")[2].strip()
+                for line in control.stdout.splitlines()
+                if line.startswith("Data page checksum version:")
+            ]
+            if checksum_lines != ["1"]:
+                raise RuntimeError("PostgreSQL data checksums are not enabled")
+            if self._is_running():
+                self._recover_owned_orphan()
+            self._write_owner(state="starting")
+            options = " ".join(
+                (
+                    "-c listen_addresses=''",
+                    f"-c unix_socket_directories='{self.socket_directory}'",
+                    "-c unix_socket_permissions=0700",
+                )
+            )
             self._run(
                 [
-                    str(self._executables["initdb"]),
-                    f"--pgdata={self.data_directory}",
-                    "--username=atlas",
-                    "--auth-local=trust",
-                    "--auth-host=reject",
-                    "--encoding=UTF8",
-                    "--no-locale",
-                    "--data-checksums",
+                    str(self._executables["pg_ctl"]),
+                    "--pgdata",
+                    str(self.data_directory),
+                    "--log",
+                    str(self.postgres_root / "postgres.log"),
+                    "--options",
+                    options,
+                    "--wait",
+                    "start",
                 ]
             )
-        control = self._run([str(self._executables["pg_controldata"]), str(self.data_directory)])
-        checksum_lines = [
-            line.partition(":")[2].strip()
-            for line in control.stdout.splitlines()
-            if line.startswith("Data page checksum version:")
-        ]
-        if checksum_lines != ["1"]:
-            raise RuntimeError("PostgreSQL data checksums are not enabled")
-        if self._is_running():
-            raise RuntimeError("PostgreSQL cluster is already owned by another process")
-        options = " ".join(
-            (
-                "-c listen_addresses=''",
-                f"-c unix_socket_directories='{self.socket_directory}'",
-                "-c unix_socket_permissions=0700",
+            self._started_here = True
+            postmaster_pid, postmaster_started_at = self._postmaster_identity()
+            self._write_owner(
+                state="running",
+                postmaster_pid=postmaster_pid,
+                postmaster_started_at=postmaster_started_at,
             )
-        )
-        self._run(
-            [
-                str(self._executables["pg_ctl"]),
-                "--pgdata",
-                str(self.data_directory),
-                "--log",
-                str(self.postgres_root / "postgres.log"),
-                "--options",
-                options,
-                "--wait",
-                "start",
-            ]
-        )
-        self._started_here = True
-        try:
             database = self._run(
                 [
                     str(self._executables["psql"]),
@@ -199,23 +374,29 @@ class EmbeddedPostgres:
                 ]
             )
         except Exception:
-            self.stop()
+            if self._started_here:
+                self.stop()
+            else:
+                self._release_ownership_lock()
             raise
 
     def stop(self) -> None:
-        if not self._started_here:
-            return
-        self._run(
-            [
-                str(self._executables["pg_ctl"]),
-                "--pgdata",
-                str(self.data_directory),
-                "--mode=fast",
-                "--wait",
-                "stop",
-            ]
-        )
-        self._started_here = False
+        try:
+            if self._started_here:
+                self._run(
+                    [
+                        str(self._executables["pg_ctl"]),
+                        "--pgdata",
+                        str(self.data_directory),
+                        "--mode=fast",
+                        "--wait",
+                        "stop",
+                    ]
+                )
+                self._started_here = False
+                self.ownership_path.unlink(missing_ok=True)
+        finally:
+            self._release_ownership_lock()
 
 
 __all__ = ["EmbeddedPostgres"]
