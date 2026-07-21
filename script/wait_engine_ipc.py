@@ -67,14 +67,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     paths = RuntimePaths.from_environment()
     cfg = resolve_ipc_bind(data_root=paths.data_root)
-    token = load_ipc_token(cfg.token_path)
-    if args.require_auth and not token:
-        print("ipc token missing", file=sys.stderr)
-        return 2
-    headers = {"Authorization": f"Bearer {token}"} if token else {}
     deadline = time.monotonic() + args.timeout_seconds
     last_error = "not attempted"
     while time.monotonic() < deadline:
+        token = load_ipc_token(cfg.token_path)
+        if args.require_auth and not token:
+            last_error = "ipc token missing"
+            time.sleep(0.1)
+            continue
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
         try:
             if cfg.mode is IpcTransportMode.UNIX_DOMAIN:
                 assert cfg.uds_path is not None
@@ -102,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
             last_error = str(exc)
         time.sleep(0.1)
     print(f"ipc_not_ready: {last_error}", file=sys.stderr)
-    return 1
+    return 2 if args.require_auth and last_error == "ipc token missing" else 1
 
 
 if __name__ == "__main__":

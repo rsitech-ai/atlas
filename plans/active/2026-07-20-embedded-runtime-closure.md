@@ -99,6 +99,7 @@
 - 2026-07-21: The first full regression exposed a pre-existing collector API classification defect: a missing default PostgreSQL socket raised `ValueError` and was reported as invalid client input (422) instead of service unavailable (503). Narrowed the client-error boundary and added missing-fixture coverage; focused reproduction now passes.
 - 2026-07-21: Full regression passed at code commit `641f12912700`: 1308 Python tests passed, one optional ONNX test skipped, 55 Swift tests passed, Swift product build passed, and lock/Ruff/format/strict-mypy/parser-governance gates passed.
 - 2026-07-21: Final workflow inspection found `package_release.sh` still assembled the obsolete shell-only app. It now builds the pinned runtime payload and passes it explicitly into atomic app assembly before the fail-closed signing/notarization gate; the script contract locks this order and argument.
+- 2026-07-21: End-to-end packaging at `0ca11b8f744f` rebuilt a clean exact-SHA payload and app, verified live closure, and stopped only at unsigned/signing-identity/notarization blockers. The actual app then reached authenticated UDS readiness with pgvector 0.8.5 and all 12 migrations, and normal app quit removed the postmaster PID/process. The readiness helper now polls token creation instead of racing app startup.
 - 2026-07-21: Next: exact-head full regression, final independent review, PR/merge, then stop at the owner notary-credential gate rather than publishing an unnotarized download.
 
 ## Rollback / Recovery
